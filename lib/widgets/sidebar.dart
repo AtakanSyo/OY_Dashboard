@@ -49,6 +49,7 @@ class Sidebar extends StatelessWidget {
         return const [
           _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.groups, "Hastalar"),
+          _SidebarMenuItem(Icons.fact_check, "Ölçüm Oturumları"),
           _SidebarMenuItem(Icons.analytics, "Ayak Analizi"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
@@ -67,6 +68,7 @@ class Sidebar extends StatelessWidget {
         return const [
           _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.groups, "Hastalar"),
+          _SidebarMenuItem(Icons.fact_check, "Ölçüm Oturumları"),
           _SidebarMenuItem(Icons.analytics, "Ayak Analizi"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.storefront, "Mağaza"),

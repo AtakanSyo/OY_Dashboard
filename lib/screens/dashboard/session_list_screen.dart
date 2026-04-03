@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_order_repository.dart';
+import 'package:oy_site/data/mock/mock_measurement_session_repository.dart';
 import 'package:oy_site/models/app_user.dart';
-import 'package:oy_site/models/order_model.dart';
+import 'package:oy_site/models/measurement_session.dart';
 
-class OrdersScreen extends StatefulWidget {
+class SessionListScreen extends StatefulWidget {
   final AppUser currentUser;
 
-  const OrdersScreen({
+  const SessionListScreen({
     super.key,
     required this.currentUser,
   });
 
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  State<SessionListScreen> createState() => _SessionListScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
-  final MockOrderRepository _orderRepository = MockOrderRepository();
+class _SessionListScreenState extends State<SessionListScreen> {
+  final MockMeasurementSessionRepository _sessionRepository =
+      MockMeasurementSessionRepository();
   final TextEditingController _searchController = TextEditingController();
 
-  List<OrderModel> _allOrders = [];
-  List<OrderModel> _filteredOrders = [];
+  List<MeasurementSession> _allSessions = [];
+  List<MeasurementSession> _filteredSessions = [];
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -28,7 +29,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    _loadSessions();
   }
 
   @override
@@ -37,109 +38,82 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.dispose();
   }
 
-  Future<void> _loadOrders() async {
+  Future<void> _loadSessions() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final orders = await _orderRepository.getOrders();
+      final sessions = await _sessionRepository.getSessions();
 
       if (!mounted) return;
 
       setState(() {
-        _allOrders = orders;
-        _filteredOrders = orders;
+        _allSessions = sessions;
+        _filteredSessions = sessions;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Siparişler yüklenirken hata oluştu: $e';
+        _errorMessage = 'Oturumlar yüklenirken hata oluştu: $e';
         _isLoading = false;
       });
     }
   }
 
-  void _filterOrders(String query) {
+  void _filterSessions(String query) {
     final q = query.trim().toLowerCase();
 
     setState(() {
       if (q.isEmpty) {
-        _filteredOrders = _allOrders;
+        _filteredSessions = _allSessions;
         return;
       }
 
-      _filteredOrders = _allOrders.where((order) {
-        return order.orderNo.toLowerCase().contains(q) ||
-            order.productType.toLowerCase().contains(q) ||
-            order.orderStatus.toLowerCase().contains(q) ||
-            order.currencyCode.toLowerCase().contains(q);
+      _filteredSessions = _allSessions.where((session) {
+        return session.sessionCode.toLowerCase().contains(q) ||
+            session.status.toLowerCase().contains(q) ||
+            (session.sessionTime ?? '').toLowerCase().contains(q);
       }).toList();
     });
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return '—';
+  String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}.'
         '${date.month.toString().padLeft(2, '0')}.'
         '${date.year}';
   }
 
-  String _formatMoney(double amount, String currencyCode) {
-    return '${amount.toStringAsFixed(2)} $currencyCode';
-  }
-
-  String _productLabel(String productType) {
-    switch (productType) {
-      case 'insole':
-        return 'Tabanlık';
-      case 'sports_insole':
-        return 'Spor Tabanlık';
-      case 'sandal':
-        return 'Sandalet';
+  Color _statusColor(String status) {
+    switch (status) {
+      case SessionStatuses.completed:
+        return Colors.green;
+      case SessionStatuses.inProgress:
+        return Colors.orange;
+      case SessionStatuses.draft:
+        return Colors.blueGrey;
+      case SessionStatuses.cancelled:
+        return Colors.red;
       default:
-        return productType;
+        return Colors.grey;
     }
   }
 
   String _statusLabel(String status) {
     switch (status) {
-      case OrderStatuses.pending:
-        return 'Beklemede';
-      case OrderStatuses.designing:
-        return 'Tasarımda';
-      case OrderStatuses.production:
-        return 'Üretimde';
-      case OrderStatuses.shipped:
-        return 'Kargoda';
-      case OrderStatuses.delivered:
-        return 'Teslim Edildi';
-      case OrderStatuses.cancelled:
+      case SessionStatuses.completed:
+        return 'Tamamlandı';
+      case SessionStatuses.inProgress:
+        return 'Devam Ediyor';
+      case SessionStatuses.draft:
+        return 'Taslak';
+      case SessionStatuses.cancelled:
         return 'İptal';
       default:
         return status;
-    }
-  }
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case OrderStatuses.pending:
-        return Colors.orange;
-      case OrderStatuses.designing:
-        return Colors.deepPurple;
-      case OrderStatuses.production:
-        return Colors.blue;
-      case OrderStatuses.shipped:
-        return Colors.teal;
-      case OrderStatuses.delivered:
-        return Colors.green;
-      case OrderStatuses.cancelled:
-        return Colors.red;
-      default:
-        return Colors.grey;
     }
   }
 
@@ -147,9 +121,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.currentUser.isCustomer ? 'Siparişlerim' : 'Siparişler',
-        ),
+        title: const Text('Ölçüm Oturumları'),
         backgroundColor: Colors.teal,
       ),
       body: Padding(
@@ -158,17 +130,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.currentUser.isCustomer
-                  ? 'Sipariş geçmişinizi buradan takip edebilirsiniz.'
-                  : 'Sipariş akışını ve üretim durumlarını buradan takip edebilirsin.',
+              'Ölçüm sürecini buradan yönetebilirsin',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Taslak, devam eden ve tamamlanan oturumlar bu ekranda listelenir.',
               style: TextStyle(color: Colors.grey[700]),
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _searchController,
-              onChanged: _filterOrders,
+              onChanged: _filterSessions,
               decoration: InputDecoration(
-                hintText: 'Sipariş no, ürün tipi veya durum ile ara',
+                hintText: 'Oturum kodu, durum veya saat ile ara',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -180,6 +157,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: _buildContent(),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Yeni ölçüm oturumu oluşturma ekranını sonra ekleyeceğiz.'),
+            ),
+          );
+        },
+        backgroundColor: Colors.teal,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          'Yeni Oturum',
+          style: TextStyle(color: Colors.white),
         ),
       ),
     );
@@ -199,22 +191,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
     }
 
-    if (_filteredOrders.isEmpty) {
-      return Center(
-        child: Text(
-          widget.currentUser.isCustomer
-              ? 'Size ait sipariş bulunamadı.'
-              : 'Kayıtlı sipariş bulunamadı.',
-        ),
+    if (_filteredSessions.isEmpty) {
+      return const Center(
+        child: Text('Kayıtlı ölçüm oturumu bulunamadı.'),
       );
     }
 
     return ListView.separated(
-      itemCount: _filteredOrders.length,
+      itemCount: _filteredSessions.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final order = _filteredOrders[index];
-        final statusColor = _statusColor(order.orderStatus);
+        final session = _filteredSessions[index];
+        final statusColor = _statusColor(session.status);
 
         return Container(
           padding: const EdgeInsets.all(18),
@@ -235,7 +223,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 radius: 26,
                 backgroundColor: statusColor.withOpacity(0.12),
                 child: Icon(
-                  Icons.shopping_bag,
+                  Icons.assignment,
                   color: statusColor,
                 ),
               ),
@@ -250,7 +238,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          order.orderNo,
+                          session.sessionCode,
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
@@ -266,7 +254,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            _statusLabel(order.orderStatus),
+                            _statusLabel(session.status),
                             style: TextStyle(
                               color: statusColor,
                               fontWeight: FontWeight.w600,
@@ -278,32 +266,36 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Ürün: ${_productLabel(order.productType)}',
-                      style: TextStyle(color: Colors.grey[800]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Net Tutar: ${_formatMoney(order.netAmount, order.currencyCode)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      'Tarih: ${_formatDate(session.sessionDate)}'
+                      '${session.sessionTime != null ? ' • Saat: ${session.sessionTime}' : ''}',
+                      style: TextStyle(color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
-                      spacing: 12,
+                      spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _buildInfoChip(
-                          Icons.calendar_today,
-                          'Sipariş: ${_formatDate(order.orderedAt)}',
+                        _buildTag(
+                          session.has3dScan ? '3D Scan Var' : '3D Scan Yok',
+                          session.has3dScan,
                         ),
-                        _buildInfoChip(
-                          Icons.local_shipping_outlined,
-                          'Kargo: ${_formatDate(order.shippedAt)}',
+                        _buildTag(
+                          session.hasPlantarCsv
+                              ? 'Plantar Veri Var'
+                              : 'Plantar Veri Yok',
+                          session.hasPlantarCsv,
                         ),
-                        _buildInfoChip(
-                          Icons.home_outlined,
-                          'Teslim: ${_formatDate(order.deliveredAt)}',
+                        _buildTag(
+                          session.hasInsolePhoto
+                              ? 'Fotoğraf Var'
+                              : 'Fotoğraf Yok',
+                          session.hasInsolePhoto,
+                        ),
+                        _buildTag(
+                          session.orderCreated
+                              ? 'Sipariş Oluşturuldu'
+                              : 'Sipariş Yok',
+                          session.orderCreated,
                         ),
                       ],
                     ),
@@ -316,7 +308,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        '${order.orderNo} detay ekranını sonra bağlayacağız.',
+                        '${session.sessionCode} detay ekranını sonra bağlayacağız.',
                       ),
                     ),
                   );
@@ -330,23 +322,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text) {
+  Widget _buildTag(String text, bool active) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(10),
+        color: active ? Colors.green.withOpacity(0.12) : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.teal),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 13),
-          ),
-        ],
+      child: Text(
+        text,
+        style: TextStyle(
+          color: active ? Colors.green.shade700 : Colors.grey.shade700,
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
       ),
     );
   }

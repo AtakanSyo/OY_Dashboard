@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/dashboard/patient_list_screen.dart';
+import 'package:oy_site/screens/dashboard/session_list_screen.dart';
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
 
@@ -34,9 +35,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return [
           ProfileScreen(currentUser: widget.currentUser),
           PatientListScreen(currentUser: widget.currentUser),
-          AnalysisScreen(currentUserEmail: widget.currentUser.email),
-          OrdersScreen(currentUserEmail: widget.currentUser.email),
-          SupportScreen(currentUserEmail: widget.currentUser.email),
+          SessionListScreen(currentUser: widget.currentUser),
+          AnalysisScreen(currentUser: widget.currentUser),
+          OrdersScreen(currentUser: widget.currentUser),
+          SupportScreen(currentUser: widget.currentUser),
           PressureScreen(
             pressureRepository: widget.pressureRepository,
           ),
@@ -45,19 +47,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case RoleCodes.customer:
         return [
           ProfileScreen(currentUser: widget.currentUser),
-          OrdersScreen(currentUserEmail: widget.currentUser.email),
+          OrdersScreen(currentUser: widget.currentUser),
           StoreScreen(currentUserEmail: widget.currentUser.email),
-          SupportScreen(currentUserEmail: widget.currentUser.email),
+          SupportScreen(currentUser: widget.currentUser),
         ];
 
       case RoleCodes.optiYouTeam:
         return [
           ProfileScreen(currentUser: widget.currentUser),
           PatientListScreen(currentUser: widget.currentUser),
-          AnalysisScreen(currentUserEmail: widget.currentUser.email),
-          OrdersScreen(currentUserEmail: widget.currentUser.email),
+          SessionListScreen(currentUser: widget.currentUser),
+          AnalysisScreen(currentUser: widget.currentUser),
+          OrdersScreen(currentUser: widget.currentUser),
           StoreScreen(currentUserEmail: widget.currentUser.email),
-          SupportScreen(currentUserEmail: widget.currentUser.email),
+          SupportScreen(currentUser: widget.currentUser),
           PressureScreen(
             pressureRepository: widget.pressureRepository,
           ),
@@ -66,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       default:
         return [
           ProfileScreen(currentUser: widget.currentUser),
-          SupportScreen(currentUserEmail: widget.currentUser.email),
+          SupportScreen(currentUser: widget.currentUser),
         ];
     }
   }
