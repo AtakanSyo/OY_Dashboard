@@ -3,6 +3,7 @@ import 'package:oy_site/data/mock/mock_measurement_session_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/patient.dart';
+import 'package:oy_site/screens/dashboard/create_session_screen.dart';
 import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
 
 class PatientDetailScreen extends StatefulWidget {
@@ -115,6 +116,41 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     }
   }
 
+Future<void> _openCreateSessionScreen() async {
+  final newSession = await Navigator.push<MeasurementSession>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CreateSessionScreen(
+        currentUser: widget.currentUser,
+        patients: [widget.patient],
+        initialPatient: widget.patient,
+      ),
+    ),
+  );
+
+  if (newSession != null && mounted) {
+    setState(() {
+      _sessions = [newSession, ..._sessions];
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${newSession.sessionCode} oluşturuldu.'),
+      ),
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SessionDetailScreen(
+          currentUser: widget.currentUser,
+          session: newSession,
+        ),
+      ),
+    );
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     final patient = widget.patient;
@@ -134,7 +170,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               children: [
                 _buildHeader(patient),
                 const SizedBox(height: 24),
-
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -224,13 +259,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             runSpacing: 10,
             children: [
               ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Yeni ölçüm oturumu oluşturma akışını sonra bağlayacağız.'),
-                    ),
-                  );
-                },
+                onPressed: _openCreateSessionScreen,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
                   padding: const EdgeInsets.symmetric(

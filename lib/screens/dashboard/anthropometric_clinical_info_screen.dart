@@ -168,6 +168,8 @@ class _AnthropometricClinicalInfoScreenState
         content: Text('Antropometrik / klinik bilgiler kaydedildi.'),
       ),
     );
+
+    Navigator.pop(context, true);
   }
 
   String _sessionSubtitle() {

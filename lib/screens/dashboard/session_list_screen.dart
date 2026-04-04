@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/data/mock/mock_measurement_session_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
+import 'package:oy_site/models/patient.dart';
+import 'package:oy_site/screens/dashboard/create_session_screen.dart';
+import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
 
 class SessionListScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -25,6 +28,40 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
+
+  final List<Patient> _mockPatients = const [
+    Patient(
+      patientId: 1,
+      clinicId: 101,
+      createdByUserId: 1,
+      patientCode: 'PT-0001',
+      firstName: 'Ayşe',
+      lastName: 'Demir',
+      email: 'ayse.demir@example.com',
+      gender: 'female',
+      phone: '+90 555 111 11 11',
+    ),
+    Patient(
+      patientId: 2,
+      clinicId: 101,
+      createdByUserId: 1,
+      patientCode: 'PT-0002',
+      firstName: 'Mehmet',
+      lastName: 'Kaya',
+      email: 'mehmet.kaya@example.com',
+      gender: 'male',
+      phone: '+90 555 222 22 22',
+    ),
+    Patient(
+      patientId: 3,
+      clinicId: 101,
+      createdByUserId: 1,
+      patientCode: 'PT-0003',
+      firstName: 'Elif',
+      lastName: 'Yıldız',
+      gender: 'female',
+    ),
+  ];
 
   @override
   void initState() {
@@ -75,7 +112,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
       _filteredSessions = _allSessions.where((session) {
         return session.sessionCode.toLowerCase().contains(q) ||
-            session.status.toLowerCase().contains(q) ||
+            session.effectiveStatus.toLowerCase().contains(q) ||
             (session.sessionTime ?? '').toLowerCase().contains(q);
       }).toList();
     });
@@ -116,6 +153,41 @@ class _SessionListScreenState extends State<SessionListScreen> {
         return status;
     }
   }
+
+Future<void> _openCreateSessionScreen() async {
+  final newSession = await Navigator.push<MeasurementSession>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CreateSessionScreen(
+        currentUser: widget.currentUser,
+        patients: _mockPatients,
+      ),
+    ),
+  );
+
+  if (newSession != null && mounted) {
+    setState(() {
+      _allSessions = [newSession, ..._allSessions];
+      _filteredSessions = [newSession, ..._filteredSessions];
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${newSession.sessionCode} oluşturuldu.'),
+      ),
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SessionDetailScreen(
+          currentUser: widget.currentUser,
+          session: newSession,
+        ),
+      ),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -160,13 +232,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yeni ölçüm oturumu oluşturma ekranını sonra ekleyeceğiz.'),
-            ),
-          );
-        },
+        onPressed: _openCreateSessionScreen,
         backgroundColor: Colors.teal,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
@@ -202,7 +268,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final session = _filteredSessions[index];
-        final statusColor = _statusColor(session.status);
+        final statusColor = _statusColor(session.effectiveStatus);
 
         return Container(
           padding: const EdgeInsets.all(18),
@@ -254,7 +320,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            _statusLabel(session.status),
+                            _statusLabel(session.effectiveStatus),
                             style: TextStyle(
                               color: statusColor,
                               fontWeight: FontWeight.w600,
@@ -305,10 +371,12 @@ class _SessionListScreenState extends State<SessionListScreen> {
               const SizedBox(width: 12),
               IconButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${session.sessionCode} detay ekranını sonra bağlayacağız.',
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SessionDetailScreen(
+                        currentUser: widget.currentUser,
+                        session: session,
                       ),
                     ),
                   );

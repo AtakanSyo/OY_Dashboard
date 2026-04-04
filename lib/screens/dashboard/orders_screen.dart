@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/data/mock/mock_order_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/order_model.dart';
+import 'package:oy_site/screens/dashboard/order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -313,10 +314,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
               const SizedBox(width: 12),
               IconButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${order.orderNo} detay ekranını sonra bağlayacağız.',
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OrderDetailScreen(
+                        currentUser: widget.currentUser,
+                        order: order,
                       ),
                     ),
                   );

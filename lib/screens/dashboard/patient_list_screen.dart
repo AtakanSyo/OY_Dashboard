@@ -3,6 +3,7 @@ import 'package:oy_site/data/mock/mock_patient_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient.dart';
 import 'package:oy_site/screens/dashboard/patient_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/patient_create_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -135,12 +136,28 @@ class _PatientListScreenState extends State<PatientListScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yeni hasta ekleme ekranını sonra bağlayacağız.'),
+        onPressed: () async {
+          final newPatient = await Navigator.push<Patient>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PatientCreateScreen(
+                currentUser: widget.currentUser,
+              ),
             ),
           );
+
+          if (newPatient != null && mounted) {
+            setState(() {
+              _allPatients = [newPatient, ..._allPatients];
+              _filteredPatients = [newPatient, ..._filteredPatients];
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${newPatient.fullName} hasta kaydı oluşturuldu.'),
+              ),
+            );
+          }
         },
         backgroundColor: Colors.teal,
         icon: const Icon(Icons.add, color: Colors.white),

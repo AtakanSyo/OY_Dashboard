@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
-                value: _selectedRoleCode,
+                initialValue: _selectedRoleCode,
                 decoration: InputDecoration(
                   labelText: 'Kullanıcı Rolü',
                   border: OutlineInputBorder(

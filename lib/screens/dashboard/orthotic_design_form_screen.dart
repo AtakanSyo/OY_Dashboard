@@ -125,6 +125,8 @@ class _OrthoticDesignFormScreenState
         content: Text('Tasarım formu kaydedildi.'),
       ),
     );
+
+    Navigator.pop(context, true);
   }
 
   String _formatSessionTitle() {

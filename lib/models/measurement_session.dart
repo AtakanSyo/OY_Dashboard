@@ -15,6 +15,10 @@ class MeasurementSession {
   final bool hasInsolePhoto;
   final bool orderCreated;
 
+  // UI workflow için geçici alanlar
+  final bool clinicalInfoCompleted;
+  final bool designFormCompleted;
+
   final DateTime? completedAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -33,15 +37,55 @@ class MeasurementSession {
     this.hasPlantarCsv = false,
     this.hasInsolePhoto = false,
     this.orderCreated = false,
+    this.clinicalInfoCompleted = false,
+    this.designFormCompleted = false,
     this.completedAt,
     this.createdAt,
     this.updatedAt,
   });
 
-  bool get isDraft => status == SessionStatuses.draft;
-  bool get isInProgress => status == SessionStatuses.inProgress;
-  bool get isCompleted => status == SessionStatuses.completed;
-  bool get isCancelled => status == SessionStatuses.cancelled;
+  bool get isDraft => effectiveStatus == SessionStatuses.draft;
+  bool get isInProgress => effectiveStatus == SessionStatuses.inProgress;
+  bool get isCompleted => effectiveStatus == SessionStatuses.completed;
+  bool get isCancelled => effectiveStatus == SessionStatuses.cancelled;
+
+  List<bool> get workflowSteps => [
+        clinicalInfoCompleted,
+        has3dScan,
+        hasPlantarCsv,
+        hasInsolePhoto,
+        designFormCompleted,
+        orderCreated,
+      ];
+
+  int get completedStepCount => workflowSteps.where((e) => e).length;
+  int get totalStepCount => workflowSteps.length;
+
+  bool get hasAnyStepCompleted => completedStepCount > 0;
+  bool get allStepsCompleted => completedStepCount == totalStepCount;
+
+  String get effectiveStatus {
+    if (status == SessionStatuses.cancelled) {
+      return SessionStatuses.cancelled;
+    }
+
+    if (!hasAnyStepCompleted) {
+      return SessionStatuses.draft;
+    }
+
+    if (allStepsCompleted) {
+      return SessionStatuses.completed;
+    }
+
+    return SessionStatuses.inProgress;
+  }
+
+  bool get canCreateOrder =>
+      clinicalInfoCompleted &&
+      has3dScan &&
+      hasPlantarCsv &&
+      hasInsolePhoto &&
+      designFormCompleted;
 
   MeasurementSession copyWith({
     int? sessionId,
@@ -57,6 +101,8 @@ class MeasurementSession {
     bool? hasPlantarCsv,
     bool? hasInsolePhoto,
     bool? orderCreated,
+    bool? clinicalInfoCompleted,
+    bool? designFormCompleted,
     DateTime? completedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -76,6 +122,9 @@ class MeasurementSession {
       hasPlantarCsv: hasPlantarCsv ?? this.hasPlantarCsv,
       hasInsolePhoto: hasInsolePhoto ?? this.hasInsolePhoto,
       orderCreated: orderCreated ?? this.orderCreated,
+      clinicalInfoCompleted:
+          clinicalInfoCompleted ?? this.clinicalInfoCompleted,
+      designFormCompleted: designFormCompleted ?? this.designFormCompleted,
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -97,6 +146,8 @@ class MeasurementSession {
       hasPlantarCsv: map['has_plantar_csv'] as bool? ?? false,
       hasInsolePhoto: map['has_insole_photo'] as bool? ?? false,
       orderCreated: map['order_created'] as bool? ?? false,
+      clinicalInfoCompleted: map['clinical_info_completed'] as bool? ?? false,
+      designFormCompleted: map['design_form_completed'] as bool? ?? false,
       completedAt: _parseDate(map['completed_at']),
       createdAt: _parseDate(map['created_at']),
       updatedAt: _parseDate(map['updated_at']),
@@ -118,6 +169,8 @@ class MeasurementSession {
       'has_plantar_csv': hasPlantarCsv,
       'has_insole_photo': hasInsolePhoto,
       'order_created': orderCreated,
+      'clinical_info_completed': clinicalInfoCompleted,
+      'design_form_completed': designFormCompleted,
       'completed_at': completedAt?.toIso8601String(),
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
