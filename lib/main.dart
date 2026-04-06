@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/core/supabase_config.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 
@@ -10,6 +12,11 @@ class AppConfig {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
 
   final pressureRepository = AppConfig.useMock
       ? "MOCK_REPOSITORY"

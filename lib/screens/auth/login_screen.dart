@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_users.dart';
-import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:oy_site/screens/dashboard/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,61 +17,23 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   String? _errorMessage;
   bool _isLoading = false;
-  String? _selectedRoleCode;
-
-  final List<Map<String, String>> _roles = const [
-    {
-      'role_code': RoleCodes.expert,
-      'role_name': 'Uzman',
-    },
-    {
-      'role_code': RoleCodes.customer,
-      'role_name': 'Müşteri',
-    },
-    {
-      'role_code': RoleCodes.optiYouTeam,
-      'role_name': 'OptiYou Ekibi',
-    },
-  ];
-
-  Future<AppUser?> _mockLogin({
-    required String email,
-    required String roleCode,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    if (email != 'testuser@example.com') {
-      return null;
-    }
-
-    if (!RoleCodes.values.contains(roleCode)) {
-      return null;
-    }
-
-    return MockUsers.buildTestUser(
-      email: email,
-      roleCode: roleCode,
-    );
-  }
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
-    final roleCode = _selectedRoleCode;
+    final password = _passwordController.text;
 
     if (email.isEmpty) {
-      setState(() {
-        _errorMessage = 'Lütfen e-posta girin.';
-      });
+      setState(() => _errorMessage = 'Lütfen e-posta girin.');
       return;
     }
-
-    if (roleCode == null || roleCode.isEmpty) {
-      setState(() {
-        _errorMessage = 'Lütfen bir kullanıcı rolü seçin.';
-      });
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'Lütfen şifrenizi girin.');
       return;
     }
 
@@ -80,18 +42,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final appUser = await _mockLogin(
-      email: email,
-      roleCode: roleCode,
-    );
+    try {
+      final appUser = await _authService.signIn(
+        email: email,
+        password: password,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (appUser != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -101,17 +59,36 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
-    } else {
-      setState(() {
-        _errorMessage =
-            'Geçersiz giriş. Test kullanıcı bilgileri veya rol seçimi hatalı.';
-      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = _localizeAuthError(e.message));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = 'Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _localizeAuthError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('invalid login') ||
+        lower.contains('invalid credentials')) {
+      return 'E-posta veya şifre hatalı.';
+    }
+    if (lower.contains('email not confirmed')) {
+      return 'E-posta adresiniz doğrulanmamış.';
+    }
+    if (lower.contains('too many requests')) {
+      return 'Çok fazla deneme yaptınız. Lütfen bekleyin.';
+    }
+    return message;
   }
 
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -132,51 +109,54 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 20),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedRoleCode,
+              const SizedBox(height: 24),
+              TextField(
+                controller: _emailController,
+                enabled: !_isLoading,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'Kullanıcı Rolü',
+                  labelText: 'E-posta',
+                  hintText: 'ornek@eposta.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                items: _roles.map((role) {
-                  return DropdownMenuItem<String>(
-                    value: role['role_code'],
-                    child: Text(role['role_name']!),
-                  );
-                }).toList(),
-                onChanged: _isLoading
-                    ? null
-                    : (value) {
-                        setState(() {
-                          _selectedRoleCode = value;
-                          _errorMessage = null;
-                        });
-                      },
+                onChanged: (_) {
+                  if (_errorMessage != null) {
+                    setState(() => _errorMessage = null);
+                  }
+                },
               ),
               const SizedBox(height: 16),
               TextField(
-                controller: _emailController,
+                controller: _passwordController,
                 enabled: !_isLoading,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'E-posta',
-                  hintText: 'testuser@example.com',
+                  labelText: 'Şifre',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   errorText: _errorMessage,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
                 ),
                 onChanged: (_) {
                   if (_errorMessage != null) {
-                    setState(() {
-                      _errorMessage = null;
-                    });
+                    setState(() => _errorMessage = null);
                   }
                 },
+                onSubmitted: (_) => _isLoading ? null : _login(),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
