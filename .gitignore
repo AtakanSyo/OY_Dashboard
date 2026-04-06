@@ -92,3 +92,4 @@ app.*.symbols
 # Obfuscation
 # ------------------------
 app.*.map.json
+.vercel

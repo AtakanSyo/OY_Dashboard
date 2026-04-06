@@ -1,7 +1,9 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:oy_site/services/file_bytes_helper.dart';
 
 class InsolePhotoUploadDialog extends StatefulWidget {
   const InsolePhotoUploadDialog({super.key});
@@ -12,44 +14,51 @@ class InsolePhotoUploadDialog extends StatefulWidget {
 }
 
 class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
-  String? _filePath;
+  Uint8List? _fileBytes;
+  String? _fileName;
   bool _isDragging = false;
   bool _isUploading = false;
 
+  bool get _hasFile => _fileBytes != null;
+
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
       allowMultiple: false,
+      withData: true,
     );
 
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _filePath = result.files.single.path!;
-      });
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    Uint8List? bytes = file.bytes;
+
+    // On desktop, bytes may be null — read from path.
+    if (bytes == null && file.path != null) {
+      bytes = await readBytesFromPath(file.path!);
     }
+
+    if (bytes == null) return;
+
+    setState(() {
+      _fileBytes = bytes;
+      _fileName = file.name;
+    });
   }
 
   Future<void> _upload() async {
-    if (_filePath == null) return;
+    if (_fileBytes == null) return;
 
-    setState(() {
-      _isUploading = true;
-    });
+    setState(() => _isUploading = true);
 
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (!mounted) return;
 
-    setState(() {
-      _isUploading = false;
-    });
+    setState(() => _isUploading = false);
 
     Navigator.pop(context, true);
-  }
-
-  String _fileNameFromPath(String path) {
-    return path.split(Platform.pathSeparator).last;
   }
 
   @override
@@ -101,121 +110,27 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
               const SizedBox(height: 18),
 
               Expanded(
-                child: DropTarget(
-                  onDragDone: (detail) {
-                    if (detail.files.isNotEmpty) {
-                      final dropped = detail.files.first.path;
-                      setState(() {
-                        _filePath = dropped;
-                      });
-                    }
-                  },
-                  onDragEntered: (_) {
-                    setState(() {
-                      _isDragging = true;
-                    });
-                  },
-                  onDragExited: (_) {
-                    setState(() {
-                      _isDragging = false;
-                    });
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: _isDragging
-                          ? Colors.teal.withOpacity(0.10)
-                          : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _isDragging ? Colors.teal : Colors.grey.shade300,
-                        width: 1.5,
+                child: kIsWeb
+                    ? _buildDropArea()
+                    : DropTarget(
+                        onDragDone: (detail) async {
+                          if (detail.files.isNotEmpty) {
+                            final f = detail.files.first;
+                            final bytes = await readBytesFromPath(f.path);
+                            if (bytes != null && mounted) {
+                              setState(() {
+                                _fileBytes = bytes;
+                                _fileName = f.name;
+                              });
+                            }
+                          }
+                        },
+                        onDragEntered: (_) =>
+                            setState(() => _isDragging = true),
+                        onDragExited: (_) =>
+                            setState(() => _isDragging = false),
+                        child: _buildDropArea(),
                       ),
-                    ),
-                    child: _filePath == null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.cloud_upload,
-                                    size: 56,
-                                    color: Colors.teal.shade600,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'Dosyayı buraya sürükleyip bırakın',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'veya aşağıdaki butonla seçin',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  ElevatedButton.icon(
-                                    onPressed: _pickFile,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.teal,
-                                    ),
-                                    icon: const Icon(Icons.folder_open, color: Colors.white),
-                                    label: const Text(
-                                      'Dosya Seç',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.image, color: Colors.teal),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _fileNameFromPath(_filePath!),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _filePath = null;
-                                        });
-                                      },
-                                      child: const Text('Temizle'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.file(
-                                      File(_filePath!),
-                                      width: double.infinity,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                  ),
-                ),
               ),
 
               const SizedBox(height: 18),
@@ -226,14 +141,12 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                   TextButton(
                     onPressed: _isUploading
                         ? null
-                        : () {
-                            Navigator.pop(context, false);
-                          },
+                        : () => Navigator.pop(context, false),
                     child: const Text('İptal'),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: (_filePath == null || _isUploading) ? null : _upload,
+                    onPressed: (!_hasFile || _isUploading) ? null : _upload,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                     ),
@@ -257,6 +170,93 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDropArea() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _isDragging
+            ? Colors.teal.withOpacity(0.10)
+            : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isDragging ? Colors.teal : Colors.grey.shade300,
+          width: 1.5,
+        ),
+      ),
+      child: !_hasFile
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_upload,
+                        size: 56, color: Colors.teal.shade600),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Dosyayı buraya sürükleyip bırakın',
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('veya aşağıdaki butonla seçin',
+                        style: TextStyle(color: Colors.grey[700])),
+                    const SizedBox(height: 18),
+                    ElevatedButton.icon(
+                      onPressed: _pickFile,
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal),
+                      icon: const Icon(Icons.folder_open,
+                          color: Colors.white),
+                      label: const Text('Dosya Seç',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.image, color: Colors.teal),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _fileName ?? '',
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _fileBytes = null;
+                          _fileName = null;
+                        }),
+                        child: const Text('Temizle'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        _fileBytes!,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

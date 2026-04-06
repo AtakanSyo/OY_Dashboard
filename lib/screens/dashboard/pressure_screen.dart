@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_libserialport/flutter_libserialport.dart';
+import 'package:oy_site/services/serial/serial_port_factory.dart';
 import 'dart:math';
 
 class PressureScreen extends StatefulWidget {
@@ -18,9 +18,9 @@ class PressureScreen extends StatefulWidget {
 }
 
 class _PressureScreenState extends State<PressureScreen> {
-  final List<String> _ports = SerialPort.availablePorts;
-  SerialPort? _port;
-  SerialPortReader? _reader;
+  late final SerialPortService _serialService;
+  List<String> _ports = [];
+  String? _connectedPort;
 
   String _status = "Disconnected";
   int _frameCount = 0;
@@ -43,44 +43,32 @@ class _PressureScreenState extends State<PressureScreen> {
   DateTime _lastSendTime = DateTime.now();
 
   @override
-  void dispose() {
-    _reader?.close();
-    _port?.close();
-    _emailControllerDisposeSafe();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _serialService = createSerialPortService();
+    _ports = _serialService.availablePorts;
   }
 
-  void _emailControllerDisposeSafe() {
-    // Şu an bu screen içinde controller yok.
-    // İleride eklenirse dispose düzeni bozulmasın diye boş bırakıldı.
+  @override
+  void dispose() {
+    _serialService.disconnect();
+    super.dispose();
   }
 
   void _connect(String portName) {
     try {
-      _reader?.close();
-      _port?.close();
-
-      _port = SerialPort(portName);
-      _port!.openReadWrite();
-
-      _port!.config = SerialPortConfig()
-        ..baudRate = 460800
-        ..bits = 8
-        ..stopBits = 1
-        ..parity = 0;
-
-      _reader = SerialPortReader(_port!);
-      _reader!.stream.listen((Uint8List data) {
+      _serialService.connect(portName, (Uint8List data) {
         _buffer.addAll(data);
         _processBuffer();
       });
 
       setState(() {
-        _status = "Connected to $portName";
+        _connectedPort = portName;
+        _status = 'Connected to $portName';
       });
     } catch (e) {
       setState(() {
-        _status = "Error: $e";
+        _status = 'Error: $e';
       });
     }
   }
@@ -266,7 +254,7 @@ class _PressureScreenState extends State<PressureScreen> {
                 children: [
                   const Text("Port: "),
                   DropdownButton<String>(
-                    value: _port?.name,
+                    value: _connectedPort,
                     hint: const Text("Select"),
                     items: _ports.map((port) {
                       return DropdownMenuItem(
