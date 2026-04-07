@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/data/mock/mock_order_production_steps_repository.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/models/order_production_step.dart';
@@ -28,12 +29,22 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   bool _isLoadingSteps = true;
   String? _errorMessage;
 
+  final Map<String, TextEditingController> _noteControllers = {};
+
   OrderModel get order => widget.operationItem.order;
 
   @override
   void initState() {
     super.initState();
     _loadSteps();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _noteControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _loadSteps() async {
@@ -47,15 +58,22 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
       if (!mounted) return;
 
+      steps.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+      for (final step in steps) {
+        _noteControllers[step.stepCode] =
+            TextEditingController(text: step.note ?? '');
+      }
+
       setState(() {
-        _steps = steps..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        _steps = steps;
         _isLoadingSteps = false;
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Üretim adımları yüklenirken hata oluştu: $e';
+        _errorMessage = 'Sipariş adımları yüklenirken hata oluştu: $e';
         _isLoadingSteps = false;
       });
     }
@@ -197,137 +215,308 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     );
   }
 
-  Widget _buildFlowStep({
-    required OrderProductionStep step,
-    required bool isLast,
-  }) {
-    final color = step.isCompleted ? Colors.green : Colors.orange;
+  IconData _iconForStep(String stepCode) {
+    switch (stepCode) {
+      case OptiYouOperationColumnCodes.infoMailSent:
+      case OptiYouOperationColumnCodes.postInfoMailSent:
+      case OptiYouOperationColumnCodes.satisfactionSurveySent:
+        return Icons.mail_outline;
+      case OptiYouOperationColumnCodes.kvkkShared:
+        return Icons.verified_user_outlined;
+      case OptiYouOperationColumnCodes.stlUploaded:
+        return Icons.upload_file;
+      case OptiYouOperationColumnCodes.technicalReview:
+        return Icons.rule_folder_outlined;
+      case OptiYouOperationColumnCodes.qualityControl:
+        return Icons.fact_check_outlined;
+      case OptiYouOperationColumnCodes.packaging:
+        return Icons.inventory_2_outlined;
+      case OptiYouOperationColumnCodes.shipped:
+        return Icons.local_shipping_outlined;
+      case OptiYouOperationColumnCodes.designCompleted:
+      case OptiYouOperationColumnCodes.designWaiting:
+        return Icons.design_services_outlined;
+      case OptiYouOperationColumnCodes.productionStarted:
+      case OptiYouOperationColumnCodes.productionCompleted:
+        return Icons.precision_manufacturing_outlined;
+      case OptiYouOperationColumnCodes.closed:
+        return Icons.check_circle_outline;
+      default:
+        return Icons.radio_button_checked;
+    }
+  }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 52,
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: color.withOpacity(0.4),
-                  ),
-                ),
-                child: Icon(
-                  step.isCompleted ? Icons.check : Icons.pending_actions,
-                  color: color,
-                  size: 20,
-                ),
-              ),
-              if (!isLast)
-                Container(
-                  width: 3,
-                  height: 120,
-                  margin: const EdgeInsets.only(top: 2, bottom: 2),
-                  decoration: BoxDecoration(
-                    color: step.isCompleted
-                        ? Colors.green.withOpacity(0.45)
-                        : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-            ],
+  bool _isMailStep(String stepCode) {
+    return stepCode == OptiYouOperationColumnCodes.infoMailSent ||
+        stepCode == OptiYouOperationColumnCodes.postInfoMailSent ||
+        stepCode == OptiYouOperationColumnCodes.satisfactionSurveySent;
+  }
+
+  bool _isFileStep(String stepCode) {
+    return stepCode == OptiYouOperationColumnCodes.stlUploaded;
+  }
+
+  bool _needsCheckbox(String stepCode) {
+    return !_isMailStep(stepCode) && !_isFileStep(stepCode);
+  }
+
+  bool _needsNoteField(String stepCode) {
+    return stepCode == OptiYouOperationColumnCodes.kvkkShared ||
+        stepCode == OptiYouOperationColumnCodes.technicalReview ||
+        stepCode == OptiYouOperationColumnCodes.qualityControl ||
+        stepCode == OptiYouOperationColumnCodes.packaging ||
+        stepCode == OptiYouOperationColumnCodes.shipped;
+  }
+
+  String _stepDisplayName(String stepCode, String fallbackName) {
+    switch (stepCode) {
+      case OptiYouOperationColumnCodes.orderReceived:
+        return 'Sipariş Alındı';
+      case OptiYouOperationColumnCodes.infoMailSent:
+        return 'Bilgi Maili Atıldı';
+      case OptiYouOperationColumnCodes.kvkkShared:
+        return 'KVKK Paylaşıldı';
+      case OptiYouOperationColumnCodes.technicalReview:
+        return 'Teknik Kontrol';
+      case OptiYouOperationColumnCodes.designWaiting:
+        return 'Tasarım Bekleniyor';
+      case OptiYouOperationColumnCodes.designCompleted:
+        return 'Tasarım Tamamlandı';
+      case OptiYouOperationColumnCodes.stlUploaded:
+        return 'STL Yüklendi';
+      case OptiYouOperationColumnCodes.productionStarted:
+        return 'Üretimde';
+      case OptiYouOperationColumnCodes.productionCompleted:
+        return 'Üretim Tamamlandı';
+      case OptiYouOperationColumnCodes.qualityControl:
+        return 'Kalite Kontrol';
+      case OptiYouOperationColumnCodes.packaging:
+        return 'Paketleme';
+      case OptiYouOperationColumnCodes.shipped:
+        return 'Kargoya Verildi';
+      case OptiYouOperationColumnCodes.postInfoMailSent:
+        return 'Sipariş Sonrası Mail';
+      case OptiYouOperationColumnCodes.satisfactionSurveySent:
+        return 'Memnuniyet Anketi';
+      case OptiYouOperationColumnCodes.closed:
+        return 'Kapandı';
+      default:
+        return fallbackName;
+    }
+  }
+
+  void _toggleStepCompleted(OrderProductionStep step, bool? value) {
+    final updatedValue = value ?? false;
+
+    setState(() {
+      final index = _steps.indexWhere((e) => e.stepId == step.stepId);
+      if (index == -1) return;
+
+      _steps[index] = _steps[index].copyWith(
+        isCompleted: updatedValue,
+        completedAt: updatedValue ? DateTime.now() : null,
+        completedByUserName:
+            updatedValue ? widget.currentUser.displayName : null,
+      );
+    });
+  }
+
+  void _showSimpleActionMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Widget _buildStepActionArea(OrderProductionStep step) {
+    final noteController = _noteControllers[step.stepCode];
+
+    if (_isMailStep(step.stepCode)) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () {
+              _showSimpleActionMessage(
+                '${_stepDisplayName(step.stepCode, step.stepName)} için trigger mail akışı daha sonra bağlanacak.',
+              );
+            },
+            icon: const Icon(Icons.send_outlined),
+            label: const Text('Trigger Mail'),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: step.isCompleted
-                      ? Colors.green.withOpacity(0.35)
-                      : Colors.grey.shade300,
-                ),
+          OutlinedButton.icon(
+            onPressed: () {
+              _showSimpleActionMessage(
+                '${_stepDisplayName(step.stepCode, step.stepName)} için mail taslağı editörü daha sonra bağlanacak.',
+              );
+            },
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Mail Taslağını Düzenle'),
+          ),
+        ],
+      );
+    }
+
+    if (_isFileStep(step.stepCode)) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () {
+              _showSimpleActionMessage(
+                'STL dosya yükleme akışı daha sonra bağlanacak.',
+              );
+            },
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Dosya Yükle'),
+          ),
+          if ((step.note ?? '').trim().isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          step.stepName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: step.isCompleted
-                              ? Colors.green.withOpacity(0.12)
-                              : Colors.orange.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          step.isCompleted ? 'Tamamlandı' : 'Bekliyor',
-                          style: TextStyle(
-                            color: step.isCompleted
-                                ? Colors.green.shade700
-                                : Colors.orange.shade700,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    step.stepDescription,
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildKeyValueRow(
-                    'Tamamlanma Tarihi',
-                    _formatDate(step.completedAt),
-                  ),
-                  _buildKeyValueRow(
-                    'Tamamlayan',
-                    step.completedByUserName ?? '—',
-                  ),
-                  if ((step.note ?? '').trim().isNotEmpty)
-                    _buildKeyValueRow(
-                      'Not',
-                      step.note!,
-                    ),
-                ],
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                step.note!,
+                style: TextStyle(color: Colors.grey[700]),
               ),
             ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_needsCheckbox(step.stepCode))
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: step.isCompleted,
+            onChanged: (value) => _toggleStepCompleted(step, value),
+            title: const Text('Tamamlandı olarak işaretle'),
+            controlAffinity: ListTileControlAffinity.leading,
           ),
-        ),
+        if (_needsNoteField(step.stepCode) && noteController != null) ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: noteController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Not',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              isDense: true,
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildFlowContent() {
+  Widget _buildStepRow(OrderProductionStep step) {
+    final isCompleted = step.isCompleted;
+    final stepTitle = _stepDisplayName(step.stepCode, step.stepName);
+    final color = isCompleted ? Colors.green : Colors.orange;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCompleted
+              ? Colors.green.withOpacity(0.25)
+              : Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(
+                  _iconForStep(step.stepCode),
+                  size: 18,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  stepTitle,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? Colors.green.withOpacity(0.12)
+                      : Colors.orange.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  isCompleted ? 'Tamamlandı' : 'Bekliyor',
+                  style: TextStyle(
+                    color: isCompleted
+                        ? Colors.green.shade700
+                        : Colors.orange.shade700,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildStepActionArea(step),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Zaman: ${_formatDate(step.completedAt)}',
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'İşleyen: ${step.completedByUserName ?? '—'}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepsContent() {
     if (_isLoadingSteps) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorMessage != null) {
@@ -341,42 +530,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
     if (_steps.isEmpty) {
       return const Center(
-        child: Text('Bu sipariş için üretim adımı bulunamadı.'),
+        child: Text('Bu sipariş için adım bulunamadı.'),
       );
     }
 
-    final completedCount = _steps.where((e) => e.isCompleted).length;
-    final progress = _steps.isEmpty ? 0.0 : completedCount / _steps.length;
-
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Tamamlanma Oranı: ${(progress * 100).toStringAsFixed(0)}%',
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 10,
-            backgroundColor: Colors.grey.shade300,
-            color: Colors.teal,
-          ),
-        ),
-        const SizedBox(height: 22),
-        ...List.generate(_steps.length, (index) {
-          final step = _steps[index];
-          final isLast = index == _steps.length - 1;
-          return _buildFlowStep(
-            step: step,
-            isLast: isLast,
-          );
-        }),
-      ],
+      children: _steps.map(_buildStepRow).toList(),
     );
   }
 
@@ -394,7 +553,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
+            constraints: const BoxConstraints(maxWidth: 1150),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -492,7 +651,6 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -551,15 +709,24 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                                 const SizedBox(height: 8),
                                 _buildKeyValueRow(
                                   'Brüt Tutar',
-                                  _formatMoney(order.grossAmount, order.currencyCode),
+                                  _formatMoney(
+                                    order.grossAmount,
+                                    order.currencyCode,
+                                  ),
                                 ),
                                 _buildKeyValueRow(
                                   'İndirim',
-                                  _formatMoney(order.discountAmount, order.currencyCode),
+                                  _formatMoney(
+                                    order.discountAmount,
+                                    order.currencyCode,
+                                  ),
                                 ),
                                 _buildKeyValueRow(
                                   'Net Tutar',
-                                  _formatMoney(order.netAmount, order.currencyCode),
+                                  _formatMoney(
+                                    order.netAmount,
+                                    order.currencyCode,
+                                  ),
                                 ),
                               ],
                             ),
@@ -570,92 +737,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                     const SizedBox(width: 24),
                     Expanded(
                       flex: 3,
-                      child: Column(
-                        children: [
-                          _buildSectionCard(
-                            title: 'Üretim / Operasyon Akışı',
-                            child: _buildFlowContent(),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSectionCard(
-                            title: 'Operasyon Notları / ERP Özeti',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (widget.operationItem.hasMissingData)
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.10),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.orange.withOpacity(0.25),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Colors.orange,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            'Eksik veri uyarısı: ${widget.operationItem.missingDataSummary}',
-                                            style: TextStyle(
-                                              color: Colors.orange.shade800,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                else
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.10),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.green.withOpacity(0.25),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle_outline,
-                                          color: Colors.green,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            'Temel üretim verileri eksiksiz görünüyor.',
-                                            style: TextStyle(
-                                              color: Colors.green.shade800,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Bu alan ileride iç ekip notları, hedef teslim tarihi, kalite kontrol bilgileri '
-                                  've operasyonel ERP verileri için genişletilecek.',
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      child: _buildSectionCard(
+                        title: 'Operasyon Adımları',
+                        child: _buildStepsContent(),
                       ),
                     ),
                   ],

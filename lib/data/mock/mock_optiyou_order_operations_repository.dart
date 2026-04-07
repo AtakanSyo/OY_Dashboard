@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 
@@ -30,6 +31,7 @@ class MockOptiYouOrderOperationsRepository {
         hasMissingData: true,
         missingDataSummary: '3D scan eksik',
         priorityLabel: 'Yüksek',
+        currentColumnCode: OptiYouOperationColumnCodes.technicalReview,
       ),
       OptiYouOrderOperationItem(
         order: OrderModel(
@@ -53,6 +55,7 @@ class MockOptiYouOrderOperationsRepository {
         hasMissingData: false,
         missingDataSummary: '',
         priorityLabel: 'Orta',
+        currentColumnCode: OptiYouOperationColumnCodes.productionStarted,
       ),
       OptiYouOrderOperationItem(
         order: OrderModel(
@@ -77,6 +80,7 @@ class MockOptiYouOrderOperationsRepository {
         hasMissingData: false,
         missingDataSummary: '',
         priorityLabel: 'Düşük',
+        currentColumnCode: OptiYouOperationColumnCodes.postInfoMailSent,
       ),
       OptiYouOrderOperationItem(
         order: OrderModel(
@@ -102,6 +106,7 @@ class MockOptiYouOrderOperationsRepository {
         hasMissingData: false,
         missingDataSummary: '',
         priorityLabel: 'Orta',
+        currentColumnCode: OptiYouOperationColumnCodes.closed,
       ),
     ];
   }

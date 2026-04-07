@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
-import 'package:oy_site/screens/dashboard/optiyou_order_list_screen.dart';
 import 'package:oy_site/screens/dashboard/patient_list_screen.dart';
 import 'package:oy_site/screens/dashboard/session_list_screen.dart';
+import 'package:oy_site/screens/dashboard/optiyou_operations_board_screen.dart';
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
 
@@ -56,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case RoleCodes.optiYouTeam:
         return [
           ProfileScreen(currentUser: widget.currentUser),
-          OptiYouOrderListScreen(currentUser: widget.currentUser),
+          OptiYouOperationsBoardScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
           SupportScreen(currentUser: widget.currentUser),
         ];
