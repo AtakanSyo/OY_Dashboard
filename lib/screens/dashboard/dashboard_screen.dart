@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/screens/dashboard/customer_analysis_results_screen.dart';
 import 'package:oy_site/screens/dashboard/patient_list_screen.dart';
 import 'package:oy_site/screens/dashboard/session_list_screen.dart';
 import 'package:oy_site/screens/dashboard/optiyou_operations_board_screen.dart';
 import 'package:oy_site/screens/dashboard/sales_statistics_screen.dart';
+import 'package:oy_site/screens/dashboard/customer_home_screen.dart';
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
 
@@ -48,7 +50,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       case RoleCodes.customer:
         return [
+          CustomerHomeScreen(currentUser: widget.currentUser),
           ProfileScreen(currentUser: widget.currentUser),
+          CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
           StoreScreen(currentUserEmail: widget.currentUser.email),
           SupportScreen(currentUser: widget.currentUser),

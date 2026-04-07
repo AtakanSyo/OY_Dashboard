@@ -58,7 +58,9 @@ class Sidebar extends StatelessWidget {
 
       case RoleCodes.customer:
         return const [
+          _SidebarMenuItem(Icons.home, "Ana Sayfa"),
           _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.insights_outlined, "Analiz Sonuçlarım"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.storefront, "Mağaza"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
