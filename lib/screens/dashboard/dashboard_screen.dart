@@ -35,42 +35,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Widget> get _pages {
     switch (widget.currentUser.roleCode) {
+
+      // 👨‍⚕️ EXPERT
       case RoleCodes.expert:
         return [
-          ProfileScreen(currentUser: widget.currentUser),
-          PatientListScreen(currentUser: widget.currentUser),
-          SessionListScreen(currentUser: widget.currentUser),
-          AnalysisScreen(currentUser: widget.currentUser),
-          OrdersScreen(currentUser: widget.currentUser),
-          SupportScreen(currentUser: widget.currentUser),
-          PressureScreen(
+          PatientListScreen(currentUser: widget.currentUser),        // 0
+          SessionListScreen(currentUser: widget.currentUser),        // 1
+          AnalysisScreen(currentUser: widget.currentUser),           // 2
+          OrdersScreen(currentUser: widget.currentUser),             // 3
+          SupportScreen(currentUser: widget.currentUser),            // 4
+          PressureScreen(                                            // 5
             pressureRepository: widget.pressureRepository,
           ),
+          ProfileScreen(currentUser: widget.currentUser),            // 6
         ];
 
+      // 👤 CUSTOMER
       case RoleCodes.customer:
         return [
-          CustomerHomeScreen(currentUser: widget.currentUser),
-          ProfileScreen(currentUser: widget.currentUser),
-          CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
-          OrdersScreen(currentUser: widget.currentUser),
-          StoreScreen(currentUserEmail: widget.currentUser.email),
-          SupportScreen(currentUser: widget.currentUser),
+          CustomerHomeScreen(currentUser: widget.currentUser),       // 0
+          CustomerAnalysisResultsScreen(currentUser: widget.currentUser), // 1
+          OrdersScreen(currentUser: widget.currentUser),             // 2
+          StoreScreen(currentUserEmail: widget.currentUser.email),   // 3
+          SupportScreen(currentUser: widget.currentUser),            // 4
+          ProfileScreen(currentUser: widget.currentUser),            // 5
         ];
 
+      // 🏭 OPTIYOU TEAM
       case RoleCodes.optiYouTeam:
         return [
-          ProfileScreen(currentUser: widget.currentUser),
-          const SalesStatisticsScreen(),
-          OptiYouOperationsBoardScreen(currentUser: widget.currentUser),
-          OrdersScreen(currentUser: widget.currentUser),
-          SupportScreen(currentUser: widget.currentUser),
+          const SalesStatisticsScreen(),                             // 0
+          OptiYouOperationsBoardScreen(currentUser: widget.currentUser), // 1
+          OrdersScreen(currentUser: widget.currentUser),             // 2
+          SupportScreen(currentUser: widget.currentUser),            // 3
+          ProfileScreen(currentUser: widget.currentUser),            // 4
         ];
 
+      // 🔹 DEFAULT
       default:
         return [
-          ProfileScreen(currentUser: widget.currentUser),
-          SupportScreen(currentUser: widget.currentUser),
+          SupportScreen(currentUser: widget.currentUser),            // 0
+          ProfileScreen(currentUser: widget.currentUser),            // 1
         ];
     }
   }

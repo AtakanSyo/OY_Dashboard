@@ -124,24 +124,22 @@ class _Navbar extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.teal,
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.teal.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.accessibility_new,
-                    color: Colors.white, size: 22),
+                child: Image.asset(
+                  'assets/images/favicon.png',
+                  height: 20,
+                ),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'OptiYou',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal,
-                  letterSpacing: -0.5,
-                ),
+
+              const SizedBox(width: 20),
+
+              Image.asset(
+                'assets/images/logo.png',
+                height: 50,
               ),
             ],
           ),

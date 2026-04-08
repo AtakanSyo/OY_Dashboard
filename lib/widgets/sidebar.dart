@@ -22,22 +22,50 @@ class Sidebar extends StatelessWidget {
       color: Colors.grey[200],
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          const Text(
-            "OY Dashboard",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 40),
-          ...menuItems.asMap().entries.map((entry) {
-            final index = entry.key;
-            final item = entry.value;
+          const SizedBox(height: 32),
 
-            return _buildMenuItem(
-              item.icon,
-              item.title,
-              index,
-            );
-          }),
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  height: 40,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "OY Dashboard",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+
+          Expanded(
+            child: Column(
+              children: [
+                ...menuItems.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+
+                  return _buildMenuItem(
+                    item.icon,
+                    item.title,
+                    index,
+                  );
+                }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -47,38 +75,38 @@ class Sidebar extends StatelessWidget {
     switch (currentUser.roleCode) {
       case RoleCodes.expert:
         return const [
-          _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.groups, "Hastalar"),
           _SidebarMenuItem(Icons.fact_check, "Ölçüm Oturumları"),
           _SidebarMenuItem(Icons.analytics, "Ayak Analizi"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
           _SidebarMenuItem(Icons.speed, "Basınç Ölçüm"),
+          _SidebarMenuItem(Icons.person, "Profil"),
         ];
 
       case RoleCodes.customer:
         return const [
           _SidebarMenuItem(Icons.home, "Ana Sayfa"),
-          _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.insights_outlined, "Analiz Sonuçlarım"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.storefront, "Mağaza"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
+          _SidebarMenuItem(Icons.person, "Profil"),
         ];
 
       case RoleCodes.optiYouTeam:
         return const [
-          _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.show_chart, "Satış İstatistikleri"),
           _SidebarMenuItem(Icons.inventory_2_outlined, "Sipariş Operasyonlar"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
+          _SidebarMenuItem(Icons.person, "Profil"),
         ];
 
       default:
         return const [
-          _SidebarMenuItem(Icons.person, "Profil"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),
+          _SidebarMenuItem(Icons.person, "Profil"),
         ];
     }
   }

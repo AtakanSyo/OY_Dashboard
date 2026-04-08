@@ -38,6 +38,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/images/logo.png
+    - assets/images/favicon.png
     - assets/scans/
     - assets/Results1.csv
     - assets/foot_measurements.csv
