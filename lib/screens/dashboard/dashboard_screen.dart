@@ -39,8 +39,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // 👨‍⚕️ EXPERT
       case RoleCodes.expert:
         return [
-          PatientListScreen(currentUser: widget.currentUser),        // 0
-          SessionListScreen(currentUser: widget.currentUser),        // 1
+          PatientListScreen(currentUser: widget.currentUser, pressureRepository: widget.pressureRepository),        // 0
+          SessionListScreen(currentUser: widget.currentUser, pressureRepository: widget.pressureRepository),        // 1
           AnalysisScreen(currentUser: widget.currentUser),           // 2
           OrdersScreen(currentUser: widget.currentUser),             // 3
           SupportScreen(currentUser: widget.currentUser),            // 4

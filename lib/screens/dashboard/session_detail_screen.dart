@@ -6,15 +6,18 @@ import 'package:oy_site/screens/dashboard/anthropometric_clinical_info_screen.da
 import 'package:oy_site/screens/dashboard/insole_photo_upload_dialog.dart';
 import 'package:oy_site/screens/dashboard/order_create_screen.dart';
 import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
+import 'package:oy_site/screens/dashboard/pressure_measurement_dialog.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   final AppUser currentUser;
   final MeasurementSession session;
+  final dynamic pressureRepository;
 
   const SessionDetailScreen({
     super.key,
     required this.currentUser,
     required this.session,
+    required this.pressureRepository,
   });
 
   @override
@@ -155,13 +158,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         title: 'Plantar Pressure',
         subtitle: 'Basınç verisi ve özet sonuçları',
         isCompleted: _currentSession.hasPlantarCsv,
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Plantar Pressure modülünü daha sonra bağlayacağız.'),
-            ),
-          );
-        },
+        onTap: _openPressureMeasurementDialog,
       ),
       _SessionStepItem(
         icon: Icons.photo_camera_back,
@@ -257,6 +254,28 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _openPressureMeasurementDialog() async {
+    if (!_currentSession.clinicalInfoCompleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Basınç ölçümünden önce klinik / antropometrik bilgiler tamamlanmalıdır.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PressureMeasurementDialog(
+        pressureRepository: widget.pressureRepository,
+        sessionCode: _currentSession.sessionCode,
+      ),
+    );
   }
 
   Future<void> _openOrderCreateScreen() async {

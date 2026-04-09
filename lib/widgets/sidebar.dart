@@ -75,8 +75,8 @@ class Sidebar extends StatelessWidget {
     switch (currentUser.roleCode) {
       case RoleCodes.expert:
         return const [
-          _SidebarMenuItem(Icons.groups, "Hastalar"),
-          _SidebarMenuItem(Icons.fact_check, "Ölçüm Oturumları"),
+          _SidebarMenuItem(Icons.groups, "Müşteriler"),
+          _SidebarMenuItem(Icons.fact_check, "Randevular"),
           _SidebarMenuItem(Icons.analytics, "Ayak Analizi"),
           _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
           _SidebarMenuItem(Icons.help_outline, "Destek"),

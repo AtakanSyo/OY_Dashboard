@@ -8,10 +8,12 @@ import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
 
 class SessionListScreen extends StatefulWidget {
   final AppUser currentUser;
+  final dynamic pressureRepository;
 
   const SessionListScreen({
     super.key,
     required this.currentUser,
+    required this.pressureRepository,
   });
 
   @override
@@ -154,40 +156,54 @@ class _SessionListScreenState extends State<SessionListScreen> {
     }
   }
 
-Future<void> _openCreateSessionScreen() async {
-  final newSession = await Navigator.push<MeasurementSession>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => CreateSessionScreen(
-        currentUser: widget.currentUser,
-        patients: _mockPatients,
-      ),
-    ),
-  );
-
-  if (newSession != null && mounted) {
-    setState(() {
-      _allSessions = [newSession, ..._allSessions];
-      _filteredSessions = [newSession, ..._filteredSessions];
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${newSession.sessionCode} oluşturuldu.'),
+  Future<void> _openCreateSessionScreen() async {
+    final newSession = await Navigator.push<MeasurementSession>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateSessionScreen(
+          currentUser: widget.currentUser,
+          patients: _mockPatients,
+        ),
       ),
     );
 
-    await Navigator.push(
+    if (newSession != null && mounted) {
+      setState(() {
+        _allSessions = [newSession, ..._allSessions];
+        _filteredSessions = [newSession, ..._filteredSessions];
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${newSession.sessionCode} oluşturuldu.'),
+        ),
+      );
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SessionDetailScreen(
+            currentUser: widget.currentUser,
+            session: newSession,
+            pressureRepository: widget.pressureRepository,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _openSessionDetail(MeasurementSession session) {
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => SessionDetailScreen(
           currentUser: widget.currentUser,
-          session: newSession,
+          session: session,
+          pressureRepository: widget.pressureRepository,
         ),
       ),
     );
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -370,17 +386,7 @@ Future<void> _openCreateSessionScreen() async {
               ),
               const SizedBox(width: 12),
               IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SessionDetailScreen(
-                        currentUser: widget.currentUser,
-                        session: session,
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () => _openSessionDetail(session),
                 icon: const Icon(Icons.arrow_forward_ios),
               ),
             ],

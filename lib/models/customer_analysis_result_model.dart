@@ -52,6 +52,7 @@ class CustomerAnalysisResult {
   final CustomerFootSummary rightFoot;
   final List<CustomerAnalysisMetric> metrics;
   final List<CustomerRecommendationItem> recommendations;
+  final CustomerAnalysisVisualSet visuals;
 
   const CustomerAnalysisResult({
     required this.analysisDate,
@@ -61,5 +62,39 @@ class CustomerAnalysisResult {
     required this.rightFoot,
     required this.metrics,
     required this.recommendations,
+    required this.visuals
+  });
+}
+
+class CustomerAnalysisVisualSet {
+  final String sessionCode;
+
+  final String archLeftImage;
+  final String archRightImage;
+
+  final String archSectionLeftImage;
+  final String archSectionRightImage;
+
+  final String foot2dLeftImage;
+  final String foot2dRightImage;
+
+  final String pronatorLeftImage;
+  final String pronatorRightImage;
+
+  final String leftStlFile;
+  final String rightStlFile;
+
+  const CustomerAnalysisVisualSet({
+    required this.sessionCode,
+    required this.archLeftImage,
+    required this.archRightImage,
+    required this.archSectionLeftImage,
+    required this.archSectionRightImage,
+    required this.foot2dLeftImage,
+    required this.foot2dRightImage,
+    required this.pronatorLeftImage,
+    required this.pronatorRightImage,
+    required this.leftStlFile,
+    required this.rightStlFile,
   });
 }

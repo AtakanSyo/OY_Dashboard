@@ -7,10 +7,12 @@ import 'package:oy_site/screens/dashboard/patient_create_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   final AppUser currentUser;
+  final dynamic pressureRepository;
 
   const PatientListScreen({
     super.key,
     required this.currentUser,
+    required this.pressureRepository,
   });
 
   @override
@@ -272,6 +274,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       builder: (_) => PatientDetailScreen(
                         currentUser: widget.currentUser,
                         patient: patient,
+                        pressureRepository: widget.pressureRepository,
                       ),
                     ),
                   );

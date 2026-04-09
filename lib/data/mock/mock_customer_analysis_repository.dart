@@ -75,6 +75,19 @@ class MockCustomerAnalysisRepository {
               'Sert zemin kullanımı için destekleyici ürünler daha uygun olabilir.',
         ),
       ],
+      visuals: const CustomerAnalysisVisualSet(
+        sessionCode: 'SESSION-001',
+        archLeftImage: 'assets/mock_data/SESSION-001/arch_L.bmp',
+        archRightImage: 'assets/mock_data/SESSION-001/arch_R.bmp',
+        archSectionLeftImage: 'assets/mock_data/SESSION-001/archSectV_L.bmp',
+        archSectionRightImage: 'assets/mock_data/SESSION-001/archSectV_R.bmp',
+        foot2dLeftImage: 'assets/mock_data/SESSION-001/foot3d_L.bmp',
+        foot2dRightImage: 'assets/mock_data/SESSION-001/foot3d_R.bmp',
+        pronatorLeftImage: 'assets/mock_data/SESSION-001/pronatorL-line.bmp',
+        pronatorRightImage: 'assets/mock_data/SESSION-001/pronatorR-line.bmp',
+        leftStlFile: 'assets/mock_data/SESSION-001/name-surname_L.stl',
+        rightStlFile: 'assets/mock_data/SESSION-001/name-surname_R.stl',
+      ),
     );
   }
 }

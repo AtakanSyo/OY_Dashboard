@@ -9,11 +9,13 @@ import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
 class PatientDetailScreen extends StatefulWidget {
   final AppUser currentUser;
   final Patient patient;
+  final dynamic pressureRepository;
 
   const PatientDetailScreen({
     super.key,
     required this.currentUser,
     required this.patient,
+    required this.pressureRepository,
   });
 
   @override
@@ -145,6 +147,7 @@ Future<void> _openCreateSessionScreen() async {
         builder: (_) => SessionDetailScreen(
           currentUser: widget.currentUser,
           session: newSession,
+          pressureRepository: widget.pressureRepository,
         ),
       ),
     );
@@ -478,6 +481,7 @@ Future<void> _openCreateSessionScreen() async {
                       builder: (_) => SessionDetailScreen(
                         currentUser: widget.currentUser,
                         session: session,
+                        pressureRepository: widget.pressureRepository,
                       ),
                     ),
                   );

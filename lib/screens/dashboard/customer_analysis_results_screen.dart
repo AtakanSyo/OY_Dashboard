@@ -145,6 +145,11 @@ class _CustomerAnalysisResultsScreenState
           ),
           const SizedBox(height: 24),
           _buildSectionCard(
+            title: 'Analiz Görselleri',
+            child: _buildVisualGallery(result),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionCard(
             title: 'Öneriler',
             child: Column(
               children: result.recommendations
@@ -368,6 +373,202 @@ class _CustomerAnalysisResultsScreenState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVisualGallery(CustomerAnalysisResult result) {
+    final visuals = result.visuals;
+
+    return Column(
+      children: [
+        _buildImagePairRow(
+          title: 'Yükseklik Haritası',
+          leftLabel: 'Sol',
+          rightLabel: 'Sağ',
+          leftPath: visuals.archLeftImage,
+          rightPath: visuals.archRightImage,
+        ),
+        const SizedBox(height: 20),
+        _buildImagePairRow(
+          title: 'Ark Yüksekliği Analizi',
+          leftLabel: 'Sol',
+          rightLabel: 'Sağ',
+          leftPath: visuals.archSectionLeftImage,
+          rightPath: visuals.archSectionRightImage,
+        ),
+        const SizedBox(height: 20),
+        _buildImagePairRow(
+          title: '2D Ayak Görüntüsü',
+          leftLabel: 'Sol',
+          rightLabel: 'Sağ',
+          leftPath: visuals.foot2dLeftImage,
+          rightPath: visuals.foot2dRightImage,
+        ),
+        const SizedBox(height: 20),
+        _buildImagePairRow(
+          title: 'Ayak-Bilek Açısı',
+          leftLabel: 'Sol',
+          rightLabel: 'Sağ',
+          leftPath: visuals.pronatorLeftImage,
+          rightPath: visuals.pronatorRightImage,
+        ),
+        const SizedBox(height: 20),
+        _buildStlInfoCard(visuals),
+      ],
+    );
+  }
+
+  Widget _buildImagePairRow({
+    required String title,
+    required String leftLabel,
+    required String rightLabel,
+    required String leftPath,
+    required String rightPath,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildImageCard(
+                label: leftLabel,
+                assetPath: leftPath,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildImageCard(
+                label: rightLabel,
+                assetPath: rightPath,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageCard({
+    required String label,
+    required String assetPath,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.asset(
+              assetPath,
+              width: double.infinity,
+              height: 220,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('ASSET ERROR -> $assetPath');
+                debugPrint('DETAIL -> $error');
+
+                return Container(
+                  height: 220,
+                  alignment: Alignment.center,
+                  color: Colors.grey.shade200,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'Görsel yüklenemedi\n$assetPath\n$error',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStlInfoCard(CustomerAnalysisVisualSet visuals) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '3D Tarama Dosyaları',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildFileRow('Sol STL', visuals.leftStlFile),
+          const SizedBox(height: 8),
+          _buildFileRow('Sağ STL', visuals.rightStlFile),
+          const SizedBox(height: 10),
+          Text(
+            'STL önizleme ve DOCX rapor entegrasyonu daha sonra eklenecek.',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileRow(String label, String path) {
+    final fileName = path.split('/').last;
+
+    return Row(
+      children: [
+        const Icon(
+          Icons.insert_drive_file_outlined,
+          size: 18,
+          color: Colors.teal,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        Expanded(
+          child: Text(
+            fileName,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.grey[800]),
+          ),
+        ),
+      ],
     );
   }
 
