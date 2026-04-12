@@ -1,14 +1,27 @@
 import 'dart:async';
 
 import 'package:oy_site/models/customer_analysis_result_model.dart';
+import 'package:oy_site/models/session_scan_assets.dart';
+import 'package:oy_site/services/scan/session_scan_assets_parser.dart';
 
 class MockCustomerAnalysisRepository {
+  final SessionScanAssetsParser _parser = const SessionScanAssetsParser();
+
   Future<CustomerAnalysisResult> getLatestAnalysis({
     required int userId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 350));
 
+    // Geçici local test klasörü:
+    const localScanFolderPath =
+        r'C:\dev_projects\oy_dashboard_dev_project\OY_Dashboard\assets\mock_data\mock_3d_data';
+
+    final SessionScanAssets assets =
+        _parser.parseFolder(localScanFolderPath);
+
     return CustomerAnalysisResult(
+      sessionCode: 'SES-2026-0408',
+      locationLabel: 'OptiYou İzmir',
       analysisDate: DateTime(2026, 4, 8),
       overallSummary:
           'Ayak analizinizde her iki ayakta da ark desteği ihtiyacı ve uzun süreli yüklenmede yorgunluk artışı görülmektedir. Sol ayakta basınç yoğunluğu sağ ayağa göre biraz daha fazladır.',
@@ -75,18 +88,18 @@ class MockCustomerAnalysisRepository {
               'Sert zemin kullanımı için destekleyici ürünler daha uygun olabilir.',
         ),
       ],
-      visuals: const CustomerAnalysisVisualSet(
-        sessionCode: 'SESSION-001',
-        archLeftImage: 'assets/mock_data/SESSION-001/arch_L.bmp',
-        archRightImage: 'assets/mock_data/SESSION-001/arch_R.bmp',
-        archSectionLeftImage: 'assets/mock_data/SESSION-001/archSectV_L.bmp',
-        archSectionRightImage: 'assets/mock_data/SESSION-001/archSectV_R.bmp',
-        foot2dLeftImage: 'assets/mock_data/SESSION-001/foot3d_L.bmp',
-        foot2dRightImage: 'assets/mock_data/SESSION-001/foot3d_R.bmp',
-        pronatorLeftImage: 'assets/mock_data/SESSION-001/pronatorL-line.bmp',
-        pronatorRightImage: 'assets/mock_data/SESSION-001/pronatorR-line.bmp',
-        leftStlFile: 'assets/mock_data/SESSION-001/name-surname_L.stl',
-        rightStlFile: 'assets/mock_data/SESSION-001/name-surname_R.stl',
+      visuals: CustomerAnalysisVisualSet(
+        sessionCode: 'SES-2026-0408',
+        archLeftImagePath: assets.archLeftPath,
+        archRightImagePath: assets.archRightPath,
+        archSectionLeftImagePath: assets.archSectionLeftPath,
+        archSectionRightImagePath: assets.archSectionRightPath,
+        foot2dLeftImagePath: assets.foot2dLeftPath,
+        foot2dRightImagePath: assets.foot2dRightPath,
+        pronatorLeftImagePath: assets.pronatorLeftPath,
+        pronatorRightImagePath: assets.pronatorRightPath,
+        leftStlPath: assets.stlLeftPath,
+        rightStlPath: assets.stlRightPath,
       ),
     );
   }

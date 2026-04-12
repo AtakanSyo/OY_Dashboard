@@ -7,6 +7,7 @@ import 'package:oy_site/screens/dashboard/insole_photo_upload_dialog.dart';
 import 'package:oy_site/screens/dashboard/order_create_screen.dart';
 import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
 import 'package:oy_site/screens/dashboard/pressure_measurement_dialog.dart';
+import 'package:oy_site/screens/dashboard/scan_folder_upload_dialog.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -26,6 +27,9 @@ class SessionDetailScreen extends StatefulWidget {
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
   late MeasurementSession _currentSession;
+
+  String? _scanFolderPath;
+  List<String> _scanFolderFiles = [];
 
   @override
   void initState() {
@@ -132,6 +136,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   List<_SessionStepItem> _buildSessionSteps() {
+    final hasUploadedScanFolder =
+        _currentSession.has3dScan || _scanFolderPath != null;
+
     return [
       _SessionStepItem(
         icon: Icons.monitor_weight,
@@ -143,15 +150,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       _SessionStepItem(
         icon: Icons.view_in_ar,
         title: '3D Scan',
-        subtitle: '3D tarama dosyaları ve analiz sonuçları',
-        isCompleted: _currentSession.has3dScan,
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('3D Scan modülünü daha sonra bağlayacağız.'),
-            ),
-          );
-        },
+        subtitle: _scanFolderPath == null
+            ? '3D tarama klasörünü yükle'
+            : 'Klasör yüklendi • ${_scanFolderFiles.length} dosya',
+        isCompleted: hasUploadedScanFolder,
+        onTap: _openScanFolderUploadDialog,
       ),
       _SessionStepItem(
         icon: Icons.speed,
@@ -209,9 +212,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         );
 
         _currentSession = updated.copyWith(
-          completedAt: updated.allStepsCompleted
-              ? DateTime.now()
-              : updated.completedAt,
+          completedAt:
+              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
         );
       });
 
@@ -221,6 +223,39 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _openScanFolderUploadDialog() async {
+    final result = await showDialog<ScanFolderUploadResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const ScanFolderUploadDialog(),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _scanFolderPath = result.folderPath;
+      _scanFolderFiles = result.fileNames;
+
+      final updated = _currentSession.copyWith(
+        has3dScan: true,
+        updatedAt: DateTime.now(),
+      );
+
+      _currentSession = updated.copyWith(
+        completedAt:
+            updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+      );
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '3D tarama klasörü yüklendi (${result.fileNames.length} dosya).',
+        ),
+      ),
+    );
   }
 
   Future<void> _openDesignFormScreen() async {
@@ -242,9 +277,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         );
 
         _currentSession = updated.copyWith(
-          completedAt: updated.allStepsCompleted
-              ? DateTime.now()
-              : updated.completedAt,
+          completedAt:
+              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
         );
       });
 
@@ -308,9 +342,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         );
 
         _currentSession = updated.copyWith(
-          completedAt: updated.allStepsCompleted
-              ? DateTime.now()
-              : updated.completedAt,
+          completedAt:
+              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
         );
       });
 
@@ -337,9 +370,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         );
 
         _currentSession = updated.copyWith(
-          completedAt: updated.allStepsCompleted
-              ? DateTime.now()
-              : updated.completedAt,
+          completedAt:
+              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
         );
       });
 
@@ -447,44 +479,113 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: _buildSectionCard(
-                        title: 'Temel Bilgiler',
-                        child: Column(
-                          children: [
-                            _buildKeyValueRow(
-                              'Session ID',
-                              _currentSession.sessionId?.toString() ?? '—',
+                      child: Column(
+                        children: [
+                          _buildSectionCard(
+                            title: 'Temel Bilgiler',
+                            child: Column(
+                              children: [
+                                _buildKeyValueRow(
+                                  'Session ID',
+                                  _currentSession.sessionId?.toString() ?? '—',
+                                ),
+                                _buildKeyValueRow(
+                                  'Clinic ID',
+                                  _currentSession.clinicId.toString(),
+                                ),
+                                _buildKeyValueRow(
+                                  'Patient ID',
+                                  _currentSession.patientId.toString(),
+                                ),
+                                _buildKeyValueRow(
+                                  'Expert User ID',
+                                  _currentSession.expertUserId.toString(),
+                                ),
+                                _buildKeyValueRow(
+                                  'Assigned OptiYou User ID',
+                                  _currentSession.assignedOptityouUserId
+                                          ?.toString() ??
+                                      '—',
+                                ),
+                                _buildKeyValueRow(
+                                  'Oluşturulma',
+                                  _formatDate(_currentSession.createdAt),
+                                ),
+                                _buildKeyValueRow(
+                                  'Güncellenme',
+                                  _formatDate(_currentSession.updatedAt),
+                                ),
+                                _buildKeyValueRow(
+                                  'Tamamlanma',
+                                  _formatDate(_currentSession.completedAt),
+                                ),
+                              ],
                             ),
-                            _buildKeyValueRow(
-                              'Clinic ID',
-                              _currentSession.clinicId.toString(),
-                            ),
-                            _buildKeyValueRow(
-                              'Patient ID',
-                              _currentSession.patientId.toString(),
-                            ),
-                            _buildKeyValueRow(
-                              'Expert User ID',
-                              _currentSession.expertUserId.toString(),
-                            ),
-                            _buildKeyValueRow(
-                              'Assigned OptiYou User ID',
-                              _currentSession.assignedOptityouUserId?.toString() ?? '—',
-                            ),
-                            _buildKeyValueRow(
-                              'Oluşturulma',
-                              _formatDate(_currentSession.createdAt),
-                            ),
-                            _buildKeyValueRow(
-                              'Güncellenme',
-                              _formatDate(_currentSession.updatedAt),
-                            ),
-                            _buildKeyValueRow(
-                              'Tamamlanma',
-                              _formatDate(_currentSession.completedAt),
+                          ),
+                          if (_scanFolderPath != null) ...[
+                            const SizedBox(height: 16),
+                            _buildSectionCard(
+                              title: 'Yüklenen 3D Tarama Klasörü',
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _scanFolderPath!,
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Dosya sayısı: ${_scanFolderFiles.length}',
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (_scanFolderFiles.isNotEmpty)
+                                    ..._scanFolderFiles
+                                        .take(6)
+                                        .map(
+                                          (fileName) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 6,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons
+                                                      .insert_drive_file_outlined,
+                                                  size: 18,
+                                                  color: Colors.teal,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    fileName,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                  if (_scanFolderFiles.length > 6)
+                                    Text(
+                                      '+ ${_scanFolderFiles.length - 6} dosya daha',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 24),

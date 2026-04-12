@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:oy_site/data/mock/mock_customer_analysis_repository.dart';
 import 'package:oy_site/models/app_user.dart';
@@ -23,29 +25,85 @@ class _CustomerAnalysisResultsScreenState
 
   bool _isLoading = true;
   String? _errorMessage;
-  CustomerAnalysisResult? _result;
+
+  List<CustomerAnalysisResult> _results = [];
+  int _selectedIndex = 0;
+
+  CustomerAnalysisResult? get _selectedResult {
+    if (_results.isEmpty) return null;
+    if (_selectedIndex < 0 || _selectedIndex >= _results.length) return null;
+    return _results[_selectedIndex];
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadAnalysis();
+    _loadAnalyses();
   }
 
-  Future<void> _loadAnalysis() async {
+  Future<void> _loadAnalyses() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final result = await _repository.getLatestAnalysis(
+      final latest = await _repository.getLatestAnalysis(
         userId: widget.currentUser.userId!,
+      );
+
+      final older1 = CustomerAnalysisResult(
+        analysisDate: DateTime(2026, 3, 18),
+        sessionCode: 'SES-2026-0318',
+        locationLabel: 'İzmir Klinik',
+        overallSummary:
+            'Önceki ölçümde sol ayakta yük dağılımı daha dengesiz görünmektedir. Yeni ölçümde genel konfor göstergelerinde iyileşme vardır.',
+        generalRiskNote:
+            'Uzun süre ayakta kalma durumunda destekli kullanım sürdürülmelidir.',
+        leftFoot: latest.leftFoot,
+        rightFoot: latest.rightFoot,
+        metrics: latest.metrics,
+        recommendations: latest.recommendations,
+        visuals: latest.visuals,
+      );
+
+      final older2 = CustomerAnalysisResult(
+        analysisDate: DateTime(2026, 2, 10),
+        sessionCode: 'SES-2026-0210',
+        locationLabel: 'İstanbul Merkez',
+        overallSummary:
+            'İlk ölçümlerde kemer desteği ihtiyacı daha belirgindir. Sonraki ölçümlerde yük dağılımında kısmi iyileşme görülmektedir.',
+        generalRiskNote:
+            'Destekleyici iç taban kullanımı önerilmeye devam edilmektedir.',
+        leftFoot: latest.leftFoot,
+        rightFoot: latest.rightFoot,
+        metrics: latest.metrics,
+        recommendations: latest.recommendations,
+        visuals: latest.visuals,
+      );
+
+      final current = CustomerAnalysisResult(
+        analysisDate: latest.analysisDate,
+        sessionCode: latest.sessionCode.isEmpty
+            ? 'SES-2026-0408'
+            : latest.sessionCode,
+        locationLabel: latest.locationLabel.isEmpty
+            ? 'OptiYou İzmir'
+            : latest.locationLabel,
+        overallSummary: latest.overallSummary,
+        generalRiskNote: latest.generalRiskNote,
+        leftFoot: latest.leftFoot,
+        rightFoot: latest.rightFoot,
+        metrics: latest.metrics,
+        recommendations: latest.recommendations,
+        visuals: latest.visuals,
       );
 
       if (!mounted) return;
 
       setState(() {
-        _result = result;
+        _results = [current, older1, older2];
+        _selectedIndex = 0;
         _isLoading = false;
       });
     } catch (e) {
@@ -70,6 +128,56 @@ class _CustomerAnalysisResultsScreenState
     return Colors.red;
   }
 
+  void _openImagePreview(String title, String filePath) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: SizedBox(
+          width: 950,
+          height: 720,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: InteractiveViewer(
+                    child: Image.file(
+                      File(filePath),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Text('Görsel yüklenemedi'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,7 +186,7 @@ class _CustomerAnalysisResultsScreenState
         backgroundColor: Colors.teal,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: _buildContent(),
       ),
     );
@@ -86,9 +194,7 @@ class _CustomerAnalysisResultsScreenState
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorMessage != null) {
@@ -100,515 +206,667 @@ class _CustomerAnalysisResultsScreenState
       );
     }
 
-    if (_result == null) {
-      return const Center(
-        child: Text('Analiz sonucu bulunamadı.'),
-      );
+    final selected = _selectedResult;
+    if (selected == null) {
+      return const Center(child: Text('Analiz sonucu bulunamadı.'));
     }
-
-    final result = _result!;
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeaderCard(result),
-          const SizedBox(height: 24),
+          _buildSectionCard(
+            title: 'Ölçüm Geçmişi',
+            child: _buildSessionCards(),
+          ),
+          const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _buildFootCard(
+                child: _buildFootPanel(
                   title: 'Sol Ayak',
-                  foot: result.leftFoot,
+                  foot: selected.leftFoot,
+                  isRightAligned: false,
+                  visuals: _buildFootVisuals(
+                    isLeft: true,
+                    result: selected,
+                  ),
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 18),
               Expanded(
-                child: _buildFootCard(
+                child: _buildFootPanel(
                   title: 'Sağ Ayak',
-                  foot: result.rightFoot,
+                  foot: selected.rightFoot,
+                  isRightAligned: true,
+                  visuals: _buildFootVisuals(
+                    isLeft: false,
+                    result: selected,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           _buildSectionCard(
-            title: 'Önemli Bulgular',
-            child: Column(
-              children: result.metrics
-                  .map(
-                    (metric) => _buildMetricRow(metric),
-                  )
-                  .toList(),
-            ),
+            title: 'Genel Analiz Sonuçları',
+            child: _buildGeneralResultsPanel(selected),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           _buildSectionCard(
-            title: 'Analiz Görselleri',
-            child: _buildVisualGallery(result),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionCard(
-            title: 'Öneriler',
-            child: Column(
-              children: result.recommendations
-                  .map(
-                    (item) => _buildRecommendationItem(item),
-                  )
-                  .toList(),
-            ),
+            title: 'Genel Durum',
+            child: _buildOverviewCard(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderCard(CustomerAnalysisResult result) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.teal.withOpacity(0.12),
-            child: const Icon(
-              Icons.insights_outlined,
-              color: Colors.teal,
-              size: 30,
+  Widget _buildSessionCards() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: List.generate(_results.length, (index) {
+        final result = _results[index];
+        final isSelected = index == _selectedIndex;
+
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 230,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.teal.withOpacity(0.08) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? Colors.teal : Colors.grey.shade300,
+                width: isSelected ? 1.4 : 1,
+              ),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 6),
+              ],
             ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Son Analiz Özeti',
-                  style: TextStyle(
-                    fontSize: 22,
+                Text(
+                  result.sessionCode,
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Analiz Tarihi: ${_formatDate(result.analysisDate)}',
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  result.overallSummary,
-                  style: const TextStyle(height: 1.5),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        color: Colors.orange,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          result.generalRiskNote,
-                          style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontWeight: FontWeight.w600,
-                          ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _formatDate(result.analysisDate),
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 13,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        result.locationLabel,
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      }),
     );
   }
 
-  Widget _buildFootCard({
+  Widget _buildFootPanel({
     required String title,
     required CustomerFootSummary foot,
+    required bool isRightAligned,
+    required Widget visuals,
   }) {
+    final textAlign = isRightAligned ? TextAlign.right : TextAlign.left;
+    final crossAlign = isRightAligned
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start;
+
     return _buildSectionCard(
       title: title,
       child: Column(
+        crossAxisAlignment: crossAlign,
         children: [
-          _buildKeyValueRow('Ayak Tipi', foot.footType),
-          _buildKeyValueRow('Basınç Özeti', foot.pressureSummary),
-          _buildKeyValueRow('Denge Özeti', foot.balanceSummary),
-          _buildKeyValueRow('Kemer Desteği', foot.archSupportNeed),
-          _buildKeyValueRow('Ana Bulgular', foot.mainFinding),
+          _infoLine(
+            'Ayak Tipi',
+            foot.footType,
+            textAlign: textAlign,
+            crossAxisAlignment: crossAlign,
+          ),
+          const SizedBox(height: 10),
+          _infoLine(
+            'Basınç Özeti',
+            foot.pressureSummary,
+            textAlign: textAlign,
+            crossAxisAlignment: crossAlign,
+          ),
+          const SizedBox(height: 10),
+          _infoLine(
+            'Denge Özeti',
+            foot.balanceSummary,
+            textAlign: textAlign,
+            crossAxisAlignment: crossAlign,
+          ),
+          const SizedBox(height: 10),
+          _infoLine(
+            'Kemer Desteği',
+            foot.archSupportNeed,
+            textAlign: textAlign,
+            crossAxisAlignment: crossAlign,
+          ),
+          const SizedBox(height: 10),
+          _infoLine(
+            'Ana Bulgular',
+            foot.mainFinding,
+            textAlign: textAlign,
+            crossAxisAlignment: crossAlign,
+          ),
           const SizedBox(height: 16),
-          _buildScoreBar(
-            label: 'Basınç Konfor Skoru',
+          _scoreTile(
+            title: 'Basınç Konfor Skoru',
             score: foot.pressureScore,
+            textAlign: textAlign,
+            contentAlignment: crossAlign,
           ),
-          const SizedBox(height: 12),
-          _buildScoreBar(
-            label: 'Stabilite Skoru',
+          const SizedBox(height: 10),
+          _scoreTile(
+            title: 'Stabilite Skoru',
             score: foot.stabilityScore,
+            textAlign: textAlign,
+            contentAlignment: crossAlign,
           ),
-          const SizedBox(height: 12),
-          _buildScoreBar(
-            label: 'Ark Desteği Skoru',
+          const SizedBox(height: 10),
+          _scoreTile(
+            title: 'Ark Desteği Skoru',
             score: foot.archScore,
+            textAlign: textAlign,
+            contentAlignment: crossAlign,
           ),
+          const SizedBox(height: 16),
+          visuals,
         ],
       ),
     );
   }
 
-  Widget _buildScoreBar({
-    required String label,
-    required double score,
+  Widget _buildFootVisuals({
+    required bool isLeft,
+    required CustomerAnalysisResult result,
   }) {
-    final color = _scoreColor(score);
+    final visuals = result.visuals;
+    final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+    final crossAlign =
+        isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end;
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _imageTile(
+          title: isLeft ? 'Yükseklik Haritası' : 'Yükseklik Haritası',
+          filePath: isLeft
+              ? visuals.archLeftImagePath
+              : visuals.archRightImagePath,
+          textAlign: textAlign,
+          contentAlignment: crossAlign,
+        ),
+        _imageTile(
+          title: 'Ark Analizi',
+          filePath: isLeft
+              ? visuals.archSectionLeftImagePath
+              : visuals.archSectionRightImagePath,
+          textAlign: textAlign,
+          contentAlignment: crossAlign,
+        ),
+        _imageTile(
+          title: '2D Ayak Görüntüsü',
+          filePath: isLeft
+              ? visuals.foot2dLeftImagePath
+              : visuals.foot2dRightImagePath,
+          textAlign: textAlign,
+          contentAlignment: crossAlign,
+        ),
+        _imageTile(
+          title: 'Ayak-Bilek Açısı',
+          filePath: isLeft
+              ? visuals.pronatorLeftImagePath
+              : visuals.pronatorRightImagePath,
+          textAlign: textAlign,
+          contentAlignment: crossAlign,
+        ),
+        _fileTile(
+          title: isLeft ? 'Sol STL' : 'Sağ STL',
+          path: isLeft ? visuals.leftStlPath : visuals.rightStlPath,
+          textAlign: textAlign,
+          contentAlignment: crossAlign,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGeneralResultsPanel(CustomerAnalysisResult result) {
+    final metrics = result.metrics;
+
+    String metricValue(String label) {
+      final match = metrics.where((m) => m.label == label);
+      return match.isEmpty ? '—' : match.first.value;
+    }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          alignment: WrapAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(color: Colors.grey[800]),
-              ),
+            _centerTile(
+              title: 'Session ID',
+              value: result.sessionCode,
+              icon: Icons.tag,
             ),
-            Text(
-              score.toStringAsFixed(0),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+            _centerTile(
+              title: 'Tarih',
+              value: _formatDate(result.analysisDate),
+              icon: Icons.calendar_today_outlined,
+            ),
+            _centerTile(
+              title: 'Yer',
+              value: result.locationLabel,
+              icon: Icons.location_on_outlined,
+            ),
+            _centerTile(
+              title: 'Denge',
+              value: metricValue('Sol / Sağ Denge'),
+              icon: Icons.balance,
+            ),
+            _centerTile(
+              title: 'Maks. Basınç',
+              value: metricValue('Maksimum Basınç Bölgesi'),
+              icon: Icons.my_location_outlined,
+            ),
+            _centerTile(
+              title: 'Risk',
+              value: metricValue('Gün Sonu Yorgunluk Riski'),
+              icon: Icons.warning_amber_outlined,
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: score / 100,
-            minHeight: 10,
-            backgroundColor: Colors.grey.shade300,
-            color: color,
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Genel Özet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result.overallSummary,
+                textAlign: TextAlign.center,
+                style: const TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result.generalRiskNote,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.orange.shade900,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (result.recommendations.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: result.recommendations.map((item) {
+              return Container(
+                width: 300,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.teal.withOpacity(0.18)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      color: Colors.teal,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.description,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        height: 1.35,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildOverviewCard() {
+    final latest = _results.first;
+
+    return Column(
+      children: [
+        const Text(
+          'Genel Durum',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Toplam ${_results.length} ölçüm kaydınız var. En güncel ölçüm ${latest.sessionCode} ve tarihi ${_formatDate(latest.analysisDate)}.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey[700],
+            height: 1.4,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMetricRow(CustomerAnalysisMetric metric) {
+  Widget _infoLine(
+    String label,
+    String value, {
+    required TextAlign textAlign,
+    required CrossAxisAlignment crossAxisAlignment,
+  }) {
+    return Column(
+      crossAxisAlignment: crossAxisAlignment,
+      children: [
+        Text(
+          label,
+          textAlign: textAlign,
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          textAlign: textAlign,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            height: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _centerTile({
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      width: 170,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.teal.withOpacity(0.12),
-            child: const Icon(
-              Icons.analytics_outlined,
-              size: 18,
-              color: Colors.teal,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  metric.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  metric.description,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            metric.value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVisualGallery(CustomerAnalysisResult result) {
-    final visuals = result.visuals;
-
-    return Column(
-      children: [
-        _buildImagePairRow(
-          title: 'Yükseklik Haritası',
-          leftLabel: 'Sol',
-          rightLabel: 'Sağ',
-          leftPath: visuals.archLeftImage,
-          rightPath: visuals.archRightImage,
-        ),
-        const SizedBox(height: 20),
-        _buildImagePairRow(
-          title: 'Ark Yüksekliği Analizi',
-          leftLabel: 'Sol',
-          rightLabel: 'Sağ',
-          leftPath: visuals.archSectionLeftImage,
-          rightPath: visuals.archSectionRightImage,
-        ),
-        const SizedBox(height: 20),
-        _buildImagePairRow(
-          title: '2D Ayak Görüntüsü',
-          leftLabel: 'Sol',
-          rightLabel: 'Sağ',
-          leftPath: visuals.foot2dLeftImage,
-          rightPath: visuals.foot2dRightImage,
-        ),
-        const SizedBox(height: 20),
-        _buildImagePairRow(
-          title: 'Ayak-Bilek Açısı',
-          leftLabel: 'Sol',
-          rightLabel: 'Sağ',
-          leftPath: visuals.pronatorLeftImage,
-          rightPath: visuals.pronatorRightImage,
-        ),
-        const SizedBox(height: 20),
-        _buildStlInfoCard(visuals),
-      ],
-    );
-  }
-
-  Widget _buildImagePairRow({
-    required String title,
-    required String leftLabel,
-    required String rightLabel,
-    required String leftPath,
-    required String rightPath,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildImageCard(
-                label: leftLabel,
-                assetPath: leftPath,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildImageCard(
-                label: rightLabel,
-                assetPath: rightPath,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildImageCard({
-    required String label,
-    required String assetPath,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              assetPath,
-              width: double.infinity,
-              height: 220,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('ASSET ERROR -> $assetPath');
-                debugPrint('DETAIL -> $error');
-
-                return Container(
-                  height: 220,
-                  alignment: Alignment.center,
-                  color: Colors.grey.shade200,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      'Görsel yüklenemedi\n$assetPath\n$error',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStlInfoCard(CustomerAnalysisVisualSet visuals) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '3D Tarama Dosyaları',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _buildFileRow('Sol STL', visuals.leftStlFile),
+          Icon(icon, size: 18, color: Colors.teal),
           const SizedBox(height: 8),
-          _buildFileRow('Sağ STL', visuals.rightStlFile),
-          const SizedBox(height: 10),
           Text(
-            'STL önizleme ve DOCX rapor entegrasyonu daha sonra eklenecek.',
+            title,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey[700],
               fontSize: 12,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              height: 1.3,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFileRow(String label, String path) {
-    final fileName = path.split('/').last;
+  Widget _scoreTile({
+    required String title,
+    required double score,
+    required TextAlign textAlign,
+    required CrossAxisAlignment contentAlignment,
+  }) {
+    final color = _scoreColor(score);
 
-    return Row(
-      children: [
-        const Icon(
-          Icons.insert_drive_file_outlined,
-          size: 18,
-          color: Colors.teal,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        Expanded(
-          child: Text(
-            fileName,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.grey[800]),
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: contentAlignment,
+        children: [
+          Text(
+            title,
+            textAlign: textAlign,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Text(
+            score.toStringAsFixed(0),
+            textAlign: textAlign,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: score / 100,
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade300,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildRecommendationItem(CustomerRecommendationItem item) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.teal.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.withOpacity(0.18)),
+  Widget _imageTile({
+    required String title,
+    required String? filePath,
+    required TextAlign textAlign,
+    required CrossAxisAlignment contentAlignment,
+  }) {
+    final hasFile = filePath != null && filePath.trim().isNotEmpty;
+
+    return InkWell(
+      onTap: hasFile ? () => _openImagePreview(title, filePath) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 220,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: contentAlignment,
+          children: [
+            Text(
+              title,
+              textAlign: textAlign,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: hasFile
+                  ? Container(
+                      width: double.infinity,
+                      height: 150,
+                      color: Colors.white,
+                      child: Image.file(
+                        File(filePath),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          alignment: Alignment.center,
+                          color: Colors.grey.shade200,
+                          child: const Text('Görsel yüklenemedi'),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey.shade200,
+                      alignment: Alignment.center,
+                      child: const Text('Dosya yok'),
+                    ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _fileTile({
+    required String title,
+    required String? path,
+    required TextAlign textAlign,
+    required CrossAxisAlignment contentAlignment,
+  }) {
+    final fileName = path == null ? 'Dosya yok' : path.split('\\').last;
+
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: contentAlignment,
         children: [
           const Icon(
-            Icons.check_circle_outline,
+            Icons.insert_drive_file_outlined,
             color: Colors.teal,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.description,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: textAlign,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            fileName,
+            textAlign: textAlign,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
             ),
           ),
         ],
@@ -622,15 +880,12 @@ class _CustomerAnalysisResultsScreenState
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 8),
         ],
       ),
       child: Column(
@@ -639,39 +894,12 @@ class _CustomerAnalysisResultsScreenState
           Text(
             title,
             style: const TextStyle(
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 14),
           child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKeyValueRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
         ],
       ),
     );

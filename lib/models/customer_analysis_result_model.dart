@@ -45,6 +45,8 @@ class CustomerRecommendationItem {
 }
 
 class CustomerAnalysisResult {
+  final String sessionCode;
+  final String locationLabel;
   final DateTime analysisDate;
   final String overallSummary;
   final String generalRiskNote;
@@ -55,6 +57,8 @@ class CustomerAnalysisResult {
   final CustomerAnalysisVisualSet visuals;
 
   const CustomerAnalysisResult({
+    required this.sessionCode,
+    required this.locationLabel,
     required this.analysisDate,
     required this.overallSummary,
     required this.generalRiskNote,
@@ -62,39 +66,39 @@ class CustomerAnalysisResult {
     required this.rightFoot,
     required this.metrics,
     required this.recommendations,
-    required this.visuals
+    required this.visuals,
   });
 }
 
 class CustomerAnalysisVisualSet {
   final String sessionCode;
 
-  final String archLeftImage;
-  final String archRightImage;
+  final String? archLeftImagePath;
+  final String? archRightImagePath;
 
-  final String archSectionLeftImage;
-  final String archSectionRightImage;
+  final String? archSectionLeftImagePath;
+  final String? archSectionRightImagePath;
 
-  final String foot2dLeftImage;
-  final String foot2dRightImage;
+  final String? foot2dLeftImagePath;
+  final String? foot2dRightImagePath;
 
-  final String pronatorLeftImage;
-  final String pronatorRightImage;
+  final String? pronatorLeftImagePath;
+  final String? pronatorRightImagePath;
 
-  final String leftStlFile;
-  final String rightStlFile;
+  final String? leftStlPath;
+  final String? rightStlPath;
 
   const CustomerAnalysisVisualSet({
     required this.sessionCode,
-    required this.archLeftImage,
-    required this.archRightImage,
-    required this.archSectionLeftImage,
-    required this.archSectionRightImage,
-    required this.foot2dLeftImage,
-    required this.foot2dRightImage,
-    required this.pronatorLeftImage,
-    required this.pronatorRightImage,
-    required this.leftStlFile,
-    required this.rightStlFile,
+    this.archLeftImagePath,
+    this.archRightImagePath,
+    this.archSectionLeftImagePath,
+    this.archSectionRightImagePath,
+    this.foot2dLeftImagePath,
+    this.foot2dRightImagePath,
+    this.pronatorLeftImagePath,
+    this.pronatorRightImagePath,
+    this.leftStlPath,
+    this.rightStlPath,
   });
 }
