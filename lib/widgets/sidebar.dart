@@ -94,6 +94,16 @@ class Sidebar extends StatelessWidget {
           _SidebarMenuItem(Icons.person, "Profil"),
         ];
 
+      case RoleCodes.corporate:
+        return const [
+          _SidebarMenuItem(Icons.dashboard_outlined, "Dashboard"),
+          _SidebarMenuItem(Icons.apartment_outlined, "Departman Analizi"),
+          _SidebarMenuItem(Icons.show_chart, "Trendler"),
+          _SidebarMenuItem(Icons.groups_outlined, "Çalışanlar"),
+          _SidebarMenuItem(Icons.description_outlined, "Raporlar"),
+          _SidebarMenuItem(Icons.person, "Profil"),
+        ];
+
       case RoleCodes.optiYouTeam:
         return const [
           _SidebarMenuItem(Icons.show_chart, "Satış İstatistikleri"),

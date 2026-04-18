@@ -29,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const List<Map<String, String>> _roles = [
     {'code': RoleCodes.expert,      'label': 'Uzman'},
     {'code': RoleCodes.customer,    'label': 'Müşteri'},
+    {'code': RoleCodes.corporate, 'label': 'Kurumsal'},
     {'code': RoleCodes.optiYouTeam, 'label': 'OptiYou Ekibi'},
   ];
 

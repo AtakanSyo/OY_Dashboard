@@ -56,6 +56,7 @@ class AppUser {
 
   bool get isExpert => roleCode == RoleCodes.expert;
   bool get isCustomer => roleCode == RoleCodes.customer;
+  bool get isCorporate => roleCode == RoleCodes.corporate;
   bool get isOptiYouTeam => roleCode == RoleCodes.optiYouTeam;
 
   AppUser copyWith({
@@ -161,11 +162,13 @@ class AppUser {
 class RoleCodes {
   static const String expert = 'EXPERT';
   static const String customer = 'CUSTOMER';
+  static const String corporate = 'CORPORATE';
   static const String optiYouTeam = 'OPTIYOU_TEAM';
 
   static const List<String> values = [
     expert,
     customer,
+    corporate,
     optiYouTeam,
   ];
 }

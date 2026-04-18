@@ -50,6 +50,28 @@ class MockUsers {
           updatedAt: DateTime.now(),
         );
 
+      case RoleCodes.corporate:
+        return AppUser(
+          userId: 4,
+          roleId: 4,
+          clinicId: null,
+          firstName: 'Kurumsal',
+          lastName: 'Kullanıcı',
+          email: email,
+          username: 'corporate.user',
+          phone: '+90 555 000 00 04',
+          title: 'Kurumsal Yetkili',
+          commissionProfileName: 'corporate_default',
+          roleCode: RoleCodes.corporate,
+          roleName: 'Kurumsal',
+          clinicCode: null,
+          clinicName: 'Kurumsal Firma',
+          clinicType: 'corporate',
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
       case RoleCodes.customer:
       default:
         return AppUser(
