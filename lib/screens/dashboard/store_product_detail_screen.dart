@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/screens/dashboard/store_screen.dart';
+import 'package:oy_site/services/payment/iyzico_checkout_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class StoreProductDetailScreen extends StatelessWidget {
+class StoreProductDetailScreen extends StatefulWidget {
   final StoreProduct product;
   final StoreMeasurementSummary measurement;
 
@@ -12,10 +14,49 @@ class StoreProductDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<StoreProductDetailScreen> createState() =>
+      _StoreProductDetailScreenState();
+}
+
+class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
+  final IyzicoCheckoutService _checkoutService = IyzicoCheckoutService();
+  bool _isStartingPayment = false;
+
+  Future<void> _startPayment() async {
+    if (_isStartingPayment) return;
+
+    setState(() => _isStartingPayment = true);
+    try {
+      final checkout = await _checkoutService.initializeCheckout(
+        productId: widget.product.id,
+      );
+      final url = checkout.paymentPageUrl!;
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        throw Exception('Geçersiz ödeme URL\'i alındı.');
+      }
+
+      final opened = await launchUrl(uri, webOnlyWindowName: '_blank');
+      if (!opened) {
+        throw Exception('Ödeme sayfası açılamadı.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ödeme başlatılamadı: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingPayment = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(product.title),
+        title: Text(widget.product.title),
         backgroundColor: Colors.teal,
       ),
       body: SingleChildScrollView(
@@ -27,7 +68,7 @@ class StoreProductDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 buildMeasurementCard(
-                  measurement: measurement,
+                  measurement: widget.measurement,
                   compact: false,
                 ),
                 const SizedBox(height: 24),
@@ -62,7 +103,7 @@ class StoreProductDetailScreen extends StatelessWidget {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
                                   child: Image.asset(
-                                    product.imagePath,
+                                    widget.product.imagePath,
                                     fit: BoxFit.contain,
                                   ),
                                 ),
@@ -74,7 +115,7 @@ class StoreProductDetailScreen extends StatelessWidget {
                                   radius: 18,
                                   backgroundColor: Colors.white,
                                   child: Icon(
-                                    product.icon,
+                                    widget.product.icon,
                                     size: 18,
                                     color: Colors.teal,
                                   ),
@@ -88,7 +129,7 @@ class StoreProductDetailScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  product.title,
+                                  widget.product.title,
                                   style: const TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,
@@ -96,7 +137,7 @@ class StoreProductDetailScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  product.shortDescription,
+                                  widget.product.shortDescription,
                                   style: TextStyle(
                                     color: Colors.grey[700],
                                     height: 1.4,
@@ -105,7 +146,7 @@ class StoreProductDetailScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  product.priceLabel,
+                                  widget.product.priceLabel,
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
@@ -120,31 +161,23 @@ class StoreProductDetailScreen extends StatelessWidget {
                       const SizedBox(height: 24),
                       _buildInfoSection(
                         title: 'Ürün Hakkında',
-                        content: product.fullDescription,
+                        content: widget.product.fullDescription,
                       ),
                       const SizedBox(height: 18),
                       _buildInfoSection(
-                        title: product.usageTitle,
-                        content: product.usageDescription,
+                        title: widget.product.usageTitle,
+                        content: widget.product.usageDescription,
                       ),
                       const SizedBox(height: 18),
                       _buildInfoSection(
                         title: 'Neden Bu Ürün Öneriliyor?',
-                        content: product.whyRecommended,
+                        content: widget.product.whyRecommended,
                       ),
                       const SizedBox(height: 28),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: ElevatedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Satın alma akışı daha sonra bağlanacak.',
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: _isStartingPayment ? null : _startPayment,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal,
                             foregroundColor: Colors.white,
@@ -156,12 +189,21 @@ class StoreProductDetailScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Satın Al',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: _isStartingPayment
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Satın Al',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

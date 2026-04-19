@@ -23,11 +23,13 @@ import 'support_screen.dart';
 class DashboardScreen extends StatefulWidget {
   final AppUser currentUser;
   final dynamic pressureRepository;
+  final int initialIndex;
 
   const DashboardScreen({
     super.key,
     required this.currentUser,
     required this.pressureRepository,
+    this.initialIndex = 0,
   });
 
   @override
@@ -36,6 +38,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   List<Widget> get _pages {
     switch (widget.currentUser.roleCode) {
