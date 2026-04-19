@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/screens/dashboard/store_screen.dart';
 import 'package:oy_site/services/payment/iyzico_checkout_service.dart';
+import 'package:oy_site/services/payment/payment_popup_handle.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class StoreProductDetailScreen extends StatefulWidget {
@@ -26,6 +27,8 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     if (_isStartingPayment) return;
 
     setState(() => _isStartingPayment = true);
+    final popup = openPaymentPopup();
+    var popupNavigated = false;
     try {
       final checkout = await _checkoutService.initializeCheckout(
         productId: widget.product.id,
@@ -36,11 +39,19 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         throw Exception('Geçersiz ödeme URL\'i alındı.');
       }
 
-      final opened = await launchUrl(uri, webOnlyWindowName: '_blank');
-      if (!opened) {
-        throw Exception('Ödeme sayfası açılamadı.');
+      if (popup != null) {
+        popup.navigate(url);
+        popupNavigated = true;
+      } else {
+        final opened = await launchUrl(uri, webOnlyWindowName: '_blank');
+        if (!opened) {
+          throw Exception('Ödeme sayfası açılamadı.');
+        }
       }
     } catch (e) {
+      if (popup != null && !popupNavigated) {
+        popup.close();
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ödeme başlatılamadı: $e')),
