@@ -4,7 +4,11 @@ import 'package:oy_site/screens/auth/register_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final dynamic pressureRepository;
-  const HomeScreen({super.key, required this.pressureRepository});
+
+  const HomeScreen({
+    super.key,
+    required this.pressureRepository,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -76,24 +80,31 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _scrollController,
               child: Column(
                 children: [
-                  _HeroSection(isNarrow: isNarrow, onGetStarted: _goToRegister),
+                  _HeroSection(
+                    isNarrow: isNarrow,
+                    onGetStarted: _goToRegister,
+                  ),
                   _ImpactStatsSection(isNarrow: isNarrow),
                   _KimIcinSection(isNarrow: isNarrow),
-                  Container(
-                    key: _centersKey,
-                    child: _MeasurementCentersSection(isNarrow: isNarrow),
-                  ),
                   Container(
                     key: _featuresKey,
                     child: _FeaturesSection(isNarrow: isNarrow),
                   ),
+                  _AnalysisSystemsSection(isNarrow: isNarrow),
                   Container(
                     key: _servicesKey,
                     child: _ServicesSection(isNarrow: isNarrow),
                   ),
                   Container(
                     key: _productsKey,
-                    child: _ProductsSection(isNarrow: isNarrow),
+                    child: _ProductsSection(
+                      isNarrow: isNarrow,
+                      onOpenStore: _goToRegister,
+                    ),
+                  ),
+                  Container(
+                    key: _centersKey,
+                    child: _MeasurementCentersSection(isNarrow: isNarrow),
                   ),
                   Container(
                     key: _aboutKey,
@@ -110,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
 // ── Navbar ──────────────────────────────────────────────────────────────────
 
 class _Navbar extends StatelessWidget {
@@ -148,7 +160,6 @@ class _Navbar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Row(
         children: [
-          // Logo
           Row(
             children: [
               Container(
@@ -158,19 +169,18 @@ class _Navbar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Image.asset(
-                  'assets/images/favicon.png',
+                  'assets/images/branding/favicon.png',
                   height: 20,
                 ),
               ),
               const SizedBox(width: 20),
               Image.asset(
-                'assets/images/logo.png',
+                'assets/images/branding/logo.png',
                 height: 50,
               ),
             ],
           ),
           const Spacer(),
-
           if (!isNarrow) ...[
             _NavLink(label: 'Hizmetler', onTap: onScrollToServices),
             _NavLink(label: 'Ürünler', onTap: onScrollToProducts),
@@ -334,8 +344,6 @@ class _Navbar extends StatelessWidget {
   }
 }
 
-// ── Nav link with hover underline ────────────────────────────────────────────
-
 class _NavLink extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
@@ -396,7 +404,11 @@ class _NavLinkState extends State<_NavLink> {
 class _HeroSection extends StatelessWidget {
   final bool isNarrow;
   final VoidCallback onGetStarted;
-  const _HeroSection({required this.isNarrow, required this.onGetStarted});
+
+  const _HeroSection({
+    required this.isNarrow,
+    required this.onGetStarted,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +449,7 @@ class _HeroSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Text(
-            'Ortopedik Tabanlık Yönetim Platformu',
+            'Ayak Sağlığında Dijital Çözüm Ekosistemi',
             style: TextStyle(
               color: Colors.white,
               fontSize: 13,
@@ -447,7 +459,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'Ayak Sağlığında\nYeni Nesil\nYönetim',
+          'Ayak Sağlığında\nYeni Nesil\nTakip ve Analiz',
           textAlign: isNarrow ? TextAlign.center : TextAlign.left,
           style: const TextStyle(
             color: Colors.white,
@@ -459,7 +471,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'OptiYou, klinisyenler için geliştirilmiş bütünleşik bir ayak tarama, basınç analizi ve özel tabanlık tasarım platformudur. Hastalarınızı yönetin, ölçümleri takip edin, siparişleri dijital ortamda işleyin.',
+          'Optiyou; bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için ayak sağlığı analizi, basınç değerlendirmesi, kişisel ortopedik ürün tasarımı ve periyodik takip altyapısı sunar.',
           textAlign: isNarrow ? TextAlign.center : TextAlign.left,
           style: TextStyle(
             color: Colors.white.withOpacity(0.88),
@@ -477,8 +489,8 @@ class _HeroSection extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.teal.shade800,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 28, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -486,24 +498,8 @@ class _HeroSection extends StatelessWidget {
               ),
               child: const Text(
                 'Analiz Randevusu Alın',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(width: 14),
-            OutlinedButton(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withOpacity(0.6)),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Daha Fazla Bilgi',
-                  style: TextStyle(fontSize: 16)),
             ),
           ],
         ),
@@ -513,9 +509,9 @@ class _HeroSection extends StatelessWidget {
             children: [
               _statBadge('2,500+', 'Analiz Edilmiş Ayak'),
               const SizedBox(width: 32),
-              _statBadge('150+', 'Aktif Klinisyen'),
+              _statBadge('150+', 'Aktif Uzman'),
               const SizedBox(width: 32),
-              _statBadge('98%', 'Müşteri Memnuniyeti'),
+              _statBadge('98%', 'Memnuniyet'),
             ],
           ),
       ],
@@ -526,14 +522,21 @@ class _HeroSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold)),
-        Text(label,
-            style: TextStyle(
-                color: Colors.white.withOpacity(0.75), fontSize: 13)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.75),
+            fontSize: 13,
+          ),
+        ),
       ],
     );
   }
@@ -551,17 +554,17 @@ class _HeroSection extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Positioned(
-              top: 30,
-              left: 30,
+              top: 26,
+              left: 26,
               child: _floatingCard(
                 icon: Icons.show_chart,
-                label: 'Basınç Haritası',
+                label: 'Basınç Analizi',
                 color: Colors.orange,
               ),
             ),
             Positioned(
-              top: 110,
-              right: 20,
+              top: 90,
+              right: 18,
               child: _floatingCard(
                 icon: Icons.rotate_90_degrees_ccw,
                 label: '3D Ayak Tarama',
@@ -569,102 +572,117 @@ class _HeroSection extends StatelessWidget {
               ),
             ),
             Positioned(
-              bottom: 60,
-              left: 20,
+              bottom: 108,
+              left: 10,
               child: _floatingCard(
-                icon: Icons.inventory_2,
-                label: 'Sipariş Takibi',
+                icon: Icons.sports_soccer,
+                label: 'Sporcu Takibi',
+                color: Colors.blue,
+              ),
+            ),
+            Positioned(
+              bottom: 60,
+              right: 16,
+              child: _floatingCard(
+                icon: Icons.apartment_outlined,
+                label: 'Kurumsal Analiz',
                 color: Colors.teal,
               ),
             ),
-            const Icon(Icons.accessibility_new,
-                size: 100, color: Colors.white54),
+            Positioned(
+              bottom: 18,
+              left: 30,
+              child: _floatingCard(
+                icon: Icons.design_services,
+                label: 'Kişisel İç Taban',
+                color: Colors.green,
+              ),
+            ),
+            const Icon(
+              Icons.accessibility_new,
+              size: 96,
+              color: Colors.white54,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _floatingCard(
-      {required IconData icon,
-      required String label,
-      required Color color}) {
+  Widget _floatingCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-              color: color.withOpacity(0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
+            color: color.withOpacity(0.20),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800)),
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Features ─────────────────────────────────────────────────────────────────
+// ── Platforma Genel Bakış ───────────────────────────────────────────────────
 
 class _FeaturesSection extends StatelessWidget {
   final bool isNarrow;
+
   const _FeaturesSection({required this.isNarrow});
 
-  static const List<Map<String, dynamic>> _features = [
+  static const List<Map<String, dynamic>> _groups = [
     {
-      'icon': Icons.scanner,
-      'color': Color(0xFF00897B),
-      'title': 'Ayak Tarama',
-      'desc':
-          'Yüksek çözünürlüklü 3D tarama ile ayak profilini hassas biçimde ölçün. Sonuçları anında kaydedin ve geçmişle karşılaştırın.',
+      'title': 'Uzmanlar',
+      'icon': Icons.medical_services_outlined,
+      'items': [
+        '3D ayak tarama ve analiz yönetimi',
+        'Basınç verisi takibi',
+        'Kişisel tabanlık tasarım süreci',
+        'Hasta ve sipariş operasyonları',
+      ],
     },
     {
-      'icon': Icons.thermostat,
-      'color': Color(0xFFE64A19),
-      'title': 'Basınç Analizi',
-      'desc':
-          'Gerçek zamanlı plantar basınç haritalaması ile yük dağılımını görselleştirin. Seri port entegrasyonu ile donanım direkt bağlanır.',
+      'title': 'Kullanıcılar',
+      'icon': Icons.accessibility_new,
+      'items': [
+        'Analiz sonuçlarını inceleme',
+        'Ölçüm geçmişini takip etme',
+        'Kişisel ürünlere erişim',
+        'Zamana göre gelişim grafikleri',
+      ],
     },
     {
-      'icon': Icons.design_services,
-      'color': Color(0xFF5C6BC0),
-      'title': 'Tabanlık Tasarımı',
-      'desc':
-          'Hastanın ölçümlerine göre özelleştirilmiş ortopedik tabanlık tasarımı oluşturun ve üretim için hazırlayın.',
-    },
-    {
-      'icon': Icons.people_alt,
-      'color': Color(0xFF039BE5),
-      'title': 'Hasta Yönetimi',
-      'desc':
-          'Tüm fizyometrik verileri, tedavi notlarını ve seans geçmişini tek bir dijital hasta profilinde saklayın.',
-    },
-    {
-      'icon': Icons.shopping_cart,
-      'color': Color(0xFF43A047),
-      'title': 'Sipariş & Stok',
-      'desc':
-          'Tabanlık siparişlerini oluşturun, takip edin ve laboratuvar ile kolay entegrasyon sağlayan bir akış üzerinden yönetin.',
-    },
-    {
-      'icon': Icons.bar_chart,
-      'color': Color(0xFFF9A825),
-      'title': 'Raporlama',
-      'desc':
-          'Klinik performansı, hasta istatistiklerini ve ürün analizlerini interaktif grafiklerle görüntüleyin.',
+      'title': 'Kurumsal',
+      'icon': Icons.apartment_outlined,
+      'items': [
+        'Departman bazlı ayak sağlığı analizi',
+        'Çalışan grubu risk takibi',
+        'Periyodik gelişim raporları',
+        'Operasyonel içgörü ve öneriler',
+      ],
     },
   ];
 
@@ -689,23 +707,23 @@ class _FeaturesSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Klinik iş akışınızı uçtan uca dijitalleştiren özellikler',
+            'Optiyou farklı kullanıcı grupları için özelleştirilmiş takip ve analiz deneyimi sunar.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
-          const SizedBox(height: 52),
+          const SizedBox(height: 42),
           Wrap(
-            spacing: 24,
-            runSpacing: 24,
+            spacing: 22,
+            runSpacing: 22,
             alignment: WrapAlignment.center,
-            children: _features
-                .map((f) => _FeatureCard(
-                      icon: f['icon'] as IconData,
-                      color: f['color'] as Color,
-                      title: f['title'] as String,
-                      desc: f['desc'] as String,
-                      isNarrow: isNarrow,
-                    ))
-                .toList(),
+            children: _groups.map((group) {
+              return _FeatureGroupCard(
+                title: group['title'] as String,
+                icon: group['icon'] as IconData,
+                items: group['items'] as List<String>,
+                isNarrow: isNarrow,
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -713,29 +731,27 @@ class _FeaturesSection extends StatelessWidget {
   }
 }
 
-class _FeatureCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
+class _FeatureGroupCard extends StatelessWidget {
   final String title;
-  final String desc;
+  final IconData icon;
+  final List<String> items;
   final bool isNarrow;
 
-  const _FeatureCard({
-    required this.icon,
-    required this.color,
+  const _FeatureGroupCard({
     required this.title,
-    required this.desc,
+    required this.icon,
+    required this.items,
     required this.isNarrow,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: isNarrow ? double.infinity : 310,
-      padding: const EdgeInsets.all(28),
+      width: isNarrow ? double.infinity : 340,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -748,37 +764,64 @@ class _FeatureCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: Colors.teal.withOpacity(0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 26),
+            child: Icon(icon, color: Colors.teal, size: 26),
           ),
           const SizedBox(height: 16),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A2340))),
-          const SizedBox(height: 8),
-          Text(desc,
-              style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                  height: 1.55)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A2340),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 3),
+                    child: Icon(
+                      Icons.check_circle_outline,
+                      size: 17,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        height: 1.45,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── About ────────────────────────────────────────────────────────────────────
-
-class _AboutSection extends StatelessWidget {
+// ── Analiz Sistemleri ────────────────────────────────────────────────────────────────
+class _AnalysisSystemsSection extends StatelessWidget {
   final bool isNarrow;
-  const _AboutSection({required this.isNarrow});
+
+  const _AnalysisSystemsSection({required this.isNarrow});
 
   @override
   Widget build(BuildContext context) {
@@ -787,309 +830,419 @@ class _AboutSection extends StatelessWidget {
       color: Colors.white,
       padding: EdgeInsets.symmetric(
         horizontal: isNarrow ? 24 : 80,
-        vertical: 80,
+        vertical: 72,
       ),
-      child: isNarrow
-          ? _content()
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(flex: 5, child: _visual()),
-                const SizedBox(width: 64),
-                Expanded(flex: 5, child: _content()),
-              ],
-            ),
-    );
-  }
-
-  Widget _content() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: Colors.teal.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text('Hakkımızda',
-              style: TextStyle(
-                  color: Colors.teal,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13)),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'OptiYou Kimdir?',
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1A2340),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'OptiYou, ortopedik sağlık profesyonelleri için geliştirilmiş bir teknoloji şirketidir. Misyonumuz; ayak sağlığı ve ortotik çözümler alanında klinisyenlere güçlü dijital araçlar sunarak hasta bakımını iyileştirmek ve iş süreçlerini optimize etmektir.',
-          style: TextStyle(
-              color: Colors.grey.shade600, fontSize: 15, height: 1.65),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Platformumuz; ayak tarama cihazları, basınç sensörleri ve özel yazılım altyapısı ile bütünleşik bir ekosistem sunar. Veri güvenliği ve hasta mahremiyeti her zaman ön plandadır.',
-          style: TextStyle(
-              color: Colors.grey.shade600, fontSize: 15, height: 1.65),
-        ),
-        const SizedBox(height: 28),
-        _bulletPoint('Bulut tabanlı güvenli altyapı'),
-        _bulletPoint('Çoklu klinik ve kullanıcı yönetimi'),
-        _bulletPoint('Gerçek zamanlı donanım entegrasyonu'),
-        _bulletPoint('KVKK uyumlu veri işleme'),
-      ],
-    );
-  }
-
-  Widget _bulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: const BoxDecoration(
-              color: Colors.teal,
-              shape: BoxShape.circle,
+          const Text(
+            'Analiz Sistemlerimiz',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A2340),
             ),
-            child:
-                const Icon(Icons.check, color: Colors.white, size: 13),
           ),
-          const SizedBox(width: 10),
-          Text(text,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1A2340))),
+          const SizedBox(height: 12),
+          Text(
+            'Optiyou analiz sistemleri; 3D ayak tarama, ayak sağlığı analizi ve farklı operasyonel ihtiyaçlara uygun tarama altyapısı sunar.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 42),
+          Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            alignment: WrapAlignment.center,
+            children: [
+              _AnalysisSystemCard(
+                isNarrow: isNarrow,
+                title: 'OY Scan',
+                subtitle: 'Modüler ayak sağlığı analiz sistemi',
+                description:
+                    'OY Scan; 3D ayak tarama ve ayak sağlığı analizi için geliştirilen modüler bir sistemdir. Klinik, uzman ve bireysel kullanım senaryolarına uygundur.',
+                imagePath: 'assets/images/systems/oy_scan.png',
+                highlights: const [
+                  '3D ayak tarama',
+                  'Ayak sağlığı analizi',
+                  'Modüler genişleme yapısı',
+                  'Klinik ve uzman kullanımı',
+                ],
+                comparisonItems: const [
+                  _SystemComparisonItem(label: '3D ayak tarama', available: true),
+                  _SystemComparisonItem(label: 'Ayak sağlığı analizi', available: true),
+                  _SystemComparisonItem(label: 'Plantar basınç ölçümü', available: true),
+                  _SystemComparisonItem(label: 'Ayakkabı içi dinamik ölçüm', available: true),
+                  _SystemComparisonItem(label: 'Yüksek hacimli tarama', available: false),
+                  _SystemComparisonItem(label: 'Fabrika / yoğun sirkülasyon', available: false),
+                ],
+                modules: const [
+                  _SystemMiniModule(
+                    title: 'Plantar Basınç Ölçüm Pedi',
+                    imagePath: 'assets/images/systems/plantar_pressure_pad.png',
+                  ),
+                  _SystemMiniModule(
+                    title: 'Ayakkabı İçi Dinamik Modül',
+                    imagePath: 'assets/images/systems/inshoe_dynamic_pressure.png',
+                  ),
+                ],
+              ),
+              _AnalysisSystemCard(
+                isNarrow: isNarrow,
+                title: 'OY Scan Pro',
+                subtitle: 'Yüksek hacimli tarama için gelişmiş sistem',
+                description:
+                    'OY Scan Pro; daha hızlı ayak tarama yapısı ile yüksek sirkülasyonlu alanlarda, kurumsal tarama operasyonlarında ve fabrikalarda verimli kullanım sağlar.',
+                imagePath: 'assets/images/systems/oy_scan_pro.png',
+                highlights: const [
+                  'Yüksek hızda ayak tarama',
+                  'Kurumsal saha kullanımı',
+                  'Yoğun çalışan grupları için uygun',
+                  'Toplu analiz operasyonları',
+                ],
+                comparisonItems: const [
+                  _SystemComparisonItem(label: '3D ayak tarama', available: true),
+                  _SystemComparisonItem(label: 'Ayak sağlığı analizi', available: true),
+                  _SystemComparisonItem(label: 'Plantar basınç ölçümü', available: false),
+                  _SystemComparisonItem(label: 'Ayakkabı içi dinamik ölçüm', available: false),
+                  _SystemComparisonItem(label: 'Yüksek hacimli tarama', available: true),
+                  _SystemComparisonItem(label: 'Fabrika / yoğun sirkülasyon', available: true),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _visual() {
-    return Container(
-      height: 380,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.teal.shade50,
-            Colors.teal.shade100,
+class _SystemComparisonItem {
+  final String label;
+  final bool available;
+
+  const _SystemComparisonItem({
+    required this.label,
+    required this.available,
+  });
+}
+
+class _SystemMiniModule {
+  final String title;
+  final String imagePath;
+
+  const _SystemMiniModule({
+    required this.title,
+    required this.imagePath,
+  });
+}
+
+class _AnalysisSystemCard extends StatefulWidget {
+  final bool isNarrow;
+  final String title;
+  final String subtitle;
+  final String description;
+  final String imagePath;
+  final List<String> highlights;
+  final List<_SystemComparisonItem> comparisonItems;
+  final List<_SystemMiniModule> modules;
+
+  const _AnalysisSystemCard({
+    required this.isNarrow,
+    required this.title,
+    required this.subtitle,
+    required this.description,
+    required this.imagePath,
+    required this.highlights,
+    required this.comparisonItems,
+    this.modules = const [],
+  });
+
+  @override
+  State<_AnalysisSystemCard> createState() => _AnalysisSystemCardState();
+}
+
+class _AnalysisSystemCardState extends State<_AnalysisSystemCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: widget.isNarrow ? double.infinity : 520,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F9FB),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.teal.withOpacity(_hovered ? 0.20 : 0.10),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(_hovered ? 0.08 : 0.04),
+              blurRadius: _hovered ? 18 : 10,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                widget.imagePath,
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              widget.title,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A2340),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.subtitle,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.teal.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              widget.description,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Öne Çıkanlar',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF1A2340),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...widget.highlights.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        size: 17,
+                        color: Colors.teal,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: TextStyle(
+                          color: Colors.grey.shade800,
+                          fontSize: 14,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (widget.modules.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'Opsiyonel Ölçüm Modülleri',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF1A2340),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: widget.modules.map((module) {
+                  return _SystemMiniModuleCard(module: module);
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 18),
+            const Text(
+              'Sistem Uygunluğu',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF1A2340),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: widget.comparisonItems.map((item) {
+                return _SystemAvailabilityChip(item: item);
+              }).toList(),
+            ),
+          ],
+        ),
       ),
-      child: Stack(
-        alignment: Alignment.center,
+    );
+  }
+}
+
+class _SystemMiniModuleCard extends StatelessWidget {
+  final _SystemMiniModule module;
+
+  const _SystemMiniModuleCard({
+    required this.module,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.teal.withOpacity(0.08)),
+      ),
+      child: Row(
         children: [
-          Positioned(
-            top: 40,
-            left: 40,
-            child: _infoChip(Icons.verified_user, 'KVKK Uyumlu', Colors.teal),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.asset(
+              module.imagePath,
+              width: 54,
+              height: 54,
+              fit: BoxFit.cover,
+            ),
           ),
-          Positioned(
-            bottom: 40,
-            right: 40,
-            child: _infoChip(
-                Icons.cloud_done, 'Bulut Yedekleme', Colors.blue),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              module.title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A2340),
+                height: 1.35,
+              ),
+            ),
           ),
-          const Icon(Icons.accessibility_new,
-              size: 140, color: Colors.teal),
         ],
       ),
     );
   }
+}
 
-  Widget _infoChip(IconData icon, String label, Color color) {
+class _SystemAvailabilityChip extends StatelessWidget {
+  final _SystemComparisonItem item;
+
+  const _SystemAvailabilityChip({
+    required this.item,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = item.available
+        ? Colors.green.withOpacity(0.10)
+        : Colors.grey.withOpacity(0.12);
+
+    final textColor = item.available ? Colors.green.shade700 : Colors.grey.shade700;
+    final iconColor = item.available ? Colors.green : Colors.grey;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: color.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
-        ],
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 18),
+          Icon(
+            item.available ? Icons.check_circle : Icons.remove_circle_outline,
+            size: 16,
+            color: iconColor,
+          ),
           const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── CTA ──────────────────────────────────────────────────────────────────────
-
-class _CtaSection extends StatelessWidget {
-  final VoidCallback onGetStarted;
-  final VoidCallback onLogin;
-  const _CtaSection({required this.onGetStarted, required this.onLogin});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF00695C), Color(0xFF00897B)],
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 72),
-      child: Column(
-        children: [
-          const Text(
-            'Klinik Yönetiminizi Dijitalleştirin',
-            textAlign: TextAlign.center,
+          Text(
+            item.label,
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.bold,
+              color: textColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 14),
-          Text(
-            'Hemen ücretsiz hesap oluşturun ve OptiYou\'nun tüm özelliklerini deneyin.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: Colors.white.withOpacity(0.85), fontSize: 16),
-          ),
-          const SizedBox(height: 36),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: onGetStarted,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.teal.shade800,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 16),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Ücretsiz Kaydol',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 14),
-              OutlinedButton(
-                onPressed: onLogin,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side:
-                      BorderSide(color: Colors.white.withOpacity(0.6)),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 28, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Giriş Yap',
-                    style: TextStyle(fontSize: 16)),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 }
 
-// ── Footer ───────────────────────────────────────────────────────────────────
-
-class _Footer extends StatelessWidget {
-  const _Footer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF1A2340),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.teal,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.accessibility_new,
-                    color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Text('OptiYou',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Ayak sağlığında dijital dönüşüm.',
-            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          Divider(color: Colors.white.withOpacity(0.1)),
-          const SizedBox(height: 14),
-          Text(
-            '© 2026 OptiYou. Tüm hakları saklıdır.',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ── Hizmetler ────────────────────────────────────────────────────────────────
 
 class _ServicesSection extends StatelessWidget {
   final bool isNarrow;
+
   const _ServicesSection({required this.isNarrow});
 
   static const services = [
     {
       'icon': Icons.health_and_safety,
       'title': 'Ayak Sağlığı Ekosistemi',
-      'desc': 'Dijital takip ve analiz sistemi ile ayak sağlığınızı sürekli izleyin.',
+      'desc': 'Dijital takip ve analiz sistemi ile ayak sağlığınızı izleyin.',
+      'more':
+          'Periyodik analizler, risk dağılımı, kullanıcı geçmişi ve veri tabanlı içgörüleri tek platformda yönetin.',
+      'image': 'assets/images/services/foot_health_ecosystem.png',
     },
     {
       'icon': Icons.design_services,
       'title': 'Kişisel Ortopedik Tasarım',
       'desc': 'Kişiye özel ortopedik ürünler ve tabanlık tasarımları.',
+      'more':
+          'Tarama ve basınç analizinden sonra ayağa özel ürün geliştirme ve üretim hazırlık sürecini destekler.',
+      'image': 'assets/images/services/personal_orthopedic_design.png',
     },
     {
       'icon': Icons.sports_soccer,
       'title': 'Sporcu Takip Sistemi',
       'desc': 'Performans ve sakatlık riskini takip eden sistem.',
+      'more':
+          'Sporcularda basış, yük dağılımı ve destek ihtiyacı analiz edilerek performans takibi yapılır.',
+      'image': 'assets/images/services/athlete_tracking.png',
     },
     {
       'icon': Icons.factory,
       'title': 'Kurumsal Üretim (B2B)',
       'desc': 'Toplu üretim ve takip sistemleri.',
+      'more':
+          'Departman, görev ve demografik kırılımlarla kurumsal firmalarda ayak sağlığı eğilimlerini analiz edin.',
+      'image': 'assets/images/services/corporate_b2b.png',
     },
   ];
 
@@ -1108,6 +1261,15 @@ class _ServicesSection extends StatelessWidget {
             'Hizmetlerimiz',
             style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 10),
+          Text(
+            'Optiyou çözümleri bireysel, uzman ve kurumsal kullanım senaryolarına göre şekillenir.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+            ),
+          ),
           const SizedBox(height: 40),
           Wrap(
             spacing: 20,
@@ -1117,6 +1279,8 @@ class _ServicesSection extends StatelessWidget {
                 icon: s['icon'] as IconData,
                 title: s['title'] as String,
                 desc: s['desc'] as String,
+                more: s['more'] as String,
+                imagePath: s['image'] as String,
                 isNarrow: isNarrow,
               );
             }).toList(),
@@ -1127,57 +1291,137 @@ class _ServicesSection extends StatelessWidget {
   }
 }
 
-class _ServiceCard extends StatelessWidget {
+class _ServiceCard extends StatefulWidget {
   final IconData icon;
   final String title;
   final String desc;
+  final String more;
+  final String imagePath;
   final bool isNarrow;
 
   const _ServiceCard({
     required this.icon,
     required this.title,
     required this.desc,
+    required this.more,
+    required this.imagePath,
     required this.isNarrow,
   });
 
   @override
+  State<_ServiceCard> createState() => _ServiceCardState();
+}
+
+class _ServiceCardState extends State<_ServiceCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: isNarrow ? double.infinity : 260,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 40, color: Colors.teal),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(desc, textAlign: TextAlign.center),
-        ],
+    final width = widget.isNarrow ? double.infinity : 270.0;
+    final height = _hovered ? 360.0 : 230.0;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: width,
+        height: height,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(_hovered ? 0.08 : 0.03),
+              blurRadius: _hovered ? 16 : 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.teal.withOpacity(_hovered ? 0.20 : 0.08),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(widget.icon, size: 38, color: Colors.teal),
+            const SizedBox(height: 12),
+            Text(
+              widget.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.desc,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                height: 1.45,
+              ),
+            ),
+            if (_hovered) ...[
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  widget.imagePath,
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.more,
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
+// ── Ürünler ──────────────────────────────────────────────────────────────────
+
 class _ProductsSection extends StatelessWidget {
   final bool isNarrow;
-  const _ProductsSection({required this.isNarrow});
+  final VoidCallback onOpenStore;
+
+  const _ProductsSection({
+    required this.isNarrow,
+    required this.onOpenStore,
+  });
 
   static const products = [
     {
       'title': 'Kişisel Ortopedik İç Taban',
+      'desc': 'Günlük kullanım için kişiye özel destek.',
+      'image': 'assets/images/products/personal_insole.png',
     },
     {
       'title': 'Sporcu Tabanlığı',
+      'desc': 'Performans ve hareket için destekleyici yapı.',
+      'image': 'assets/images/products/sport_insole.png',
     },
     {
       'title': 'Yenileyici Sandalet',
+      'desc': 'Gün sonu rahatlama ve destek hissi.',
+      'image': 'assets/images/products/recovery_sandal.png',
     },
     {
       'title': 'Kişisel Ayakkabı',
+      'desc': 'Ayak yapınıza göre geliştirilen kişisel kullanım çözümü.',
+      'image': 'assets/images/products/personal_shoe.png',
     },
   ];
 
@@ -1196,14 +1440,26 @@ class _ProductsSection extends StatelessWidget {
             'Ürünlerimiz',
             style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 10),
+          Text(
+            'Optiyou ürünleri analiz sonuçlarına göre kişisel veya hedefli kullanım senaryolarına uyarlanır.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+            ),
+          ),
           const SizedBox(height: 40),
           Wrap(
             spacing: 20,
             runSpacing: 20,
             children: products.map((p) {
               return _ProductCard(
-                title: p['title']!,
+                title: p['title'] as String,
+                desc: p['desc'] as String,
+                imagePath: p['image'] as String,
                 isNarrow: isNarrow,
+                onOpen: onOpenStore,
               );
             }).toList(),
           ),
@@ -1213,63 +1469,128 @@ class _ProductsSection extends StatelessWidget {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends StatefulWidget {
   final String title;
+  final String desc;
+  final String imagePath;
   final bool isNarrow;
+  final VoidCallback onOpen;
 
   const _ProductCard({
     required this.title,
+    required this.desc,
+    required this.imagePath,
     required this.isNarrow,
+    required this.onOpen,
   });
 
   @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: isNarrow ? double.infinity : 260,
-      height: 200,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Center(
-        child: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: widget.isNarrow ? double.infinity : 270,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(_hovered ? 0.09 : 0.05),
+              blurRadius: _hovered ? 16 : 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.teal.withOpacity(_hovered ? 0.18 : 0.06),
+          ),
+        ),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              child: Image.asset(
+                widget.imagePath,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.desc,
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: widget.onOpen,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            _hovered ? Colors.teal.shade700 : Colors.teal,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Ürünü İncele'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+// ── Rakamlarla Etkimiz ───────────────────────────────────────────────────────
+
 class _ImpactStatsSection extends StatelessWidget {
   final bool isNarrow;
+
   const _ImpactStatsSection({required this.isNarrow});
 
   static const stats = [
     {
-      'value': '%67',
-      'title': 'Yanlış Ayakkabı Ebatı',
-      'desc':
-          'İnsanların önemli bir kısmı ayağına uygun olmayan ebatta ayakkabı kullanıyor.',
-    },
-    {
       'value': '%30',
       'title': 'Ağrılarda Azalma',
       'desc':
-          'Kişisel iç tabanlık kullanımıyla ayak, bel ve eklem ağrılarında düşüş gözlemlenebilir.',
+          'Kişisel iç tabanlık kullanımında ayak, bel ve eklem ağrılarında düşüş gözlemlenebilir.',
     },
     {
       'value': '%40',
       'title': 'Metatarsal Basınç Azalması',
       'desc':
-          'Ayağın metatarsal bölgesindeki yük ve basınç anlamlı ölçüde azaltılabilir.',
+          'Ayağın metatarsal bölgesindeki yük ve basınç belirgin biçimde azaltılabilir.',
     },
     {
       'value': '%87',
@@ -1281,13 +1602,13 @@ class _ImpactStatsSection extends StatelessWidget {
       'value': '%10',
       'title': 'Diz Rotasyonunda Azalma',
       'desc':
-          'Diz eklemindeki yanal dönüş hareketi azaltılarak biyomekanik denge desteklenebilir.',
+          'Diz eklemindeki yanal dönüş hareketinde azalma ile biyomekanik denge desteklenebilir.',
     },
     {
       'value': '%12',
       'title': 'İçe Dönmede Azalma',
       'desc':
-          'Ayak bileği inversiyon momentinde azalma ile daha dengeli bir basış elde edilebilir.',
+          'Ayak bileği inversiyon momentindeki düşüş daha dengeli bir basış sağlayabilir.',
     },
   ];
 
@@ -1312,7 +1633,7 @@ class _ImpactStatsSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Ayak sağlığı, ortopedik destek ve kullanıcı deneyimine dair öne çıkan sonuçlar',
+            'Ayak sağlığı ve ortopedik destek süreçlerinde öne çıkan etkiler',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey.shade600,
@@ -1397,8 +1718,11 @@ class _ImpactStatCard extends StatelessWidget {
   }
 }
 
+// ── Kimin İçin ───────────────────────────────────────────────────────────────
+
 class _KimIcinSection extends StatelessWidget {
   final bool isNarrow;
+
   const _KimIcinSection({required this.isNarrow});
 
   static const targets = [
@@ -1478,7 +1802,7 @@ class _KimIcinSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'OptiYou çözümleri farklı yaş, ihtiyaç ve kullanım senaryolarına uygun olarak tasarlanır.',
+            'Optiyou çözümleri farklı yaş, ihtiyaç ve kullanım senaryolarına uygun olarak tasarlanır.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey.shade600,
@@ -1603,8 +1927,11 @@ class _TargetUserCard extends StatelessWidget {
   }
 }
 
+// ── Merkezler ────────────────────────────────────────────────────────────────
+
 class _MeasurementCentersSection extends StatelessWidget {
   final bool isNarrow;
+
   const _MeasurementCentersSection({required this.isNarrow});
 
   static const centers = [
@@ -1620,16 +1947,14 @@ class _MeasurementCentersSection extends StatelessWidget {
       'title': 'İzmir Tınaztepe Üniversitesi Dijital Üretim Laboratuvarı (DML)',
       'subtitle': 'İzmir Tınaztepe Üniversitesi',
       'city': 'İzmir',
-      'address':
-          'Aydoğdu, 1267/1 Sk No:4 C Blok, 35400 Buca/İzmir',
+      'address': 'Aydoğdu, 1267/1 Sk No:4 C Blok, 35400 Buca/İzmir',
       'icon': Icons.precision_manufacturing_outlined,
     },
     {
       'title': 'Entertech İstanbul Teknokent Üniversite',
       'subtitle': 'Entertech İstanbul Teknokent',
       'city': 'İstanbul',
-      'address':
-          'Sarıgül Sk. No:37/1 İç Kapı No:97, 34320 Avcılar/İstanbul',
+      'address': 'Sarıgül Sk. No:37/1 İç Kapı No:97, 34320 Avcılar/İstanbul',
       'icon': Icons.apartment_outlined,
     },
   ];
@@ -1683,6 +2008,7 @@ class _MeasurementCentersSection extends StatelessWidget {
     );
   }
 }
+
 class _MeasurementCenterCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -1733,10 +2059,8 @@ class _MeasurementCenterCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.teal.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(999),
@@ -1791,6 +2115,330 @@ class _MeasurementCenterCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Hakkımızda ───────────────────────────────────────────────────────────────
+
+class _AboutSection extends StatelessWidget {
+  final bool isNarrow;
+
+  const _AboutSection({required this.isNarrow});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 24 : 80,
+        vertical: 80,
+      ),
+      child: isNarrow
+          ? _content()
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(flex: 5, child: _visual()),
+                const SizedBox(width: 64),
+                Expanded(flex: 5, child: _content()),
+              ],
+            ),
+    );
+  }
+
+  Widget _content() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.teal.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'Hakkımızda',
+            style: TextStyle(
+              color: Colors.teal,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Optiyou Nedir?',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A2340),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Optiyou; ayak sağlığı analizi, ortopedik ürün tasarımı ve dijital takip süreçlerini bir araya getiren teknoloji odaklı bir çözüm ekosistemidir. Bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için veri destekli değerlendirme ve ürünleştirme altyapısı sunar.',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 15,
+            height: 1.65,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Amacımız; ayak sağlığı verilerini daha anlaşılır, daha takip edilebilir ve daha uygulanabilir hale getirerek hem kişisel yaşam kalitesini hem de operasyonel faydayı artırmaktır.',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 15,
+            height: 1.65,
+          ),
+        ),
+        const SizedBox(height: 28),
+        _bulletPoint('Bireysel ve uzman odaklı dijital analiz deneyimi'),
+        _bulletPoint('Kişisel ortopedik ürün tasarım ve yönlendirme süreci'),
+        _bulletPoint('Sporcu performansı ve yük takibi'),
+        _bulletPoint('Kurumsal firmalar için toplu sağlık içgörüleri'),
+      ],
+    );
+  }
+
+  Widget _bulletPoint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: const BoxDecoration(
+              color: Colors.teal,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 13),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1A2340),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _visual() {
+    return Container(
+      height: 400,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.teal.shade50,
+            Colors.teal.shade100,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 34,
+            left: 24,
+            child: _infoChip(
+              Icons.show_chart,
+              'Dijital Ayak Analizi',
+              Colors.teal,
+            ),
+          ),
+          Positioned(
+            top: 110,
+            right: 20,
+            child: _infoChip(
+              Icons.design_services,
+              'Kişisel Ortopedik Ürünler',
+              Colors.deepPurple,
+            ),
+          ),
+          Positioned(
+            bottom: 110,
+            left: 24,
+            child: _infoChip(
+              Icons.sports_soccer,
+              'Sporcu Takibi',
+              Colors.blue,
+            ),
+          ),
+          Positioned(
+            bottom: 34,
+            right: 24,
+            child: _infoChip(
+              Icons.apartment_outlined,
+              'Kurumsal Sağlık Analitiği',
+              Colors.orange,
+            ),
+          ),
+          const Icon(
+            Icons.accessibility_new,
+            size: 140,
+            color: Colors.teal,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── CTA ──────────────────────────────────────────────────────────────────────
+
+class _CtaSection extends StatelessWidget {
+  final VoidCallback onGetStarted;
+  final VoidCallback onLogin;
+
+  const _CtaSection({
+    required this.onGetStarted,
+    required this.onLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF00695C), Color(0xFF00897B)],
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 72),
+      child: Column(
+        children: [
+          const Text(
+            'Ayak Sağlığında Dijital Takibe Geçin',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Optiyou ile analiz, takip ve kişisel çözüm süreçlerini tek platformda deneyimleyin.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 36),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: onGetStarted,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.teal.shade800,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Kayıt Ol',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 14),
+              OutlinedButton(
+                onPressed: onLogin,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withOpacity(0.6)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Giriş Yap',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+
+class _Footer extends StatelessWidget {
+  const _Footer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF1A2340),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
+      child: Column(
+        children: [
+          Image.asset(
+            'assets/images/branding/logo_footer.png',
+            height: 48,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '© 2026 Tüm hakları saklıdır.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.45),
+              fontSize: 12,
+            ),
           ),
         ],
       ),

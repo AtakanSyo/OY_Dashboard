@@ -33,7 +33,7 @@ class Sidebar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/branding/logo.png',
                   height: 40,
                 ),
               ),
