@@ -448,6 +448,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   Widget _buildSelectedFootPanel(CustomerAnalysisResult result) {
     final isLeft = _selectedFootSide == FootSelectionSide.left;
     final foot = isLeft ? result.leftFoot : result.rightFoot;
+    final report = result.parsedReport;
+
     final title = isLeft ? 'Sol Ayak Detayı' : 'Sağ Ayak Detayı';
     final textAlign = isLeft ? TextAlign.left : TextAlign.right;
     final crossAlign =
@@ -489,6 +491,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             textAlign: textAlign,
             crossAlign: crossAlign,
           ),
+          if (report != null) ...[
+            const SizedBox(height: 18),
+            _buildClinicalEvaluationPanel(
+              result: result,
+              isLeft: isLeft,
+            ),
+          ],
           const SizedBox(height: 18),
           _buildFootVisuals(
             isLeft: isLeft,
@@ -517,6 +526,128 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         _infoBox('Kemer Desteği', foot.archSupportNeed, textAlign, crossAlign),
         _infoBox('Ana Bulgular', foot.mainFinding, textAlign, crossAlign),
       ],
+    );
+  }
+
+
+  Widget _buildClinicalEvaluationPanel({
+    required CustomerAnalysisResult result,
+    required bool isLeft,
+  }) {
+    final report = result.parsedReport;
+    if (report == null) return const SizedBox.shrink();
+
+    final archIndex =
+        isLeft ? report.leftArchIndex : report.rightArchIndex;
+    final archWidthIndex =
+        isLeft ? report.leftArchWidthIndex : report.rightArchWidthIndex;
+    final halluxAngle =
+        (isLeft ? report.leftHalluxAngle : report.rightHalluxAngle)?.abs();
+    final heelAngle =
+        (isLeft ? report.leftPronatorAngle : report.rightPronatorAngle)?.abs();
+    final kneeAngle =
+        (isLeft ? report.leftKneeAngle : report.rightKneeAngle)?.abs();
+
+    return _subPanel(
+      title: 'Klinik Değerlendirme',
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          ClinicalEvaluationCard(
+            title: 'Kemer Yüksekliği Faktörü',
+            value: archIndex,
+            unit: '',
+            minValue: 0.16,
+            maxValue: 0.34,
+            normalMin: 0.21,
+            normalMax: 0.26,
+            lowLabel: 'Yüksek Ark',
+            normalLabel: 'Normal',
+            highLabel: 'Düz Taban',
+          ),
+          ClinicalEvaluationCard(
+            title: 'Kemer Genişliği Faktörü',
+            value: archWidthIndex,
+            unit: '',
+            minValue: 0.30,
+            maxValue: 0.70,
+            normalMin: 0.42,
+            normalMax: 0.52,
+            lowLabel: 'Yüksek Ark Eğilimi',
+            normalLabel: 'Normal',
+            highLabel: 'Düz Taban Eğilimi',
+          ),
+          ClinicalEvaluationCard(
+            title: 'Halluks Açısı',
+            value: halluxAngle,
+            unit: '°',
+            minValue: 0,
+            maxValue: 40,
+            normalMin: 0,
+            normalMax: 10,
+            lowLabel: 'Normal',
+            normalLabel: 'Normal',
+            highLabel: 'Risk Artışı',
+            oneDirectional: true,
+          ),
+          ClinicalEvaluationCard(
+            title: 'Topuk Açısı',
+            value: heelAngle,
+            unit: '°',
+            minValue: 0,
+            maxValue: 20,
+            normalMin: 0,
+            normalMax: 4,
+            lowLabel: 'Normal',
+            normalLabel: 'Normal',
+            highLabel: 'Risk Artışı',
+            oneDirectional: true,
+          ),
+          ClinicalEvaluationCard(
+            title: 'Diz Açısı',
+            value: kneeAngle,
+            unit: '°',
+            minValue: 0,
+            maxValue: 20,
+            normalMin: 0,
+            normalMax: 4,
+            lowLabel: 'Normal',
+            normalLabel: 'Normal',
+            highLabel: 'Risk Artışı',
+            oneDirectional: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _subPanel({
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
     );
   }
 
@@ -901,5 +1032,237 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ],
       ),
     );
+  }
+}
+
+class ClinicalEvaluationCard extends StatelessWidget {
+  final String title;
+  final double? value;
+  final String unit;
+  final double minValue;
+  final double maxValue;
+  final double normalMin;
+  final double normalMax;
+  final String lowLabel;
+  final String normalLabel;
+  final String highLabel;
+  final bool oneDirectional;
+
+  const ClinicalEvaluationCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.unit,
+    required this.minValue,
+    required this.maxValue,
+    required this.normalMin,
+    required this.normalMax,
+    required this.lowLabel,
+    required this.normalLabel,
+    required this.highLabel,
+    this.oneDirectional = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currentValue = value;
+    final safeValue = currentValue == null
+        ? null
+        : currentValue!.clamp(minValue, maxValue).toDouble();
+
+    final markerPosition = safeValue == null
+        ? 0.0
+        : ((safeValue - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
+
+    final status = _statusText(currentValue);
+    final statusColor = _statusColor(currentValue);
+
+    return Container(
+      width: 240,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Text(
+                currentValue == null
+                    ? '—'
+                    : '${currentValue.toStringAsFixed(2)}$unit',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final markerLeft = (width * markerPosition) - 6;
+
+              return SizedBox(
+                height: 28,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      top: 9,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          gradient: LinearGradient(
+                            colors: oneDirectional
+                                ? const [
+                                    Colors.green,
+                                    Colors.orange,
+                                    Colors.red,
+                                  ]
+                                : const [
+                                    Colors.red,
+                                    Colors.orange,
+                                    Colors.green,
+                                    Colors.orange,
+                                    Colors.red,
+                                  ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (safeValue != null)
+                      Positioned(
+                        top: 3,
+                        left: markerLeft.clamp(0, width - 12),
+                        child: Container(
+                          width: 12,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.teal,
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  lowLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  normalLabel,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  highLabel,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _statusText(double? value) {
+    if (value == null) return 'Veri yok';
+
+    if (oneDirectional) {
+      if (value <= normalMax) return 'Normal';
+      if (value <= (normalMax * 2)) return 'Hafif';
+      if (value <= (normalMax * 3)) return 'Orta';
+      return 'İleri';
+    }
+
+    if (value >= normalMin && value <= normalMax) {
+      return 'Normal aralık';
+    }
+
+    if (value < normalMin) {
+      return lowLabel;
+    }
+
+    return highLabel;
+  }
+
+  Color _statusColor(double? value) {
+    if (value == null) return Colors.grey;
+
+    if (oneDirectional) {
+      if (value <= normalMax) return Colors.green;
+      if (value <= (normalMax * 2)) return Colors.orange;
+      if (value <= (normalMax * 3)) return Colors.deepOrange;
+      return Colors.red;
+    }
+
+    if (value >= normalMin && value <= normalMax) return Colors.green;
+    return Colors.red;
   }
 }

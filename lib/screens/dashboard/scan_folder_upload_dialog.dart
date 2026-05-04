@@ -319,27 +319,6 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
           ),
 
           _buildPreviewSection(
-            title: 'Açı Ölçümleri',
-            children: [
-              _buildPairPreviewRow(
-                ScanReportLabels.tr('Hallux angle'),
-                report.leftHalluxAngle,
-                report.rightHalluxAngle,
-              ),
-              _buildPairPreviewRow(
-                ScanReportLabels.tr('Pronator angle'),
-                report.leftPronatorAngle,
-                report.rightPronatorAngle,
-              ),
-              _buildPairPreviewRow(
-                ScanReportLabels.tr('Knee angle'),
-                report.leftKneeAngle,
-                report.rightKneeAngle,
-              ),
-            ],
-          ),
-
-          _buildPreviewSection(
             title: 'Kemer Analizi',
             children: [
               _buildPairPreviewRow(
@@ -361,12 +340,28 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
           ),
 
           _buildPreviewSection(
-            title: 'Halluks / Topuk Analizi',
+            title: 'Halluks Analizi',
             children: [
+              _buildPairPreviewRow(
+                ScanReportLabels.tr('Hallux angle'),
+                report.leftHalluxAngle,
+                report.rightHalluxAngle,
+              ),
               _buildPairPreviewRow(
                 ScanReportLabels.tr('Hallux type'),
                 report.leftHalluxType,
                 report.rightHalluxType,
+              ),
+            ],
+          ),
+
+          _buildPreviewSection(
+            title: 'Topuk Analizi',
+            children: [
+              _buildPairPreviewRow(
+                'Topuk Açısı (°)',
+                report.leftPronatorAngle,
+                report.rightPronatorAngle,
               ),
               _buildPairPreviewRow(
                 ScanReportLabels.tr('Heel type'),
@@ -374,25 +369,14 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                 report.rightHeelType,
               ),
               _buildPairPreviewRow(
+                ScanReportLabels.tr('Knee angle'),
+                report.leftKneeAngle,
+                report.rightKneeAngle,
+              ),
+              _buildPairPreviewRow(
                 ScanReportLabels.tr('Knee type'),
                 report.leftKneeType,
                 report.rightKneeType,
-              ),
-            ],
-          ),
-
-          _buildPreviewSection(
-            title: 'Ayakkabı / Tabanlık',
-            children: [
-              _buildPairPreviewRow(
-                ScanReportLabels.tr('Shoe size'),
-                report.leftShoeSize,
-                report.rightShoeSize,
-              ),
-              _buildPairPreviewRow(
-                ScanReportLabels.tr('Insole recommendation'),
-                report.leftInsoleRecommendation,
-                report.rightInsoleRecommendation,
               ),
             ],
           ),
@@ -410,20 +394,6 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                 ),
               ],
             ),
-
-          _buildPreviewSection(
-            title: 'Ham Veri Durumu',
-            children: [
-              _buildPreviewRow(
-                'Ham metin mevcut mu',
-                report.rawText == null || report.rawText!.isEmpty ? 'Hayır' : 'Evet',
-              ),
-              _buildPreviewRow(
-                'Çekirdek ölçüm bulundu mu',
-                report.hasAnyCoreMeasurement ? 'Evet' : 'Hayır',
-              ),
-            ],
-          ),
         ],
       ),
     );
