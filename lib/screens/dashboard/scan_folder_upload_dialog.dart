@@ -12,6 +12,7 @@ import 'package:oy_site/services/analysis/plantar_pressure_mock_factory.dart';
 import 'package:oy_site/services/scan/scan_report_pdf_parser_service.dart';
 import 'package:oy_site/services/scan/session_scan_assets_parser.dart';
 import 'package:oy_site/services/session_analysis_service.dart';
+import 'package:oy_site/data/repositories/supabase_session_scan_repository.dart';
 
 class ScanFolderUploadResult {
   final String folderPath;
@@ -30,9 +31,16 @@ class ScanFolderUploadResult {
 class ScanFolderUploadDialog extends StatefulWidget {
   final int? targetUserId;
 
+  final int? sessionId;
+  final int? patientId;
+  final int? expertUserId;
+
   const ScanFolderUploadDialog({
     super.key,
     this.targetUserId,
+    this.sessionId,
+    this.patientId,
+    this.expertUserId,
   });
 
   @override
@@ -48,6 +56,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
 
   final SupabaseAnalysisRepository _analysisRepository =
       SupabaseAnalysisRepository();
+
+  final SupabaseSessionScanRepository _scanRepository =
+      SupabaseSessionScanRepository();
 
   String? _selectedFolderPath;
   List<String> _fileNames = [];
@@ -134,6 +145,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _isLoading = false;
       });
 
+      await _saveScanDataToSupabase();
+
       if (parsedReport != null) {
         await _saveParsedReportAsAnalysisResult();
       }
@@ -157,6 +170,45 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         parsedReport: _parsedReport,
       ),
     );
+  }
+
+  Future<void> _saveScanDataToSupabase() async {
+    final sessionId = widget.sessionId;
+    final patientId = widget.patientId;
+    final expertUserId = widget.expertUserId;
+
+    if (sessionId == null || patientId == null || expertUserId == null) {
+      return;
+    }
+
+    if (_parsedReport == null && _scanAssets == null) {
+      return;
+    }
+
+    try {
+      await _scanRepository.saveScanData(
+        sessionId: sessionId,
+        patientId: patientId,
+        expertUserId: expertUserId,
+        parsedReport: _parsedReport,
+        assets: _scanAssets,
+        detectedPdfPath: _detectedPdfPath,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _saveMessage = '3D scan verileri Supabase’e kaydedildi.';
+      });
+    } catch (e) {
+      debugPrint('3D scan kayıt hatası: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _saveMessage = '3D scan verileri kaydedilemedi: $e';
+      });
+    }
   }
 
   Future<void> _saveParsedReportAsAnalysisResult() async {

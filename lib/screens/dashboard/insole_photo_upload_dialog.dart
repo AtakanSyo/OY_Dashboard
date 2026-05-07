@@ -1,12 +1,25 @@
+import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:oy_site/data/repositories/supabase_session_reference_photo_repository.dart';
+import 'package:oy_site/models/session_reference_photo_model.dart';
 import 'package:oy_site/services/file_bytes_helper.dart';
 
 class InsolePhotoUploadDialog extends StatefulWidget {
-  const InsolePhotoUploadDialog({super.key});
+  final int? sessionId;
+  final int? patientId;
+  final int? expertUserId;
+
+  const InsolePhotoUploadDialog({
+    super.key,
+    this.sessionId,
+    this.patientId,
+    this.expertUserId,
+  });
 
   @override
   State<InsolePhotoUploadDialog> createState() =>
@@ -14,10 +27,17 @@ class InsolePhotoUploadDialog extends StatefulWidget {
 }
 
 class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
+  final SupabaseSessionReferencePhotoRepository _repository =
+      SupabaseSessionReferencePhotoRepository();
+
   Uint8List? _fileBytes;
   String? _fileName;
+  String? _localFilePath;
+  int? _sizeBytes;
+
   bool _isDragging = false;
   bool _isUploading = false;
+  String? _statusMessage;
 
   bool get _hasFile => _fileBytes != null;
 
@@ -34,7 +54,6 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
     final file = result.files.single;
     Uint8List? bytes = file.bytes;
 
-    // On desktop, bytes may be null — read from path.
     if (bytes == null && file.path != null) {
       bytes = await readBytesFromPath(file.path!);
     }
@@ -44,21 +63,117 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
     setState(() {
       _fileBytes = bytes;
       _fileName = file.name;
+      _localFilePath = file.path;
+      _sizeBytes = file.size;
+      _statusMessage = null;
     });
   }
 
   Future<void> _upload() async {
     if (_fileBytes == null) return;
 
-    setState(() => _isUploading = true);
+    setState(() {
+      _isUploading = true;
+      _statusMessage = null;
+    });
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      await _saveMetadataToSupabase();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() => _isUploading = false);
+      setState(() {
+        _isUploading = false;
+      });
 
-    Navigator.pop(context, true);
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUploading = false;
+        _statusMessage = 'Fotoğraf bilgisi kaydedilemedi: $e';
+      });
+    }
+  }
+
+  Future<void> _saveMetadataToSupabase() async {
+    final sessionId = widget.sessionId;
+    final patientId = widget.patientId;
+    final expertUserId = widget.expertUserId;
+
+    if (sessionId == null || patientId == null || expertUserId == null) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return;
+    }
+
+    final photo = SessionReferencePhotoModel(
+      sessionId: sessionId,
+      patientId: patientId,
+      expertUserId: expertUserId,
+      photoType: SessionReferencePhotoTypes.insolePhoto,
+      fileName: _fileName,
+      mimeType: _guessMimeType(_fileName),
+      sizeBytes: _sizeBytes ?? _fileBytes?.length,
+      localFilePath: _localFilePath,
+      uploadStatus: ReferencePhotoUploadStatuses.local,
+      note: 'Referans iç taban fotoğrafı',
+    );
+
+    await _repository.createPhoto(photo: photo);
+  }
+
+  String? _guessMimeType(String? fileName) {
+    final lower = (fileName ?? '').toLowerCase();
+
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
+
+    if (lower.endsWith('.webp')) {
+      return 'image/webp';
+    }
+
+    return null;
+  }
+
+  Future<void> _handleDroppedFile(dynamic file) async {
+    final path = file.path as String?;
+    if (path == null || path.trim().isEmpty) return;
+
+    final bytes = await readBytesFromPath(path);
+    if (bytes == null || !mounted) return;
+
+    int? size;
+    try {
+      final localFile = File(path);
+      if (localFile.existsSync()) {
+        size = localFile.lengthSync();
+      }
+    } catch (_) {}
+
+    setState(() {
+      _fileBytes = bytes;
+      _fileName = file.name as String?;
+      _localFilePath = path;
+      _sizeBytes = size ?? bytes.length;
+      _isDragging = false;
+      _statusMessage = null;
+    });
+  }
+
+  void _clearFile() {
+    setState(() {
+      _fileBytes = null;
+      _fileName = null;
+      _localFilePath = null;
+      _sizeBytes = null;
+      _statusMessage = null;
+    });
   }
 
   @override
@@ -108,33 +223,32 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                 ),
               ),
               const SizedBox(height: 18),
-
               Expanded(
                 child: kIsWeb
                     ? _buildDropArea()
                     : DropTarget(
                         onDragDone: (detail) async {
                           if (detail.files.isNotEmpty) {
-                            final f = detail.files.first;
-                            final bytes = await readBytesFromPath(f.path);
-                            if (bytes != null && mounted) {
-                              setState(() {
-                                _fileBytes = bytes;
-                                _fileName = f.name;
-                              });
-                            }
+                            await _handleDroppedFile(detail.files.first);
                           }
                         },
-                        onDragEntered: (_) =>
-                            setState(() => _isDragging = true),
-                        onDragExited: (_) =>
-                            setState(() => _isDragging = false),
+                        onDragEntered: (_) {
+                          setState(() => _isDragging = true);
+                        },
+                        onDragExited: (_) {
+                          setState(() => _isDragging = false);
+                        },
                         child: _buildDropArea(),
                       ),
               ),
-
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _statusMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ],
               const SizedBox(height: 18),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -193,26 +307,38 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_upload,
-                        size: 56, color: Colors.teal.shade600),
+                    Icon(
+                      Icons.cloud_upload,
+                      size: 56,
+                      color: Colors.teal.shade600,
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'Dosyayı buraya sürükleyip bırakın',
                       style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Text('veya aşağıdaki butonla seçin',
-                        style: TextStyle(color: Colors.grey[700])),
+                    Text(
+                      'veya aşağıdaki butonla seçin',
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
                     const SizedBox(height: 18),
                     ElevatedButton.icon(
                       onPressed: _pickFile,
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal),
-                      icon: const Icon(Icons.folder_open,
-                          color: Colors.white),
-                      label: const Text('Dosya Seç',
-                          style: TextStyle(color: Colors.white)),
+                        backgroundColor: Colors.teal,
+                      ),
+                      icon: const Icon(
+                        Icons.folder_open,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Dosya Seç',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 ),
@@ -230,19 +356,28 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                       Expanded(
                         child: Text(
                           _fileName ?? '',
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       TextButton(
-                        onPressed: () => setState(() {
-                          _fileBytes = null;
-                          _fileName = null;
-                        }),
+                        onPressed: _clearFile,
                         child: const Text('Temizle'),
                       ),
                     ],
                   ),
+                  if (_localFilePath != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _localFilePath!,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Expanded(
                     child: ClipRRect(

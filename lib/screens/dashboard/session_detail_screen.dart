@@ -409,7 +409,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final result = await showDialog<ScanFolderUploadResult>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const ScanFolderUploadDialog(),
+      builder: (_) => ScanFolderUploadDialog(
+        sessionId: _currentSession.sessionId,
+        patientId: _currentSession.patientId,
+        expertUserId: widget.currentUser.userId,
+        targetUserId: null,
+      ),
     );
 
     if (result == null || !mounted) return;
@@ -494,6 +499,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       builder: (_) => PressureMeasurementDialog(
         pressureRepository: widget.pressureRepository,
         sessionCode: _currentSession.sessionCode,
+        sessionId: _currentSession.sessionId,
+        patientId: _currentSession.patientId,
+        expertUserId: widget.currentUser.userId,
       ),
     );
 
@@ -524,7 +532,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const InsolePhotoUploadDialog(),
+      builder: (_) => InsolePhotoUploadDialog(
+        sessionId: _currentSession.sessionId,
+        patientId: _currentSession.patientId,
+        expertUserId: widget.currentUser.userId,
+      ),
     );
 
     if (result == true && mounted) {

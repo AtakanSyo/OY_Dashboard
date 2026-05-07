@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_anthropometric_clinical_info_repository.dart';
+import 'package:oy_site/data/repositories/supabase_anthropometric_clinical_info_repository.dart';
 import 'package:oy_site/models/anthropometric_clinical_info_model.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
@@ -21,28 +21,27 @@ class AnthropometricClinicalInfoScreen extends StatefulWidget {
 
 class _AnthropometricClinicalInfoScreenState
     extends State<AnthropometricClinicalInfoScreen> {
-  final MockAnthropometricClinicalInfoRepository _repository =
-      MockAnthropometricClinicalInfoRepository();
+  final SupabaseAnthropometricClinicalInfoRepository _repository =
+      SupabaseAnthropometricClinicalInfoRepository();
 
   bool _isLoading = true;
   bool _isSaving = false;
 
-  late TextEditingController _heightController;
-  late TextEditingController _weightController;
-  late TextEditingController _bmiController;
-  late TextEditingController _shoeSizeController;
-  late TextEditingController _professionController;
-  late TextEditingController _dailyStandingHoursController;
-  late TextEditingController _jobDescriptionController;
-  late TextEditingController _sportDescriptionController;
-  late TextEditingController _currentComplaintController;
-  late TextEditingController _diagnosisController;
-  late TextEditingController _diabetesNoteController;
-  late TextEditingController _otherPathologiesController;
+  late final TextEditingController _heightController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _bmiController;
+  late final TextEditingController _shoeSizeController;
+  late final TextEditingController _professionController;
+  late final TextEditingController _dailyStandingHoursController;
+  late final TextEditingController _jobDescriptionController;
+  late final TextEditingController _sportDescriptionController;
+  late final TextEditingController _currentComplaintController;
+  late final TextEditingController _diagnosisController;
+  late final TextEditingController _diabetesNoteController;
+  late final TextEditingController _otherPathologiesController;
 
   bool _doesSport = false;
   bool _hasDiabetes = false;
-
   bool _halluxValgus = false;
   bool _heelSpur = false;
   bool _flatFoot = false;
@@ -54,6 +53,7 @@ class _AnthropometricClinicalInfoScreenState
   @override
   void initState() {
     super.initState();
+
     _heightController = TextEditingController();
     _weightController = TextEditingController();
     _bmiController = TextEditingController();
@@ -88,38 +88,65 @@ class _AnthropometricClinicalInfoScreenState
   }
 
   Future<void> _loadData() async {
-    final model =
-        await _repository.getBySessionId(widget.session.sessionId ?? 0);
+    try {
+      final sessionId = widget.session.sessionId;
 
-    if (!mounted) return;
+      if (sessionId == null) {
+        throw Exception('Session ID bulunamadı.');
+      }
 
-    setState(() {
-      _heightController.text = model.heightCm?.toString() ?? '';
-      _weightController.text = model.weightKg?.toString() ?? '';
-      _bmiController.text = model.bmi?.toString() ?? '';
-      _shoeSizeController.text = model.shoeSizeEu?.toString() ?? '';
-      _professionController.text = model.profession ?? '';
-      _dailyStandingHoursController.text =
-          model.dailyStandingHours?.toString() ?? '';
-      _jobDescriptionController.text = model.jobDescription ?? '';
-      _sportDescriptionController.text = model.sportDescription ?? '';
-      _currentComplaintController.text = model.currentComplaint ?? '';
-      _diagnosisController.text = model.diagnosisPreDiagnosis ?? '';
-      _diabetesNoteController.text = model.diabetesNote ?? '';
-      _otherPathologiesController.text = model.otherPathologies ?? '';
+      final model = await _repository.getBySessionId(sessionId);
 
-      _doesSport = model.doesSport;
-      _hasDiabetes = model.hasDiabetes;
-      _halluxValgus = model.halluxValgus;
-      _heelSpur = model.heelSpur;
-      _flatFoot = model.flatFoot;
-      _pesCavus = model.pesCavus;
-      _mortonNeuroma = model.mortonNeuroma;
-      _achillesProblem = model.achillesProblem;
-      _metatarsalPain = model.metatarsalPain;
+      if (!mounted) return;
 
-      _isLoading = false;
-    });
+      if (model == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _heightController.text = model.heightCm?.toString() ?? '';
+        _weightController.text = model.weightKg?.toString() ?? '';
+        _bmiController.text = model.bmi?.toString() ?? '';
+        _shoeSizeController.text = model.shoeSizeEu?.toString() ?? '';
+        _professionController.text = model.profession ?? '';
+        _dailyStandingHoursController.text =
+            model.dailyStandingHours?.toString() ?? '';
+        _jobDescriptionController.text = model.jobDescription ?? '';
+        _sportDescriptionController.text = model.sportDescription ?? '';
+        _currentComplaintController.text = model.currentComplaint ?? '';
+        _diagnosisController.text = model.diagnosisPreDiagnosis ?? '';
+        _diabetesNoteController.text = model.diabetesNote ?? '';
+        _otherPathologiesController.text = model.otherPathologies ?? '';
+
+        _doesSport = model.doesSport;
+        _hasDiabetes = model.hasDiabetes;
+        _halluxValgus = model.halluxValgus;
+        _heelSpur = model.heelSpur;
+        _flatFoot = model.flatFoot;
+        _pesCavus = model.pesCavus;
+        _mortonNeuroma = model.mortonNeuroma;
+        _achillesProblem = model.achillesProblem;
+        _metatarsalPain = model.metatarsalPain;
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Klinik bilgiler yüklenemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   double? _parseDouble(String value) {
@@ -129,47 +156,78 @@ class _AnthropometricClinicalInfoScreenState
   }
 
   Future<void> _save() async {
+    final sessionId = widget.session.sessionId;
+    final expertUserId = widget.currentUser.userId;
+
+    if (sessionId == null || expertUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session veya uzman kullanıcı ID bulunamadı.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
-    final model = AnthropometricClinicalInfoModel(
-      sessionId: widget.session.sessionId ?? 0,
-      heightCm: _parseDouble(_heightController.text),
-      weightKg: _parseDouble(_weightController.text),
-      bmi: _parseDouble(_bmiController.text),
-      shoeSizeEu: _parseDouble(_shoeSizeController.text),
-      profession: _professionController.text.trim(),
-      dailyStandingHours: _parseDouble(_dailyStandingHoursController.text),
-      jobDescription: _jobDescriptionController.text.trim(),
-      doesSport: _doesSport,
-      sportDescription: _sportDescriptionController.text.trim(),
-      currentComplaint: _currentComplaintController.text.trim(),
-      diagnosisPreDiagnosis: _diagnosisController.text.trim(),
-      hasDiabetes: _hasDiabetes,
-      diabetesNote: _diabetesNoteController.text.trim(),
-      halluxValgus: _halluxValgus,
-      heelSpur: _heelSpur,
-      flatFoot: _flatFoot,
-      pesCavus: _pesCavus,
-      mortonNeuroma: _mortonNeuroma,
-      achillesProblem: _achillesProblem,
-      metatarsalPain: _metatarsalPain,
-      otherPathologies: _otherPathologiesController.text.trim(),
-      updatedAt: DateTime.now(),
-    );
+    try {
+      final model = AnthropometricClinicalInfoModel(
+        sessionId: sessionId,
+        heightCm: _parseDouble(_heightController.text),
+        weightKg: _parseDouble(_weightController.text),
+        bmi: _parseDouble(_bmiController.text),
+        shoeSizeEu: _parseDouble(_shoeSizeController.text),
+        profession: _professionController.text.trim(),
+        dailyStandingHours: _parseDouble(_dailyStandingHoursController.text),
+        jobDescription: _jobDescriptionController.text.trim(),
+        doesSport: _doesSport,
+        sportDescription: _sportDescriptionController.text.trim(),
+        currentComplaint: _currentComplaintController.text.trim(),
+        diagnosisPreDiagnosis: _diagnosisController.text.trim(),
+        hasDiabetes: _hasDiabetes,
+        diabetesNote: _diabetesNoteController.text.trim(),
+        halluxValgus: _halluxValgus,
+        heelSpur: _heelSpur,
+        flatFoot: _flatFoot,
+        pesCavus: _pesCavus,
+        mortonNeuroma: _mortonNeuroma,
+        achillesProblem: _achillesProblem,
+        metatarsalPain: _metatarsalPain,
+        otherPathologies: _otherPathologiesController.text.trim(),
+        updatedAt: DateTime.now(),
+      );
 
-    await _repository.save(model);
+      await _repository.upsert(
+        model: model,
+        patientId: widget.session.patientId,
+        expertUserId: expertUserId,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() => _isSaving = false);
+      setState(() => _isSaving = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Antropometrik / klinik bilgiler kaydedildi.'),
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Antropometrik / klinik bilgiler kaydedildi.'),
+          backgroundColor: Colors.green,
+        ),
+      );
 
-    Navigator.pop(context, true);
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isSaving = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Klinik bilgiler kaydedilemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String _sessionSubtitle() {
@@ -257,16 +315,7 @@ class _AnthropometricClinicalInfoScreenState
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -458,16 +507,7 @@ class _AnthropometricClinicalInfoScreenState
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -482,6 +522,19 @@ class _AnthropometricClinicalInfoScreenState
           child,
         ],
       ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 8,
+        ),
+      ],
     );
   }
 

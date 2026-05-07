@@ -5,15 +5,24 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:oy_site/services/serial/serial_port_factory.dart';
+import 'package:oy_site/data/repositories/supabase_session_pressure_repository.dart';
+import 'package:oy_site/models/session_pressure_recording_model.dart';
 
 class PressureMeasurementDialog extends StatefulWidget {
   final dynamic pressureRepository;
   final String sessionCode;
 
+  final int? sessionId;
+  final int? patientId;
+  final int? expertUserId;
+
   const PressureMeasurementDialog({
     super.key,
     required this.pressureRepository,
     required this.sessionCode,
+    this.sessionId,
+    this.patientId,
+    this.expertUserId,
   });
 
   @override
@@ -23,6 +32,9 @@ class PressureMeasurementDialog extends StatefulWidget {
 
 class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
   late final SerialPortService _serialService;
+
+  final SupabaseSessionPressureRepository _pressureRepository =
+    SupabaseSessionPressureRepository();
 
   List<String> _ports = [];
   String? _connectedPort;
@@ -274,9 +286,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return completer.future;
   }
 
-  void _toggleRecording() {
+  Future<void> _toggleRecording() async {
     if (_isRecording) {
-      _stopRecording();
+      await _stopRecording();
     } else {
       _startRecording();
     }
@@ -296,10 +308,11 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     });
   }
 
-  void _stopRecording() {
+  Future<void> _stopRecording() async {
     final frames = List<PressureFrameSnapshot>.from(_currentRecordingFrames);
 
     PressureRecording? newRecording;
+
     if (frames.isNotEmpty) {
       newRecording = PressureRecording(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -312,6 +325,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     setState(() {
       _isRecording = false;
       _currentRecordingFrames = [];
+
       if (newRecording != null) {
         _recordings = [newRecording, ..._recordings];
         _status =
@@ -320,6 +334,105 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         _status = 'Kayıt durduruldu (frame yok)';
       }
     });
+
+    if (newRecording == null) return;
+
+    await _saveRecordingToSupabase(newRecording);
+  }
+
+  Future<void> _saveRecordingToSupabase(
+    PressureRecording recording,
+  ) async {
+    final sessionId = widget.sessionId;
+    final patientId = widget.patientId;
+    final expertUserId = widget.expertUserId;
+
+    if (sessionId == null || patientId == null || expertUserId == null) {
+      setState(() {
+        _status =
+            '${recording.title} local kaydedildi. Supabase için session/patient/expert ID eksik.';
+      });
+      return;
+    }
+
+    try {
+      final stats = _calculatePressureStats(recording.frames);
+
+      final model = SessionPressureRecordingModel(
+        sessionId: sessionId,
+        patientId: patientId,
+        expertUserId: expertUserId,
+        title: recording.title,
+        frameCount: recording.frames.length,
+        durationMs: _calculateDurationMs(recording.frames),
+        maxPressure: stats.maxPressure,
+        avgPressure: stats.avgPressure,
+        rawFramesJson: _recordingToJson(recording),
+        uploadStatus: PressureUploadStatuses.local,
+        recordedAt: recording.createdAt,
+      );
+
+      await _pressureRepository.createRecording(recording: model);
+
+      if (!mounted) return;
+
+      setState(() {
+        _status =
+            '${recording.title} Supabase’e kaydedildi (${recording.frames.length} frame)';
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _status = '${recording.title} local kaydedildi, Supabase hatası: $e';
+      });
+    }
+  }
+
+  int _calculateDurationMs(List<PressureFrameSnapshot> frames) {
+    if (frames.length < 2) return 0;
+
+    return frames.last.timestamp
+        .difference(frames.first.timestamp)
+        .inMilliseconds;
+  }
+
+  _PressureStats _calculatePressureStats(
+    List<PressureFrameSnapshot> frames,
+  ) {
+    int maxValue = 0;
+    int sum = 0;
+    int count = 0;
+
+    for (final frame in frames) {
+      for (final row in frame.matrix) {
+        for (final value in row) {
+          if (value > maxValue) maxValue = value;
+          sum += value;
+          count++;
+        }
+      }
+    }
+
+    return _PressureStats(
+      maxPressure: maxValue.toDouble(),
+      avgPressure: count == 0 ? 0 : sum / count,
+    );
+  }
+
+  Map<String, dynamic> _recordingToJson(PressureRecording recording) {
+    return {
+      'id': recording.id,
+      'title': recording.title,
+      'created_at': recording.createdAt.toIso8601String(),
+      'frame_count': recording.frames.length,
+      'frames': recording.frames.map((frame) {
+        return {
+          'timestamp': frame.timestamp.toIso8601String(),
+          'matrix': frame.matrix,
+        };
+      }).toList(),
+    };
   }
 
   Future<void> _openRecording(PressureRecording recording) async {
@@ -860,4 +973,14 @@ class HeatmapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant HeatmapPainter oldDelegate) => true;
+}
+
+class _PressureStats {
+  final double maxPressure;
+  final double avgPressure;
+
+  const _PressureStats({
+    required this.maxPressure,
+    required this.avgPressure,
+  });
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_orthotic_design_form_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/orthotic_design_form_model.dart';
+import 'package:oy_site/data/repositories/supabase_orthotic_design_form_repository.dart';
 
 class OrthoticDesignFormScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -21,8 +21,8 @@ class OrthoticDesignFormScreen extends StatefulWidget {
 
 class _OrthoticDesignFormScreenState
     extends State<OrthoticDesignFormScreen> {
-  final MockOrthoticDesignFormRepository _repository =
-      MockOrthoticDesignFormRepository();
+  final SupabaseOrthoticDesignFormRepository _repository =
+      SupabaseOrthoticDesignFormRepository();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -63,9 +63,24 @@ class _OrthoticDesignFormScreenState
   }
 
   Future<void> _loadForm() async {
-    final form =
-        await _repository.getDesignFormBySessionId(widget.session.sessionId ?? 0);
+    final form = await _repository.getBySessionId(
+      widget.session.sessionId ?? 0,
+    );
 
+    if (form == null) {
+      setState(() {
+        _heelPad = false;
+        _medialArchSupport = false;
+        _metatarsalPad = false;
+        _transverseArchSupport = false;
+        _mortonRelief = false;
+        _bunionPad = false;
+        _approvedForOrder = false;
+        _isLoading = false;
+      });
+
+      return;
+    }
     if (!mounted) return;
 
     setState(() {
@@ -114,7 +129,10 @@ class _OrthoticDesignFormScreenState
       updatedAt: DateTime.now(),
     );
 
-    await _repository.saveDesignForm(form);
+    await _repository.upsert(
+      model: form,
+      patientId: widget.session.patientId,
+    );
 
     if (!mounted) return;
 
