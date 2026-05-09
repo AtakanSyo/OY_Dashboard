@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_session_reference_photo_repository.dart';
 import 'package:oy_site/models/session_reference_photo_model.dart';
 import 'package:oy_site/services/file_bytes_helper.dart';
+import 'package:oy_site/services/storage/supabase_storage_service.dart';
 
 class InsolePhotoUploadDialog extends StatefulWidget {
   final int? sessionId;
@@ -30,6 +31,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
   final SupabaseSessionReferencePhotoRepository _repository =
       SupabaseSessionReferencePhotoRepository();
 
+  final SupabaseStorageService _storageService = SupabaseStorageService();
   Uint8List? _fileBytes;
   String? _fileName;
   String? _localFilePath;
@@ -107,16 +109,49 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       return;
     }
 
+    final fileName = _fileName ?? 'insole_photo_${DateTime.now().millisecondsSinceEpoch}.png';
+
+    StorageUploadResult? uploadResult;
+
+    if (_localFilePath != null && _localFilePath!.trim().isNotEmpty) {
+      final storagePath = _storageService.buildReferencePhotoPath(
+        sessionId: sessionId,
+        photoType: SessionReferencePhotoTypes.insolePhoto,
+        fileName: fileName,
+      );
+
+      uploadResult = await _storageService.uploadLocalFile(
+        localFilePath: _localFilePath!,
+        storagePath: storagePath,
+      );
+    } else if (_fileBytes != null) {
+      final storagePath = _storageService.buildReferencePhotoPath(
+        sessionId: sessionId,
+        photoType: SessionReferencePhotoTypes.insolePhoto,
+        fileName: fileName,
+      );
+
+      uploadResult = await _storageService.uploadBytes(
+        bytes: _fileBytes!,
+        storagePath: storagePath,
+      );
+    }
+
     final photo = SessionReferencePhotoModel(
       sessionId: sessionId,
       patientId: patientId,
       expertUserId: expertUserId,
       photoType: SessionReferencePhotoTypes.insolePhoto,
-      fileName: _fileName,
-      mimeType: _guessMimeType(_fileName),
-      sizeBytes: _sizeBytes ?? _fileBytes?.length,
+      fileName: fileName,
+      mimeType: _guessMimeType(fileName),
+      sizeBytes: uploadResult?.sizeBytes ?? _sizeBytes ?? _fileBytes?.length,
       localFilePath: _localFilePath,
-      uploadStatus: ReferencePhotoUploadStatuses.local,
+      storageBucket: uploadResult?.bucket,
+      storagePath: uploadResult?.storagePath,
+      publicUrl: null,
+      uploadStatus: uploadResult == null
+          ? ReferencePhotoUploadStatuses.local
+          : ReferencePhotoUploadStatuses.uploaded,
       note: 'Referans iç taban fotoğrafı',
     );
 

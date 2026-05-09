@@ -20,6 +20,21 @@ class SupabaseOrderRepository {
         .toList();
   }
 
+  Future<List<OrderModel>> getAllOrders() async {
+    final response = await _client
+        .from('orders')
+        .select()
+        .order('ordered_at', ascending: false);
+
+    return (response as List<dynamic>)
+        .map(
+          (item) => OrderModel.fromMap(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
   Future<List<OrderModel>> getOrdersByUser({
     required int userId,
   }) async {

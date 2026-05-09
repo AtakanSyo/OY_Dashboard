@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/services/serial/serial_port_factory.dart';
 import 'package:oy_site/data/repositories/supabase_session_pressure_repository.dart';
 import 'package:oy_site/models/session_pressure_recording_model.dart';
+import 'dart:convert';
+import 'package:oy_site/services/storage/supabase_storage_service.dart';
 
 class PressureMeasurementDialog extends StatefulWidget {
   final dynamic pressureRepository;
@@ -35,6 +37,8 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
   final SupabaseSessionPressureRepository _pressureRepository =
     SupabaseSessionPressureRepository();
+
+  final SupabaseStorageService _storageService = SupabaseStorageService();
 
   List<String> _ports = [];
   String? _connectedPort;
@@ -358,6 +362,19 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     try {
       final stats = _calculatePressureStats(recording.frames);
 
+      final rawJson = _recordingToJson(recording);
+      final rawJsonBytes = utf8.encode(jsonEncode(rawJson));
+
+      final storagePath = _storageService.buildPressureRecordingPath(
+        sessionId: sessionId,
+        recordingId: recording.id,
+      );
+
+      final uploadResult = await _storageService.uploadBytes(
+        bytes: rawJsonBytes,
+        storagePath: storagePath,
+      );
+
       final model = SessionPressureRecordingModel(
         sessionId: sessionId,
         patientId: patientId,
@@ -367,8 +384,10 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         durationMs: _calculateDurationMs(recording.frames),
         maxPressure: stats.maxPressure,
         avgPressure: stats.avgPressure,
-        rawFramesJson: _recordingToJson(recording),
-        uploadStatus: PressureUploadStatuses.local,
+        rawFramesJson: null,
+        storageBucket: uploadResult.bucket,
+        storagePath: uploadResult.storagePath,
+        uploadStatus: PressureUploadStatuses.uploaded,
         recordedAt: recording.createdAt,
       );
 
@@ -378,13 +397,13 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
       setState(() {
         _status =
-            '${recording.title} Supabase’e kaydedildi (${recording.frames.length} frame)';
+            '${recording.title} Storage ve Supabase’e kaydedildi (${recording.frames.length} frame)';
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _status = '${recording.title} local kaydedildi, Supabase hatası: $e';
+        _status = '${recording.title} local kaydedildi, Supabase/Storage hatası: $e';
       });
     }
   }

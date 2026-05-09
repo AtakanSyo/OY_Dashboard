@@ -45,4 +45,17 @@ class SupabasePatientRepository {
       Map<String, dynamic>.from(response as Map),
     );
   }
+
+  Future<void> linkAuthUserToPatient({
+    required int patientId,
+    required String authUserId,
+  }) async {
+    await _client
+        .from('patients')
+        .update({
+          'auth_user_id': authUserId,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', patientId);
+  }
 }

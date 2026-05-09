@@ -3,11 +3,12 @@ import 'package:oy_site/core/supabase_config.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/payment_result_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home_screen.dart';
 
-// App config
 class AppConfig {
   static bool useMock = true;
 }
@@ -20,9 +21,8 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  final pressureRepository = AppConfig.useMock
-      ? "MOCK_REPOSITORY"
-      : "SUPABASE_REPOSITORY";
+  final pressureRepository =
+      AppConfig.useMock ? 'MOCK_REPOSITORY' : 'SUPABASE_REPOSITORY';
 
   runApp(
     OYDashboardApp(
@@ -42,6 +42,7 @@ class OYDashboardApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final paymentResult = _extractPaymentResultFromUrl();
+    final inviteToken = _extractInviteTokenFromUrl();
 
     return MaterialApp(
       title: 'OY Dashboard',
@@ -56,9 +57,13 @@ class OYDashboardApp extends StatelessWidget {
               token: paymentResult.token,
               pressureRepository: pressureRepository,
             )
-          : HomeScreen(
-              pressureRepository: pressureRepository,
-            ),
+          : inviteToken != null
+              ? RegisterScreen(
+                  inviteToken: inviteToken,
+                )
+              : HomeScreen(
+                  pressureRepository: pressureRepository,
+                ),
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';
 
@@ -72,6 +77,17 @@ class OYDashboardApp extends StatelessWidget {
               success: status == 'success',
               token: token,
               pressureRepository: pressureRepository,
+            ),
+          );
+        }
+
+        if (routeName.startsWith('/register')) {
+          final uri = Uri.parse(routeName);
+          final inviteToken = uri.queryParameters['invite'];
+
+          return MaterialPageRoute(
+            builder: (_) => RegisterScreen(
+              inviteToken: inviteToken,
             ),
           );
         }
@@ -107,12 +123,39 @@ class OYDashboardApp extends StatelessWidget {
     );
   }
 
+  String? _extractInviteTokenFromUrl() {
+    final directUri = Uri.base;
+
+    if (directUri.path == '/register') {
+      final token = directUri.queryParameters['invite'];
+      if (token != null && token.trim().isNotEmpty) {
+        return token.trim();
+      }
+    }
+
+    final fragment = Uri.base.fragment;
+    if (fragment.isEmpty) return null;
+
+    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
+    final fragmentUri = Uri.tryParse(normalized);
+
+    if (fragmentUri == null || fragmentUri.path != '/register') {
+      return null;
+    }
+
+    final token = fragmentUri.queryParameters['invite'];
+    if (token == null || token.trim().isEmpty) return null;
+
+    return token.trim();
+  }
+
   _PaymentResultRouteData? _extractPaymentResultFromUrl() {
     final fragment = Uri.base.fragment;
     if (fragment.isEmpty) return null;
 
     final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
     final fragmentUri = Uri.tryParse(normalized);
+
     if (fragmentUri == null || fragmentUri.path != '/payment-result') {
       return null;
     }

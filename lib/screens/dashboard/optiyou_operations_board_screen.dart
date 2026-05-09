@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_optiyou_order_operations_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
+import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
+import 'package:oy_site/data/repositories/supabase_order_repository.dart';
+import 'package:oy_site/models/order_operation_state_model.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -21,11 +23,14 @@ class OptiYouOperationsBoardScreen extends StatefulWidget {
 
 class _OptiYouOperationsBoardScreenState
     extends State<OptiYouOperationsBoardScreen> {
-  final MockOptiYouOrderOperationsRepository _repository =
-      MockOptiYouOrderOperationsRepository();
+
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _horizontalScrollController = ScrollController();
+  final SupabaseOrderRepository _orderRepository =
+      SupabaseOrderRepository();
 
+  final SupabaseOrderOperationRepository _operationRepository =
+      SupabaseOrderOperationRepository();
   List<OptiYouOrderOperationItem> _allItems = [];
   List<OptiYouOrderOperationItem> _filteredItems = [];
 
@@ -52,7 +57,30 @@ class _OptiYouOperationsBoardScreenState
     });
 
     try {
-      final items = await _repository.getOrderOperations();
+      final orders = await _orderRepository.getAllOrders();
+
+      final List<OptiYouOrderOperationItem> items = [];
+
+      for (final order in orders) {
+        final state = await _operationRepository.getStateByOrderId(
+          orderId: order.orderId ?? 0,
+        );
+
+        final item = OptiYouOrderOperationItem(
+          order: order,
+          patientName: 'Patient #${order.patientId}',
+          expertName: 'Expert #${order.expertUserId}',
+          clinicName: 'Clinic #${order.clinicId}',
+          priorityLabel: 'Orta',
+          currentColumnCode:
+              state?.boardColumnCode ??
+              OptiYouOperationColumnCodes.designWaiting,
+          hasMissingData: false,
+          missingDataSummary: '',
+        );
+
+        items.add(item);
+      }
 
       if (!mounted) return;
 
@@ -63,8 +91,10 @@ class _OptiYouOperationsBoardScreenState
       });
     } catch (e) {
       if (!mounted) return;
+
       setState(() {
-        _errorMessage = 'Operasyon board verileri yüklenirken hata oluştu: $e';
+        _errorMessage =
+            'Operasyon board verileri yüklenirken hata oluştu: $e';
         _isLoading = false;
       });
     }
@@ -95,23 +125,48 @@ class _OptiYouOperationsBoardScreenState
         .toList();
   }
 
-  void _moveItemToColumn(
+  Future<void> _moveItemToColumn(
     OptiYouOrderOperationItem item,
     String newColumnCode,
-  ) {
-    setState(() {
-      final index =
-          _allItems.indexWhere((e) => e.order.orderId == item.order.orderId);
+  ) async {
+    final orderId = item.order.orderId;
 
-      if (index == -1) return;
+    if (orderId == null) return;
 
-      _allItems[index] = _allItems[index].copyWith(
-        currentColumnCode: newColumnCode,
+    try {
+      await _operationRepository.updateBoardColumn(
+        orderId: orderId,
+        boardColumnCode: newColumnCode,
+        sessionId: item.order.sessionId,
+        patientId: item.order.patientId,
+        assignedUserId: widget.currentUser.userId,
       );
 
-      final query = _searchController.text.trim();
-      _applySearch(query);
-    });
+      if (!mounted) return;
+
+      setState(() {
+        final index = _allItems.indexWhere(
+          (e) => e.order.orderId == item.order.orderId,
+        );
+
+        if (index == -1) return;
+
+        _allItems[index] = _allItems[index].copyWith(
+          currentColumnCode: newColumnCode,
+        );
+
+        final query = _searchController.text.trim();
+        _applySearch(query);
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kolon güncellenemedi: $e'),
+        ),
+      );
+    }
   }
 
   int _columnIndexOfItem(OptiYouOrderOperationItem item) {

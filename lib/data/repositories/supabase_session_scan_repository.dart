@@ -3,9 +3,12 @@ import 'package:oy_site/models/session_scan_assets.dart';
 import 'package:oy_site/models/session_scan_file_model.dart';
 import 'package:oy_site/models/session_scan_report_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:oy_site/services/storage/supabase_storage_service.dart';
 
 class SupabaseSessionScanRepository {
   SupabaseClient get _client => Supabase.instance.client;
+
+  final SupabaseStorageService _storageService = SupabaseStorageService();
 
   Future<SessionScanReportModel?> getReportBySessionId({
     required int sessionId,
@@ -151,8 +154,64 @@ class SupabaseSessionScanRepository {
 
     if (files.isEmpty) return;
 
+    final uploadedFiles = <SessionScanFileModel>[];
+
+    for (final file in files) {
+      try {
+        final fileName = file.fileName ??
+            '${file.fileType}_${DateTime.now().millisecondsSinceEpoch}';
+
+        final storagePath = _storageService.buildSessionScanPath(
+          sessionId: sessionId,
+          fileType: file.fileType,
+          fileName: fileName,
+        );
+
+        final uploadResult = await _storageService.uploadLocalFile(
+          localFilePath: file.localFilePath!,
+          storagePath: storagePath,
+        );
+
+        uploadedFiles.add(
+          SessionScanFileModel(
+            sessionId: file.sessionId,
+            patientId: file.patientId,
+            expertUserId: file.expertUserId,
+            fileType: file.fileType,
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            sizeBytes: uploadResult.sizeBytes,
+            localFilePath: file.localFilePath,
+            storageBucket: uploadResult.bucket,
+            storagePath: uploadResult.storagePath,
+            publicUrl: null,
+            signedUrlExpiresAt: null,
+            uploadStatus: ScanFileUploadStatuses.uploaded,
+          ),
+        );
+      } catch (_) {
+        uploadedFiles.add(
+          SessionScanFileModel(
+            sessionId: file.sessionId,
+            patientId: file.patientId,
+            expertUserId: file.expertUserId,
+            fileType: file.fileType,
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            localFilePath: file.localFilePath,
+            storageBucket: null,
+            storagePath: null,
+            publicUrl: null,
+            signedUrlExpiresAt: null,
+            uploadStatus: ScanFileUploadStatuses.failed,
+          ),
+        );
+      }
+    }
+
     await _client.from('session_scan_files').upsert(
-          files.map((file) => file.toUpsertMap()).toList(),
+          uploadedFiles.map((file) => file.toUpsertMap()).toList(),
           onConflict: 'session_id,file_type',
         );
   }

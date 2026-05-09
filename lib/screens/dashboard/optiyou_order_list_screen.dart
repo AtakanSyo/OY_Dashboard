@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_optiyou_order_operations_repository.dart';
+import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
+import 'package:oy_site/data/repositories/supabase_order_repository.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
@@ -18,8 +20,10 @@ class OptiYouOrderListScreen extends StatefulWidget {
 }
 
 class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
-  final MockOptiYouOrderOperationsRepository _repository =
-      MockOptiYouOrderOperationsRepository();
+  final SupabaseOrderRepository _orderRepository = SupabaseOrderRepository();
+  final SupabaseOrderOperationRepository _operationRepository =
+      SupabaseOrderOperationRepository();
+
   final TextEditingController _searchController = TextEditingController();
 
   List<OptiYouOrderOperationItem> _allItems = [];
@@ -50,7 +54,30 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
     });
 
     try {
-      final items = await _repository.getOrderOperations();
+      final orders = await _orderRepository.getAllOrders();
+      final List<OptiYouOrderOperationItem> items = [];
+
+      for (final order in orders) {
+        final state = order.orderId == null
+            ? null
+            : await _operationRepository.getStateByOrderId(
+                orderId: order.orderId!,
+              );
+
+        items.add(
+          OptiYouOrderOperationItem(
+            order: order,
+            patientName: 'Patient #${order.patientId}',
+            expertName: 'Expert #${order.expertUserId}',
+            clinicName: 'Clinic #${order.clinicId}',
+            priorityLabel: 'Orta',
+            currentColumnCode:
+                state?.boardColumnCode ?? OptiYouOperationColumnCodes.designWaiting,
+            hasMissingData: false,
+            missingDataSummary: '',
+          ),
+        );
+      }
 
       if (!mounted) return;
 
@@ -80,8 +107,8 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                 item.clinicName.toLowerCase().contains(query) ||
                 item.priorityLabel.toLowerCase().contains(query);
 
-        final matchesStatus = _selectedStatus == 'Tümü' ||
-            item.order.orderStatus == _selectedStatus;
+        final matchesStatus =
+            _selectedStatus == 'Tümü' || item.order.orderStatus == _selectedStatus;
 
         final matchesProductType = _selectedProductType == 'Tümü' ||
             item.order.productType == _selectedProductType;
@@ -194,7 +221,6 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
               style: TextStyle(color: Colors.grey[700]),
             ),
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(
@@ -230,9 +256,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(
@@ -315,9 +339,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
             Expanded(
               child: _buildContent(),
             ),
@@ -329,9 +351,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorMessage != null) {
@@ -364,10 +384,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 8,
-              ),
+              BoxShadow(color: Colors.black12, blurRadius: 8),
             ],
           ),
           child: Row(
@@ -376,13 +393,9 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
               CircleAvatar(
                 radius: 26,
                 backgroundColor: statusColor.withOpacity(0.12),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  color: statusColor,
-                ),
+                child: Icon(Icons.inventory_2_outlined, color: statusColor),
               ),
               const SizedBox(width: 16),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,22 +451,18 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-
                     Text(
                       '${item.expertName} • ${item.clinicName}',
                       style: TextStyle(color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 6),
-
                     Text(
                       'Ürün: ${_productLabel(order.productType)} • '
                       'Sipariş: ${_formatDate(order.orderedAt)} • '
                       'Net Tutar: ${_formatMoney(order.netAmount, order.currencyCode)}',
                       style: TextStyle(color: Colors.grey[800]),
                     ),
-
                     const SizedBox(height: 10),
-
                     if (item.hasMissingData)
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -517,9 +526,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 12),
-
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -552,10 +559,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 8),
         ],
       ),
       child: Row(
@@ -575,10 +579,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                title,
-                style: TextStyle(color: Colors.grey[700]),
-              ),
+              Text(title, style: TextStyle(color: Colors.grey[700])),
             ],
           ),
         ],

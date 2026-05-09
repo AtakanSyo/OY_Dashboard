@@ -37,7 +37,7 @@ class PatientInviteModel {
   }
 
   String get registrationUrl {
-    return 'https://app.optiyou.com/register?invite=$token';
+    return 'https://optiyou.fit/#/register?invite=$token';
   }
 
   PatientInviteModel copyWith({
