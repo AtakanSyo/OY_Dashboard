@@ -215,6 +215,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     final report = _parsedReport;
     final assets = _scanAssets;
     final userId = widget.targetUserId;
+    final patientId = widget.patientId;
+    final sessionId = widget.sessionId;
 
     if (report == null || assets == null) return;
 
@@ -248,7 +250,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
 
     AnalysisRuntimeCache.instance.saveLatest(analysisResult);
 
-    if (userId == null) {
+    if (userId == null && patientId == null) {
       setState(() {
         _isSavingAnalysis = false;
         _saveMessage =
@@ -260,6 +262,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     try {
       await _analysisRepository.upsertAnalysisResult(
         userId: userId,
+        patientId: patientId,
+        sessionId: sessionId,
         result: analysisResult,
       );
 

@@ -14,9 +14,49 @@ class SupabaseAnalysisRepository {
         .order('analysis_date', ascending: false);
 
     return (response as List<dynamic>)
-        .map((item) => CustomerAnalysisResult.fromMap(
-              Map<String, dynamic>.from(item as Map),
-            ))
+        .map(
+          (item) => CustomerAnalysisResult.fromMap(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<CustomerAnalysisResult>> getAnalysisHistoryForCurrentCustomer() async {
+    final authUser = _client.auth.currentUser;
+
+    if (authUser == null) {
+      throw Exception('Oturum açmış kullanıcı bulunamadı.');
+    }
+
+    final patientResponse = await _client
+        .from('patients')
+        .select('id')
+        .eq('auth_user_id', authUser.id)
+        .maybeSingle();
+
+    if (patientResponse == null) {
+      return [];
+    }
+
+    final patientId = patientResponse['id'] as int?;
+
+    if (patientId == null) {
+      return [];
+    }
+
+    final response = await _client
+        .from('analysis_results')
+        .select()
+        .eq('patient_id', patientId)
+        .order('analysis_date', ascending: false);
+
+    return (response as List<dynamic>)
+        .map(
+          (item) => CustomerAnalysisResult.fromMap(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
         .toList();
   }
 
@@ -39,22 +79,44 @@ class SupabaseAnalysisRepository {
     );
   }
 
+  Future<CustomerAnalysisResult?> getLatestAnalysisForCurrentCustomer() async {
+    final results = await getAnalysisHistoryForCurrentCustomer();
+
+    if (results.isEmpty) return null;
+
+    return results.first;
+  }
+
   Future<void> saveAnalysisResult({
-    required int userId,
+    int? userId,
+    int? patientId,
+    int? sessionId,
     required CustomerAnalysisResult result,
   }) async {
     await _client.from('analysis_results').insert(
-          result.toMap(userId: userId),
+          result.toMap(
+            userId: userId,
+            patientId: patientId,
+            sessionId: sessionId,
+          ),
         );
   }
 
   Future<void> upsertAnalysisResult({
-    required int userId,
+    int? userId,
+    int? patientId,
+    int? sessionId,
     required CustomerAnalysisResult result,
   }) async {
     await _client.from('analysis_results').upsert(
-          result.toMap(userId: userId),
-          onConflict: 'user_id,session_code',
+          result.toMap(
+            userId: userId,
+            patientId: patientId,
+            sessionId: sessionId,
+          ),
+          onConflict: patientId != null && sessionId != null
+              ? 'patient_id,session_id'
+              : 'user_id,session_code',
         );
   }
 

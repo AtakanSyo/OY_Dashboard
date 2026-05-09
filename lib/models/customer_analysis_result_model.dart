@@ -132,10 +132,14 @@ class CustomerAnalysisResult {
   });
 
   Map<String, dynamic> toMap({
-    required int userId,
+    int? userId,
+    int? patientId,
+    int? sessionId,
   }) {
     return {
       'user_id': userId,
+      'patient_id': patientId,
+      'session_id': sessionId,
       'session_code': sessionCode,
       'analysis_date': analysisDate.toIso8601String(),
       'location_label': locationLabel,
@@ -144,8 +148,7 @@ class CustomerAnalysisResult {
       'left_foot': leftFoot.toMap(),
       'right_foot': rightFoot.toMap(),
       'metrics': metrics.map((item) => item.toMap()).toList(),
-      'recommendations':
-          recommendations.map((item) => item.toMap()).toList(),
+      'recommendations': recommendations.map((item) => item.toMap()).toList(),
       'visuals': visuals.toMap(),
       'parsed_report':
           parsedReport == null ? null : _parsedScanReportToMap(parsedReport!),

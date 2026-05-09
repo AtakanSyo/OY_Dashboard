@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_customer_analysis_repository.dart';
+import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/screens/dashboard/analysis_results_view.dart';
-import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 
 class CustomerAnalysisResultsScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -20,8 +19,6 @@ class CustomerAnalysisResultsScreen extends StatefulWidget {
 
 class _CustomerAnalysisResultsScreenState
     extends State<CustomerAnalysisResultsScreen> {
-  final MockCustomerAnalysisRepository _repository =
-      MockCustomerAnalysisRepository();
   final SupabaseAnalysisRepository _supabaseRepository =
       SupabaseAnalysisRepository();
 
@@ -43,16 +40,13 @@ class _CustomerAnalysisResultsScreenState
 
     try {
       final userId = widget.currentUser.userId;
+
       if (userId == null) {
         throw Exception('Kullanıcı ID bulunamadı.');
       }
 
-      final supabaseResults =
-          await _supabaseRepository.getAnalysisHistory(userId: userId);
-
-      final results = supabaseResults.isNotEmpty
-          ? supabaseResults
-          : await _repository.getAnalysisHistory(userId: userId);
+      final results =
+          await _supabaseRepository.getAnalysisHistoryForCurrentCustomer();
 
       if (!mounted) return;
 
@@ -61,25 +55,12 @@ class _CustomerAnalysisResultsScreenState
         _isLoading = false;
       });
     } catch (e) {
-      try {
-        final userId = widget.currentUser.userId;
-        final fallbackResults =
-            await _repository.getAnalysisHistory(userId: userId ?? 0);
+      if (!mounted) return;
 
-        if (!mounted) return;
-
-        setState(() {
-          _results = fallbackResults;
-          _isLoading = false;
-        });
-      } catch (_) {
-        if (!mounted) return;
-
-        setState(() {
-          _errorMessage = 'Analiz sonuçları yüklenirken hata oluştu: $e';
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _errorMessage = 'Analiz sonuçları yüklenirken hata oluştu: $e';
+        _isLoading = false;
+      });
     }
   }
 
@@ -87,7 +68,6 @@ class _CustomerAnalysisResultsScreenState
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        appBar: null,
         body: Center(
           child: CircularProgressIndicator(),
         ),
