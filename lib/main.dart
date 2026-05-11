@@ -60,6 +60,7 @@ class OYDashboardApp extends StatelessWidget {
           : inviteToken != null
               ? RegisterScreen(
                   inviteToken: inviteToken,
+                  pressureRepository: pressureRepository,
                 )
               : HomeScreen(
                   pressureRepository: pressureRepository,
@@ -88,6 +89,7 @@ class OYDashboardApp extends StatelessWidget {
           return MaterialPageRoute(
             builder: (_) => RegisterScreen(
               inviteToken: inviteToken,
+              pressureRepository: pressureRepository,
             ),
           );
         }

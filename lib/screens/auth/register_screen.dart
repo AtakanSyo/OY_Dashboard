@@ -3,15 +3,18 @@ import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dar
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
+import 'package:oy_site/screens/auth/login_screen.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String? inviteToken;
+  final dynamic pressureRepository;
 
   const RegisterScreen({
     super.key,
     this.inviteToken,
+    this.pressureRepository,
   });
 
   @override
@@ -34,21 +37,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final SupabasePatientRepository _patientRepository =
       SupabasePatientRepository();
 
+  String? _activeInviteToken;
+  PatientInviteModel? _invite;
+
   String? _errorMessage;
+  String? _inviteError;
+  String? _debugMessage;
+
   bool _isLoading = false;
   bool _isLoadingInvite = false;
   bool _inviteInvalid = false;
-  String? _inviteError;
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _success = false;
+
   String? _selectedRoleCode;
 
-  PatientInviteModel? _invite;
-
-  bool get _hasInvite => widget.inviteToken != null &&
-      widget.inviteToken!.trim().isNotEmpty;
+  bool get _hasInvite =>
+      _activeInviteToken != null && _activeInviteToken!.trim().isNotEmpty;
 
   static const List<Map<String, String>> _roles = [
     {'code': RoleCodes.expert, 'label': 'Uzman'},
@@ -61,14 +68,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
 
+    _activeInviteToken = widget.inviteToken?.trim();
+
     if (_hasInvite) {
       _selectedRoleCode = RoleCodes.customer;
       _loadInvite();
     }
   }
 
+  void _setDebug(String message) {
+    if (!mounted) return;
+
+    setState(() {
+      _debugMessage = message;
+    });
+  }
+
   Future<void> _loadInvite() async {
-    final token = widget.inviteToken?.trim();
+    final token = _activeInviteToken?.trim();
 
     if (token == null || token.isEmpty) return;
 
@@ -76,7 +93,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isLoadingInvite = true;
       _inviteInvalid = false;
       _inviteError = null;
+      _errorMessage = null;
+      _invite = null;
     });
+
+    _setDebug(
+      'INVITE LOAD START\n'
+      'token=$token',
+    );
 
     try {
       final invite = await _inviteRepository.getInviteByToken(token: token);
@@ -89,8 +113,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _inviteError = 'Davet bağlantısı bulunamadı.';
           _isLoadingInvite = false;
         });
+
+        _setDebug(
+          'INVITE LOAD ERROR\n'
+          'Invite bulunamadı.\n'
+          'token=$token',
+        );
         return;
       }
+
+      _setDebug(
+        'INVITE FOUND\n'
+        'inviteId=${invite.inviteId}\n'
+        'patientId=${invite.patientId}\n'
+        'sessionId=${invite.sessionId}\n'
+        'email=${invite.email}\n'
+        'status=${invite.status}\n'
+        'expiresAt=${invite.expiresAt}',
+      );
 
       if (invite.isUsed) {
         setState(() {
@@ -123,8 +163,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _invite = invite;
         _selectedRoleCode = RoleCodes.customer;
 
-        if ((invite.email ?? '').trim().isNotEmpty) {
-          _emailController.text = invite.email!.trim();
+        final inviteEmail = (invite.email ?? '').trim();
+        if (inviteEmail.isNotEmpty) {
+          _emailController.text = inviteEmail;
         }
 
         _isLoadingInvite = false;
@@ -137,6 +178,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _inviteError = 'Davet kontrol edilirken hata oluştu: $e';
         _isLoadingInvite = false;
       });
+
+      _setDebug(
+        'INVITE LOAD EXCEPTION\n'
+        'error=$e',
+      );
     }
   }
 
@@ -184,6 +230,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
+    _setDebug(
+      'REGISTER START\n'
+      'email=$email\n'
+      'roleCode=$_selectedRoleCode\n'
+      'hasInvite=$_hasInvite\n'
+      'inviteId=${_invite?.inviteId}\n'
+      'patientId=${_invite?.patientId}',
+    );
+
     try {
       final authUserId = await _authService.signUp(
         email: email,
@@ -193,18 +248,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
         roleCode: _selectedRoleCode!,
       );
 
+      _setDebug(
+        'AUTH SIGNUP SUCCESS\n'
+        'authUserId=$authUserId',
+      );
+
       final invite = _invite;
 
       if (invite != null) {
+        _setDebug(
+          'LINK PATIENT START\n'
+          'patientId=${invite.patientId}\n'
+          'authUserId=$authUserId',
+        );
+
         await _patientRepository.linkAuthUserToPatient(
           patientId: invite.patientId,
           authUserId: authUserId,
         );
 
+        _setDebug(
+          'LINK PATIENT SUCCESS\n'
+          'patientId=${invite.patientId}\n'
+          'authUserId=$authUserId',
+        );
+
         final inviteId = invite.inviteId;
+
         if (inviteId != null) {
+          _setDebug(
+            'MARK INVITE USED START\n'
+            'inviteId=$inviteId',
+          );
+
           await _inviteRepository.markInviteAsUsed(inviteId: inviteId);
+
+          _setDebug(
+            'REGISTER SUCCESS\n'
+            'authUserId=$authUserId\n'
+            'patientId=${invite.patientId}\n'
+            'inviteId=$inviteId',
+          );
+        } else {
+          _setDebug(
+            'REGISTER WARNING\n'
+            'Invite ID null olduğu için davet used yapılamadı.',
+          );
         }
+      } else {
+        _setDebug(
+          'REGISTER SUCCESS WITHOUT INVITE\n'
+          'authUserId=$authUserId',
+        );
       }
 
       if (!mounted) return;
@@ -212,11 +307,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _success = true);
     } on AuthException catch (e) {
       if (!mounted) return;
+
       setState(() => _errorMessage = _localizeAuthError(e.message));
+
+      _setDebug(
+        'AUTH ERROR\n'
+        'message=${e.message}',
+      );
     } catch (e) {
       if (!mounted) return;
+
       setState(
         () => _errorMessage = 'Bir hata oluştu. Lütfen tekrar deneyin: $e',
+      );
+
+      _setDebug(
+        'REGISTER EXCEPTION\n'
+        'error=$e\n'
+        'inviteId=${_invite?.inviteId}\n'
+        'patientId=${_invite?.patientId}',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -227,7 +336,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final lower = message.toLowerCase();
 
     if (lower.contains('already registered') ||
-        lower.contains('already been registered')) {
+        lower.contains('already been registered') ||
+        lower.contains('user already registered')) {
       return 'Bu e-posta adresi zaten kayıtlı.';
     }
 
@@ -240,6 +350,163 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     return message;
+  }
+
+  String? _extractInviteTokenFromText(String value) {
+    final text = value.trim();
+
+    if (text.isEmpty) return null;
+
+    if (text.startsWith('inv_')) {
+      return text;
+    }
+
+    final uri = Uri.tryParse(text);
+    if (uri == null) return null;
+
+    final directToken = uri.queryParameters['invite'];
+    if (directToken != null && directToken.trim().isNotEmpty) {
+      return directToken.trim();
+    }
+
+    final fragment = uri.fragment;
+    if (fragment.isNotEmpty) {
+      final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
+      final fragmentUri = Uri.tryParse(normalized);
+      final fragmentToken = fragmentUri?.queryParameters['invite'];
+
+      if (fragmentToken != null && fragmentToken.trim().isNotEmpty) {
+        return fragmentToken.trim();
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _showInviteLinkDialog() async {
+    final controller = TextEditingController();
+
+    final token = await showDialog<String>(
+      context: context,
+      builder: (_) {
+        String? localError;
+
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Davet Bağlantısı ile Kaydol'),
+              content: SizedBox(
+                width: 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Size verilen davet bağlantısını veya inv_ ile başlayan tokenı buraya yapıştırın.',
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: controller,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Davet bağlantısı',
+                        hintText:
+                            'https://optiyou.fit/#/register?invite=inv_...',
+                        border: const OutlineInputBorder(),
+                        errorText: localError,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Vazgeç'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final parsedToken =
+                        _extractInviteTokenFromText(controller.text);
+
+                    if (parsedToken == null) {
+                      setLocalState(() {
+                        localError = 'Geçerli bir davet tokenı bulunamadı.';
+                      });
+                      return;
+                    }
+
+                    Navigator.pop(context, parsedToken);
+                  },
+                  child: const Text('Devam Et'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (token == null || token.trim().isEmpty) return;
+
+    if (!mounted) return;
+
+    setState(() {
+      _activeInviteToken = token.trim();
+      _selectedRoleCode = RoleCodes.customer;
+      _invite = null;
+      _inviteInvalid = false;
+      _inviteError = null;
+      _errorMessage = null;
+      _debugMessage = null;
+    });
+
+    await _loadInvite();
+  }
+
+  void _goToLogin() {
+    if (widget.pressureRepository != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            pressureRepository: widget.pressureRepository,
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/',
+      (route) => false,
+    );
+  }
+
+  Widget _buildDebugBox() {
+    if (_debugMessage == null) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SelectableText(
+        _debugMessage!,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          height: 1.35,
+          fontFamily: 'monospace',
+        ),
+      ),
+    );
   }
 
   @override
@@ -267,7 +534,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         body: Center(
           child: Container(
             padding: const EdgeInsets.all(24),
-            width: 420,
+            width: 460,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -293,13 +560,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
+                _buildDebugBox(),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _goToLogin,
                     child: const Text('Giriş Ekranına Dön'),
                   ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _inviteInvalid = false;
+                      _inviteError = null;
+                      _activeInviteToken = null;
+                      _debugMessage = null;
+                    });
+                  },
+                  child: const Text('Farklı Davet Bağlantısı Gir'),
                 ),
               ],
             ),
@@ -313,7 +594,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SingleChildScrollView(
           child: Container(
             padding: const EdgeInsets.all(24),
-            width: 380,
+            width: 420,
             child: _success ? _buildSuccessView() : _buildForm(),
           ),
         ),
@@ -343,11 +624,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey[700]),
         ),
+        const SizedBox(height: 18),
+        _buildDebugBox(),
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _goToLogin,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
@@ -363,6 +646,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildInviteInfoBox() {
     if (!_hasInvite || _invite == null) return const SizedBox.shrink();
+
+    final inviteEmail = (_invite?.email ?? '').trim();
 
     return Container(
       width: double.infinity,
@@ -381,7 +666,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Davet bağlantısı doğrulandı. Bu kayıt müşteri hesabı olarak oluşturulacak ve ölçüm kaydı hesabınıza bağlanacak.',
+              inviteEmail.isEmpty
+                  ? 'Davet bağlantısı doğrulandı. Bu kayıt müşteri hesabı olarak oluşturulacak ve ölçüm kaydı hesabınıza bağlanacak.'
+                  : 'Davet bağlantısı doğrulandı. E-posta otomatik dolduruldu: $inviteEmail',
               style: TextStyle(
                 color: Colors.teal[900],
                 height: 1.35,
@@ -394,6 +681,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildForm() {
+    final inviteEmailLocked =
+        _hasInvite && (_invite?.email ?? '').trim().isNotEmpty;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -401,9 +691,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'Kayıt Ol',
           style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
+
+        if (!_hasInvite) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isLoading ? null : _showInviteLinkDialog,
+              icon: const Icon(Icons.link),
+              label: const Text('Davet Bağlantısı ile Kaydol'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         _buildInviteInfoBox(),
+        _buildDebugBox(),
 
         Row(
           children: [
@@ -475,7 +778,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         TextField(
           controller: _emailController,
-          enabled: !_isLoading,
+          enabled: !_isLoading && !inviteEmailLocked,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
             labelText: 'E-posta',
@@ -573,7 +876,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 16),
 
         TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          onPressed: _isLoading ? null : _goToLogin,
           child: const Text('Zaten hesabın var mı? Giriş Yap'),
         ),
       ],

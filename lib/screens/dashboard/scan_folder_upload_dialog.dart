@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:oy_site/constants/scan_report_labels.dart';
 import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
+import 'package:oy_site/data/repositories/supabase_session_scan_repository.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/models/parsed_scan_report.dart';
 import 'package:oy_site/models/session_scan_assets.dart';
@@ -12,7 +13,6 @@ import 'package:oy_site/services/analysis/plantar_pressure_mock_factory.dart';
 import 'package:oy_site/services/scan/scan_report_pdf_parser_service.dart';
 import 'package:oy_site/services/scan/session_scan_assets_parser.dart';
 import 'package:oy_site/services/session_analysis_service.dart';
-import 'package:oy_site/data/repositories/supabase_session_scan_repository.dart';
 
 class ScanFolderUploadResult {
   final String folderPath;
@@ -30,7 +30,6 @@ class ScanFolderUploadResult {
 
 class ScanFolderUploadDialog extends StatefulWidget {
   final int? targetUserId;
-
   final int? sessionId;
   final int? patientId;
   final int? expertUserId;
@@ -51,8 +50,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
   final ScanReportPdfParserService _pdfParserService =
       const ScanReportPdfParserService();
 
-  final SessionScanAssetsParser _assetsParser =
-      const SessionScanAssetsParser();
+  final SessionScanAssetsParser _assetsParser = const SessionScanAssetsParser();
 
   final SupabaseAnalysisRepository _analysisRepository =
       SupabaseAnalysisRepository();
@@ -62,8 +60,12 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
 
   String? _selectedFolderPath;
   List<String> _fileNames = [];
+
   bool _isLoading = false;
+  bool _isProcessingUpload = false;
   bool _isSavingAnalysis = false;
+  bool _analysisSaved = false;
+
   String? _errorMessage;
   String? _saveMessage;
 
@@ -74,12 +76,16 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
   Future<void> _pickFolder() async {
     setState(() {
       _isLoading = true;
+      _isProcessingUpload = false;
       _isSavingAnalysis = false;
+      _analysisSaved = false;
       _errorMessage = null;
       _saveMessage = null;
       _detectedPdfPath = null;
       _parsedReport = null;
       _scanAssets = null;
+      _selectedFolderPath = null;
+      _fileNames = [];
     });
 
     try {
@@ -88,6 +94,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       );
 
       if (folderPath == null || folderPath.trim().isEmpty) {
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
@@ -97,6 +104,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       final dir = Directory(folderPath);
 
       if (!dir.existsSync()) {
+        if (!mounted) return;
         setState(() {
           _errorMessage = 'Seçilen klasör bulunamadı.';
           _isLoading = false;
@@ -107,9 +115,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       final entries = dir.listSync();
       final files = entries.whereType<File>().toList();
 
-      final fileNames = files
-          .map((file) => file.uri.pathSegments.last)
-          .toList()
+      final fileNames = files.map((file) => file.uri.pathSegments.last).toList()
         ..sort();
 
       String? detectedPdfPath;
@@ -136,6 +142,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         debugPrint('Assets parse hatası: $e');
       }
 
+      if (!mounted) return;
+
       setState(() {
         _selectedFolderPath = folderPath;
         _fileNames = fileNames;
@@ -143,23 +151,40 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _parsedReport = parsedReport;
         _scanAssets = scanAssets;
         _isLoading = false;
+        _isProcessingUpload = true;
+        _saveMessage =
+            '3D scan dosyaları ve analiz verileri Supabase’e kaydediliyor. Lütfen bekleyin.';
       });
 
       await _saveScanDataToSupabase();
 
       if (parsedReport != null) {
         await _saveParsedReportAsAnalysisResult();
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _saveMessage =
+              '3D scan verileri kaydedildi. PDF parse edilemediği için analiz sonucu oluşturulmadı.';
+        });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Klasör seçilirken hata oluştu: $e';
         _isLoading = false;
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isProcessingUpload = false;
+        _isSavingAnalysis = false;
       });
     }
   }
 
   void _confirmSelection() {
     if (_selectedFolderPath == null) return;
+    if (_isLoading || _isProcessingUpload || _isSavingAnalysis) return;
 
     Navigator.pop(
       context,
@@ -178,10 +203,20 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     final expertUserId = widget.expertUserId;
 
     if (sessionId == null || patientId == null || expertUserId == null) {
+      if (!mounted) return;
+      setState(() {
+        _saveMessage =
+            '3D scan verileri geçici olarak hazırlandı. Session/patient/expert ID eksik olduğu için Supabase’e kaydedilmedi.';
+      });
       return;
     }
 
     if (_parsedReport == null && _scanAssets == null) {
+      if (!mounted) return;
+      setState(() {
+        _saveMessage =
+            'Kaydedilecek 3D scan raporu veya dosya varlığı bulunamadı.';
+      });
       return;
     }
 
@@ -218,49 +253,53 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     final patientId = widget.patientId;
     final sessionId = widget.sessionId;
 
-    if (report == null || assets == null) return;
+    if (report == null) return;
 
     setState(() {
       _isSavingAnalysis = true;
-      _saveMessage = null;
+      _analysisSaved = false;
+      _saveMessage = 'Analiz sonucu Supabase’e kaydediliyor...';
     });
 
-    final pressure = const PlantarPressureMockFactory().buildDefaultForTest();
-
-    final analysisResult = SessionAnalysisService().analyze(
-      report: report,
-      pressure: pressure,
-      analysisDate: DateTime.now(),
-      sessionCode: report.reportNo ?? 'REAL-PARSE-SESSION',
-      locationLabel: report.storeCode ?? report.address ?? 'Yüklenen Ölçüm',
-      visuals: CustomerAnalysisVisualSet(
-        sessionCode: report.reportNo ?? 'REAL-PARSE-SESSION',
-        archLeftImagePath: assets.archLeftPath,
-        archRightImagePath: assets.archRightPath,
-        archSectionLeftImagePath: assets.archSectionLeftPath,
-        archSectionRightImagePath: assets.archSectionRightPath,
-        foot2dLeftImagePath: assets.foot2dLeftPath,
-        foot2dRightImagePath: assets.foot2dRightPath,
-        pronatorLeftImagePath: assets.pronatorLeftPath,
-        pronatorRightImagePath: assets.pronatorRightPath,
-        leftStlPath: assets.stlLeftPath,
-        rightStlPath: assets.stlRightPath,
-      ),
-    );
-
-    AnalysisRuntimeCache.instance.saveLatest(analysisResult);
-
-    if (userId == null && patientId == null) {
-      setState(() {
-        _isSavingAnalysis = false;
-        _saveMessage =
-            'Analiz geçici olarak hazırlandı. Kullanıcı ID olmadığı için Supabase’e kaydedilmedi.';
-      });
-      return;
-    }
-
     try {
-      await _analysisRepository.upsertAnalysisResult(
+      final pressure = const PlantarPressureMockFactory().buildDefaultForTest();
+
+      final analysisResult = SessionAnalysisService().analyze(
+        report: report,
+        pressure: pressure,
+        analysisDate: DateTime.now(),
+        sessionCode: report.reportNo ?? 'REAL-PARSE-SESSION',
+        locationLabel: report.storeCode ?? report.address ?? 'Yüklenen Ölçüm',
+        visuals: CustomerAnalysisVisualSet(
+          sessionCode: report.reportNo ?? 'REAL-PARSE-SESSION',
+          archLeftImagePath: assets?.archLeftPath,
+          archRightImagePath: assets?.archRightPath,
+          archSectionLeftImagePath: assets?.archSectionLeftPath,
+          archSectionRightImagePath: assets?.archSectionRightPath,
+          foot2dLeftImagePath: assets?.foot2dLeftPath,
+          foot2dRightImagePath: assets?.foot2dRightPath,
+          pronatorLeftImagePath: assets?.pronatorLeftPath,
+          pronatorRightImagePath: assets?.pronatorRightPath,
+          leftStlPath: assets?.stlLeftPath,
+          rightStlPath: assets?.stlRightPath,
+        ),
+      );
+
+      AnalysisRuntimeCache.instance.saveLatest(analysisResult);
+
+      if (userId == null && patientId == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _isSavingAnalysis = false;
+          _analysisSaved = false;
+          _saveMessage =
+              'Analiz geçici olarak hazırlandı. Kullanıcı veya hasta ID olmadığı için Supabase’e kaydedilmedi.';
+        });
+        return;
+      }
+
+      await _analysisRepository.saveAnalysisResult(
         userId: userId,
         patientId: patientId,
         sessionId: sessionId,
@@ -271,7 +310,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
 
       setState(() {
         _isSavingAnalysis = false;
-        _saveMessage = 'Analiz Supabase’e kaydedildi.';
+        _analysisSaved = true;
+        _saveMessage = 'Analiz Supabase’e kaydedildi. Yüklemeyi onaylayabilirsiniz.';
       });
     } catch (e) {
       debugPrint('Supabase analiz kayıt hatası: $e');
@@ -280,6 +320,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
 
       setState(() {
         _isSavingAnalysis = false;
+        _analysisSaved = false;
         _saveMessage =
             'Analiz geçici olarak hazırlandı ancak Supabase’e kaydedilemedi: $e';
       });
@@ -345,62 +386,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_isSavingAnalysis || _saveMessage != null) ...[
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _saveMessage?.contains('kaydedilemedi') == true
-                    ? Colors.orange.withOpacity(0.10)
-                    : Colors.teal.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _saveMessage?.contains('kaydedilemedi') == true
-                      ? Colors.orange.withOpacity(0.25)
-                      : Colors.teal.withOpacity(0.20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  if (_isSavingAnalysis) ...[
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Analiz sonucu kaydediliyor...'),
-                    ),
-                  ] else ...[
-                    Icon(
-                      _saveMessage?.contains('kaydedilemedi') == true
-                          ? Icons.warning_amber_outlined
-                          : Icons.check_circle_outline,
-                      size: 18,
-                      color: _saveMessage?.contains('kaydedilemedi') == true
-                          ? Colors.orange
-                          : Colors.teal,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _saveMessage ?? '',
-                        style: TextStyle(
-                          color: _saveMessage?.contains('kaydedilemedi') == true
-                              ? Colors.orange[900]
-                              : Colors.teal[900],
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+          _buildSaveStatusBox(),
           _buildPreviewSection(
             title: 'Rapor Bilgileri',
             children: [
@@ -608,6 +594,61 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     );
   }
 
+  Widget _buildSaveStatusBox() {
+    if (_saveMessage == null && !_isProcessingUpload && !_isSavingAnalysis) {
+      return const SizedBox.shrink();
+    }
+
+    final hasError = (_saveMessage ?? '').contains('kaydedilemedi');
+    final isBusy = _isProcessingUpload || _isSavingAnalysis;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: hasError
+            ? Colors.orange.withOpacity(0.10)
+            : Colors.teal.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hasError
+              ? Colors.orange.withOpacity(0.25)
+              : Colors.teal.withOpacity(0.20),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (isBusy) ...[
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+          ] else ...[
+            Icon(
+              hasError ? Icons.warning_amber_outlined : Icons.check_circle_outline,
+              size: 18,
+              color: hasError ? Colors.orange : Colors.teal,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              _saveMessage ?? 'Kaydediliyor...',
+              style: TextStyle(
+                color: hasError ? Colors.orange[900] : Colors.teal[900],
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreviewRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -708,8 +749,57 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     );
   }
 
+  Widget _buildGlobalSaveStatusBox() {
+    if (_saveMessage == null && !_isProcessingUpload && !_isSavingAnalysis) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.teal.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.teal.withOpacity(0.20)),
+      ),
+      child: Row(
+        children: [
+          if (_isProcessingUpload || _isSavingAnalysis) ...[
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+          ] else ...[
+            const Icon(
+              Icons.info_outline,
+              color: Colors.teal,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              _saveMessage ?? 'Kaydediliyor...',
+              style: TextStyle(
+                color: Colors.teal[900],
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isActionDisabled =
+        _selectedFolderPath == null || _isLoading || _isProcessingUpload;
+
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
       child: SizedBox(
@@ -732,7 +822,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _isProcessingUpload
+                        ? null
+                        : () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -746,7 +838,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _pickFolder,
+                    onPressed: _isLoading || _isProcessingUpload
+                        ? null
+                        : _pickFolder,
                     icon: const Icon(Icons.folder_open),
                     label: const Text('Klasör Seç'),
                   ),
@@ -762,6 +856,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                 ],
               ),
               const SizedBox(height: 16),
+              _buildGlobalSaveStatusBox(),
               if (_detectedPdfPath != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -820,8 +915,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                                               separatorBuilder: (_, __) =>
                                                   const SizedBox(height: 8),
                                               itemBuilder: (context, index) {
-                                                final fileName =
-                                                    _fileNames[index];
+                                                final fileName = _fileNames[index];
 
                                                 return Container(
                                                   padding:
@@ -829,9 +923,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                                                   decoration: BoxDecoration(
                                                     color: Colors.white,
                                                     borderRadius:
-                                                        BorderRadius.circular(
-                                                      10,
-                                                    ),
+                                                        BorderRadius.circular(10),
                                                     border: Border.all(
                                                       color:
                                                           Colors.grey.shade300,
@@ -876,20 +968,28 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed:
-                        _isSavingAnalysis ? null : () => Navigator.pop(context),
+                    onPressed: _isProcessingUpload
+                        ? null
+                        : () => Navigator.pop(context),
                     child: const Text('Vazgeç'),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: _selectedFolderPath == null || _isSavingAnalysis
-                        ? null
-                        : _confirmSelection,
-                    child: _isSavingAnalysis
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                    onPressed: isActionDisabled ? null : _confirmSelection,
+                    child: _isProcessingUpload
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Kaydediliyor...'),
+                            ],
                           )
                         : const Text('Yüklemeyi Onayla'),
                   ),

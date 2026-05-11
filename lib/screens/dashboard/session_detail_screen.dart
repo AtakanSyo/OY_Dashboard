@@ -14,6 +14,7 @@ import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dar
 import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:oy_site/data/repositories/supabase_measurement_session_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -39,6 +40,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   final SupabasePatientInviteRepository _inviteRepository =
       SupabasePatientInviteRepository();
+
+  final SupabasePatientRepository _patientRepository =
+    SupabasePatientRepository();
 
   PatientInviteModel? _latestInvite;
   bool _isCreatingInvite = false;
@@ -593,10 +597,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     });
 
     try {
+      final patient = await _patientRepository.getPatientById(
+        patientId: patientId,
+      );
+
       final invite = await _inviteRepository.createInvite(
         patientId: patientId,
         sessionId: sessionId,
         expertUserId: expertUserId,
+        email: patient?.email,
       );
 
       if (!mounted) return;
@@ -621,8 +630,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ölçüm onaylandı ve kayıt daveti oluşturuldu.'),
+        SnackBar(
+          content: Text(
+            (patient?.email ?? '').trim().isEmpty
+                ? 'Ölçüm onaylandı ve kayıt daveti oluşturuldu. E-posta bulunamadı.'
+                : 'Ölçüm onaylandı ve kayıt daveti oluşturuldu. E-posta davete eklendi.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
