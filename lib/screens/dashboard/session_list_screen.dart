@@ -145,7 +145,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
     if (_patients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Önce hasta kaydı oluşturmalısınız.'),
+          content: Text('Önce Kullanıcı kaydı oluşturmalısınız.'),
           backgroundColor: Colors.orange,
         ),
       );

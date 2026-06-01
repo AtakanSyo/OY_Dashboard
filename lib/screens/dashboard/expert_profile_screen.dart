@@ -66,7 +66,7 @@ class ExpertProfileScreen extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _MiniStatTile(
-                                    title: 'Toplam Hasta',
+                                    title: 'Toplam Kullanıcı',
                                     value: '128',
                                     icon: Icons.people_alt_outlined,
                                   ),

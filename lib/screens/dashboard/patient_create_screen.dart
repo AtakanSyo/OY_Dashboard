@@ -108,7 +108,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hasta kaydı başarıyla oluşturuldu.'),
+          content: Text('Kullanıcı kaydı başarıyla oluşturuldu.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -123,7 +123,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hasta kaydı oluşturulamadı: $e'),
+          content: Text('Kullanıcı kaydı oluşturulamadı: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -134,7 +134,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Yeni Hasta Kaydı'),
+        title: const Text('Yeni Kullanıcı Kaydı'),
         backgroundColor: Colors.teal,
       ),
       body: SingleChildScrollView(
@@ -148,7 +148,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Hasta Bilgileri',
+                    'Kullanıcı Bilgileri',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -156,7 +156,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Yeni hasta kaydı oluşturmak için aşağıdaki bilgileri doldurun.',
+                    'Yeni Kullanıcı kaydı oluşturmak için aşağıdaki bilgileri doldurun.',
                     style: TextStyle(color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 24),
@@ -281,7 +281,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                       controller: _notesController,
                       maxLines: 5,
                       decoration: const InputDecoration(
-                        labelText: 'Hasta notu',
+                        labelText: 'Kullanıcı notu',
                         border: OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),
@@ -299,7 +299,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                         const SizedBox(height: 6),
                         Text('Kaydı oluşturan kullanıcı: ${widget.currentUser.displayName}'),
                         const SizedBox(height: 6),
-                        const Text('Hasta kodu kayıt sırasında otomatik üretilecektir.'),
+                        const Text('Kullanıcı kodu kayıt sırasında otomatik üretilecektir.'),
                       ],
                     ),
                   ),
@@ -324,7 +324,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                               ),
                             )
                           : const Text(
-                              'Hasta Kaydını Oluştur',
+                              'Kullanıcı Kaydını Oluştur',
                               style: TextStyle(color: Colors.white),
                             ),
                     ),

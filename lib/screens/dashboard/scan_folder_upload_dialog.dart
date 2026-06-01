@@ -294,7 +294,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
           _isSavingAnalysis = false;
           _analysisSaved = false;
           _saveMessage =
-              'Analiz geçici olarak hazırlandı. Kullanıcı veya hasta ID olmadığı için Supabase’e kaydedilmedi.';
+              'Analiz geçici olarak hazırlandı. Kullanıcı veya Kullanıcı ID olmadığı için Supabase’e kaydedilmedi.';
         });
         return;
       }

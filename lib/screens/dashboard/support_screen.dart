@@ -19,7 +19,7 @@ class SupportScreen extends StatelessWidget {
     }
 
     if (currentUser.isOptiYouTeam) {
-      return 'Operasyon, hasta akışı ve sistem yönetimi için destek seçeneklerini kullanabilirsiniz.';
+      return 'Operasyon, Kullanıcı akışı ve sistem yönetimi için destek seçeneklerini kullanabilirsiniz.';
     }
 
     return 'Yardıma mı ihtiyacınız var? Aşağıdaki seçeneklerden birini seçebilirsiniz.';
@@ -30,8 +30,8 @@ class SupportScreen extends StatelessWidget {
       return const [
         _SupportItem(
           icon: Icons.groups,
-          title: 'Hasta ve Oturum Yardımı',
-          subtitle: 'Hasta kayıtları ve ölçüm oturumlarıyla ilgili destek alın.',
+          title: 'Kullanıcı ve Oturum Yardımı',
+          subtitle: 'Kullanıcı kayıtları ve ölçüm oturumlarıyla ilgili destek alın.',
         ),
         _SupportItem(
           icon: Icons.analytics,

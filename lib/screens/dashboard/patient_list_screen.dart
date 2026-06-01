@@ -71,7 +71,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Hasta listesi yüklenirken hata oluştu: $e';
+        _errorMessage = 'Kullanıcı listesi yüklenirken hata oluştu: $e';
         _isLoading = false;
       });
     }
@@ -120,7 +120,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${newPatient.fullName} hasta kaydı oluşturuldu.'),
+        content: Text('${newPatient.fullName} Kullanıcı kaydı oluşturuldu.'),
       ),
     );
   }
@@ -142,7 +142,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hasta Listesi'),
+        title: const Text('Kullanıcı Listesi'),
         backgroundColor: Colors.teal,
       ),
       body: Padding(
@@ -159,7 +159,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Kayıtlı hastaları buradan görüntüleyebilir ve arayabilirsin.',
+              'Kayıtlı Kullanıcıları buradan görüntüleyebilir ve arayabilirsin.',
               style: TextStyle(
                 color: Colors.grey[700],
               ),
@@ -169,7 +169,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
               controller: _searchController,
               onChanged: _filterPatients,
               decoration: InputDecoration(
-                hintText: 'Hasta adı, kodu, e-posta veya telefon ile ara',
+                hintText: 'Kullanıcı adı, kodu, e-posta veya telefon ile ara',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.trim().isEmpty
                     ? null
@@ -197,7 +197,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
         backgroundColor: Colors.teal,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
-          'Yeni Hasta',
+          'Yeni Kullanıcı',
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -238,8 +238,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
       return Center(
         child: Text(
           hasSearch
-              ? 'Arama kriterine uygun hasta bulunamadı.'
-              : 'Kayıtlı hasta bulunamadı.',
+              ? 'Arama kriterine uygun Kullanıcı bulunamadı.'
+              : 'Kayıtlı Kullanıcı bulunamadı.',
         ),
       );
     }
@@ -292,7 +292,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Hasta Kodu: ${patient.patientCode}',
+                          'Kullanıcı Kodu: ${patient.patientCode}',
                           style: TextStyle(color: Colors.grey[700]),
                         ),
                         const SizedBox(height: 8),

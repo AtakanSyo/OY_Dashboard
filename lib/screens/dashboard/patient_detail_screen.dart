@@ -46,7 +46,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       final patientId = widget.patient.patientId;
 
       if (patientId == null) {
-        throw Exception('Hasta ID bulunamadı.');
+        throw Exception('Kullanıcı ID bulunamadı.');
       }
 
       final sessions = await _sessionRepository.getSessionsByPatient(
@@ -88,7 +88,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   String _buildNotesText() {
     final notes = (widget.patient.notes ?? '').trim();
-    return notes.isEmpty ? 'Hasta notu bulunmuyor' : notes;
+    return notes.isEmpty ? 'Kullanıcı notu bulunmuyor' : notes;
   }
 
   Color _statusColor(String status) {
@@ -184,7 +184,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hasta Detayı'),
+        title: const Text('Kullanıcı Detayı'),
         backgroundColor: Colors.teal,
       ),
       body: SingleChildScrollView(
@@ -266,7 +266,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Hasta Kodu: ${patient.patientCode}',
+                  'Kullanıcı Kodu: ${patient.patientCode}',
                   style: TextStyle(
                     color: Colors.grey[700],
                     fontWeight: FontWeight.w600,
@@ -305,7 +305,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content:
-                          Text('Hasta düzenleme ekranını sonra bağlayacağız.'),
+                          Text('Kullanıcı düzenleme ekranını sonra bağlayacağız.'),
                     ),
                   );
                 },
@@ -321,11 +321,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   Widget _buildPatientInfoCard(Patient patient) {
     return _buildSectionCard(
-      title: 'Hasta Bilgileri',
+      title: 'Kullanıcı Bilgileri',
       child: Column(
         children: [
           _buildKeyValueRow('Ad Soyad', patient.fullName),
-          _buildKeyValueRow('Hasta Kodu', patient.patientCode),
+          _buildKeyValueRow('Kullanıcı Kodu', patient.patientCode),
           _buildKeyValueRow('E-posta', _buildEmailText()),
           _buildKeyValueRow('Telefon', _buildPhoneText()),
           _buildKeyValueRow('Cinsiyet', patient.displayGender),
@@ -352,7 +352,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildKeyValueRow('Onam Durumu', 'Henüz bağlanmadı'),
-          _buildKeyValueRow('Bilgilendirme', 'Supabase hasta kaydı aktif'),
+          _buildKeyValueRow('Bilgilendirme', 'Supabase Kullanıcı kaydı aktif'),
           _buildKeyValueRow('E-posta Gönderimi', 'Henüz tanımlanmadı'),
           const SizedBox(height: 8),
           Text(
@@ -406,7 +406,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
     if (_sessions.isEmpty) {
       return const Center(
-        child: Text('Bu hastaya ait ölçüm oturumu bulunamadı.'),
+        child: Text('Bu Kullanıcıya ait ölçüm oturumu bulunamadı.'),
       );
     }
 

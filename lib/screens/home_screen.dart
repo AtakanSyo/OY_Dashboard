@@ -661,7 +661,7 @@ class _FeaturesSection extends StatelessWidget {
         '3D ayak tarama ve analiz yönetimi',
         'Basınç verisi takibi',
         'Kişisel tabanlık tasarım süreci',
-        'Hasta ve sipariş operasyonları',
+        'Kullanıcı ve sipariş operasyonları',
       ],
     },
     {

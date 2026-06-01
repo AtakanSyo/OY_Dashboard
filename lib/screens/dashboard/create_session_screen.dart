@@ -56,7 +56,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     if (_selectedPatient == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Lütfen bir hasta seçin.'),
+          content: Text('Lütfen bir Kullanıcı seçin.'),
         ),
       );
       return;
@@ -68,7 +68,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     if (patientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hasta ID bulunamadı. Lütfen hastayı tekrar seçin.'),
+          content: Text('Kullanıcı ID bulunamadı. Lütfen Kullanıcıyı tekrar seçin.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -171,14 +171,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Hasta, tarih ve saat bilgilerini girerek yeni bir ölçüm oturumu oluşturabilirsiniz.',
+                  'Kullanıcı, tarih ve saat bilgilerini girerek yeni bir ölçüm oturumu oluşturabilirsiniz.',
                   style: TextStyle(color: Colors.grey[700]),
                 ),
                 const SizedBox(height: 24),
                 DropdownButtonFormField<Patient>(
                   initialValue: _selectedPatient,
                   decoration: const InputDecoration(
-                    labelText: 'Hasta',
+                    labelText: 'Kullanıcı',
                     border: OutlineInputBorder(),
                   ),
                   items: widget.patients.map((patient) {
