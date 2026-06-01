@@ -50,12 +50,30 @@ class SupabasePatientRepository {
     required int patientId,
     required String authUserId,
   }) async {
-    await _client
+    final response = await _client
         .from('patients')
         .update({
           'auth_user_id': authUserId,
           'updated_at': DateTime.now().toIso8601String(),
         })
-        .eq('id', patientId);
+        .eq('id', patientId)
+        .select('id, auth_user_id')
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception(
+        'Patient auth_user_id güncellenemedi. patientId=$patientId',
+      );
+    }
+
+    final updated = Map<String, dynamic>.from(response as Map);
+    final updatedAuthUserId = updated['auth_user_id']?.toString();
+
+    if (updatedAuthUserId != authUserId) {
+      throw Exception(
+        'Patient auth_user_id eşleşmiyor. '
+        'expected=$authUserId, actual=$updatedAuthUserId',
+      );
+    }
   }
 }

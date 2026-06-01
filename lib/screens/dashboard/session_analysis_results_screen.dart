@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_customer_analysis_repository.dart';
+import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/models/measurement_session.dart';
@@ -22,8 +22,8 @@ class SessionAnalysisResultsScreen extends StatefulWidget {
 
 class _SessionAnalysisResultsScreenState
     extends State<SessionAnalysisResultsScreen> {
-  final MockCustomerAnalysisRepository _repository =
-      MockCustomerAnalysisRepository();
+  final SupabaseAnalysisRepository _repository =
+      SupabaseAnalysisRepository();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -39,15 +39,19 @@ class _SessionAnalysisResultsScreenState
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _results = [];
     });
 
     try {
-      final userId = widget.currentUser.userId;
-      if (userId == null) {
-        throw Exception('Kullanıcı ID bulunamadı.');
-      }
+      final sessionId = widget.session.sessionId;
+      final patientId = widget.session.patientId;
+      final sessionCode = widget.session.sessionCode;
 
-      final results = await _repository.getAnalysisHistory(userId: userId);
+      final results = await _repository.getAnalysisHistoryBySession(
+        sessionId: sessionId,
+        patientId: patientId,
+        sessionCode: sessionCode,
+      );
 
       if (!mounted) return;
 
@@ -65,12 +69,58 @@ class _SessionAnalysisResultsScreenState
     }
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.analytics_outlined,
+              size: 64,
+              color: Colors.grey.shade500,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Bu oturum için analiz sonucu bulunamadı.',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '3D scan klasörü yüklendikten ve analiz sonucu kaydedildikten sonra burada görünecektir.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey[700],
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: _loadAnalyses,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tekrar Kontrol Et'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        appBar: null,
-        body: Center(
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Analiz Sonuçları - ${widget.session.sessionCode}',
+          ),
+          backgroundColor: Colors.teal,
+        ),
+        body: const Center(
           child: CircularProgressIndicator(),
         ),
       );
@@ -83,9 +133,13 @@ class _SessionAnalysisResultsScreenState
           backgroundColor: Colors.teal,
         ),
         body: Center(
-          child: Text(
-            _errorMessage!,
-            style: const TextStyle(color: Colors.red),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
@@ -93,14 +147,18 @@ class _SessionAnalysisResultsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Analiz Sonuçları - ${widget.session.sessionCode}'),
+        title: Text(
+          'Analiz Sonuçları - ${widget.session.sessionCode}',
+        ),
         backgroundColor: Colors.teal,
       ),
-      body: AnalysisResultsView(
-        currentUser: widget.currentUser,
-        pageTitle: 'Ayak Sağlığı Analiz Sonuçları',
-        results: _results,
-      ),
+      body: _results.isEmpty
+          ? _buildEmptyState()
+          : AnalysisResultsView(
+              currentUser: widget.currentUser,
+              pageTitle: 'Ayak Sağlığı Analiz Sonuçları',
+              results: _results,
+            ),
     );
   }
 }

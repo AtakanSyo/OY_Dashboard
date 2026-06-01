@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
+import 'package:oy_site/legal/legal_document_registry.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:oy_site/screens/auth/login_screen.dart';
@@ -48,6 +49,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _success = false;
+
+  bool _acceptedMembershipAgreement = false;
+  bool _acceptedPrivacyPolicy = false;
+  bool _acceptedTermsOfUse = false;
+  bool _acceptedCommercialMessages = false;
 
   String? _selectedRoleCode;
 
@@ -185,6 +191,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (password != confirm) {
       setState(() => _errorMessage = 'Şifreler eşleşmiyor.');
+      return;
+    }
+
+    if (!_acceptedMembershipAgreement) {
+      setState(() {
+        _errorMessage =
+            'Devam etmek için Üyelik Sözleşmesi kabul edilmelidir.';
+      });
+      return;
+    }
+
+    if (!_acceptedPrivacyPolicy) {
+      setState(() {
+        _errorMessage = 'Devam etmek için Aydınlatma Metni okunmalıdır.';
+      });
+      return;
+    }
+
+    if (!_acceptedTermsOfUse) {
+      setState(() {
+        _errorMessage =
+            'Devam etmek için Kullanım Koşulları kabul edilmelidir.';
+      });
       return;
     }
 
@@ -382,6 +411,129 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context,
       '/',
       (route) => false,
+    );
+  }
+
+  void _showLegalDocument(String code) {
+    final document = LegalDocumentRegistry.findByCode(code);
+
+    if (document == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Belge bulunamadı.'),
+        ),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(document.title),
+        content: SizedBox(
+          width: 700,
+          height: 500,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              document.content,
+              style: const TextStyle(height: 1.5),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegalCheckboxes() {
+    return Column(
+      children: [
+        _buildLegalCheckbox(
+          value: _acceptedMembershipAgreement,
+          onChanged: (value) {
+            setState(() {
+              _acceptedMembershipAgreement = value ?? false;
+              _errorMessage = null;
+            });
+          },
+          documentCode: LegalDocumentCodes.uyelikSozlesmesi,
+          documentTitle: 'Üyelik Sözleşmesi',
+          trailingText: '’ni kabul ediyorum.',
+        ),
+        _buildLegalCheckbox(
+          value: _acceptedPrivacyPolicy,
+          onChanged: (value) {
+            setState(() {
+              _acceptedPrivacyPolicy = value ?? false;
+              _errorMessage = null;
+            });
+          },
+          documentCode: LegalDocumentCodes.aydinlatmaMetni,
+          documentTitle: 'Aydınlatma Metni',
+          trailingText: '’ni okudum.',
+        ),
+        _buildLegalCheckbox(
+          value: _acceptedTermsOfUse,
+          onChanged: (value) {
+            setState(() {
+              _acceptedTermsOfUse = value ?? false;
+              _errorMessage = null;
+            });
+          },
+          documentCode: LegalDocumentCodes.kullanimKosullari,
+          documentTitle: 'Kullanım Koşulları',
+          trailingText: '’nı kabul ediyorum.',
+        ),
+        _buildLegalCheckbox(
+          value: _acceptedCommercialMessages,
+          onChanged: (value) {
+            setState(() {
+              _acceptedCommercialMessages = value ?? false;
+              _errorMessage = null;
+            });
+          },
+          documentCode: LegalDocumentCodes.ticariElektronikIleti,
+          documentTitle: 'Ticari Elektronik İleti',
+          trailingText: ' onayını veriyorum. (Opsiyonel)',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegalCheckbox({
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+    required String documentCode,
+    required String documentTitle,
+    required String trailingText,
+  }) {
+    return CheckboxListTile(
+      value: value,
+      onChanged: _isLoading ? null : onChanged,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Wrap(
+        children: [
+          InkWell(
+            onTap: () => _showLegalDocument(documentCode),
+            child: Text(
+              documentTitle,
+              style: const TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          Text(trailingText),
+        ],
+      ),
     );
   }
 
@@ -708,6 +860,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
           onSubmitted: (_) => _isLoading ? null : _register(),
         ),
+        const SizedBox(height: 16),
+        _buildLegalCheckboxes(),
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,

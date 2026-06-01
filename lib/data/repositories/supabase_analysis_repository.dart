@@ -128,4 +128,32 @@ class SupabaseAnalysisRepository {
         .delete()
         .eq('id', analysisResultId);
   }
+
+  Future<List<CustomerAnalysisResult>> getAnalysisHistoryBySession({
+    int? sessionId,
+    int? patientId,
+    String? sessionCode,
+  }) async {
+    var query = _client.from('analysis_results').select();
+
+    if (sessionId != null) {
+      query = query.eq('session_id', sessionId);
+    } else if (patientId != null) {
+      query = query.eq('patient_id', patientId);
+    } else if (sessionCode != null && sessionCode.trim().isNotEmpty) {
+      query = query.eq('session_code', sessionCode.trim());
+    } else {
+      throw Exception('Analiz sorgusu için sessionId, patientId veya sessionCode gerekli.');
+    }
+
+    final response = await query.order('analysis_date', ascending: false);
+
+    return (response as List<dynamic>)
+        .map(
+          (item) => CustomerAnalysisResult.fromMap(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
 }
