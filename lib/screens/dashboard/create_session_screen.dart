@@ -163,7 +163,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Yeni oturum bilgileri',
+                  'Yeni ölçüm oturumu bilgileri',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -260,7 +260,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   child: Text(
                     'Klinik ID: ${widget.currentUser.clinicId ?? '-'}\n'
                     'Uzman: ${widget.currentUser.displayName}\n'
-                    'Yeni oturum başlangıç durumu: draft',
+                    'Yeni ölçüm oturumu başlangıç durumu: draft',
                     style: const TextStyle(height: 1.5),
                   ),
                 ),

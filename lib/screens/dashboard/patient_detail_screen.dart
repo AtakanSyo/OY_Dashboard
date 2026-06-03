@@ -5,6 +5,7 @@ import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/patient.dart';
 import 'package:oy_site/screens/dashboard/create_session_screen.dart';
 import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PatientDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -26,14 +27,59 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   final SupabaseMeasurementSessionRepository _sessionRepository =
       SupabaseMeasurementSessionRepository();
 
+  SupabaseClient get _client => Supabase.instance.client;
+
   bool _isLoadingSessions = true;
+  bool _isUpdatingPatient = false;
+
   String? _errorMessage;
   List<MeasurementSession> _sessions = [];
+
+  late String _firstName;
+  late String _lastName;
+  String? _email;
+  String? _phone;
+  String? _gender;
+  DateTime? _birthDate;
+  String? _notes;
 
   @override
   void initState() {
     super.initState();
+
+    _firstName = widget.patient.firstName;
+    _lastName = widget.patient.lastName;
+    _email = widget.patient.email;
+    _phone = widget.patient.phone;
+    _gender = widget.patient.gender;
+    _birthDate = widget.patient.birthDate;
+    _notes = widget.patient.notes;
+
     _loadSessions();
+  }
+
+  String get _fullName {
+    final name = '$_firstName $_lastName'.trim();
+    return name.isEmpty ? 'İsimsiz Kullanıcı' : name;
+  }
+
+  String get _displayGender {
+    switch ((_gender ?? '').toUpperCase()) {
+      case 'MALE':
+      case 'M':
+      case 'ERKEK':
+        return 'Erkek';
+      case 'FEMALE':
+      case 'F':
+      case 'KADIN':
+        return 'Kadın';
+      case 'OTHER':
+      case 'DİĞER':
+      case 'DIGER':
+        return 'Diğer';
+      default:
+        return 'Belirtilmedi';
+    }
   }
 
   Future<void> _loadSessions() async {
@@ -76,18 +122,37 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         '${date.year}';
   }
 
+  String _formatDateForInput(DateTime? date) {
+    if (date == null) return '';
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  DateTime? _parseDateInput(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      throw Exception('Doğum tarihi YYYY-MM-DD formatında olmalıdır.');
+    }
+
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
   String _buildPhoneText() {
-    final phone = (widget.patient.phone ?? '').trim();
+    final phone = (_phone ?? '').trim();
     return phone.isEmpty ? 'Telefon bilgisi yok' : phone;
   }
 
   String _buildEmailText() {
-    final email = (widget.patient.email ?? '').trim();
+    final email = (_email ?? '').trim();
     return email.isEmpty ? 'E-posta bilgisi yok' : email;
   }
 
   String _buildNotesText() {
-    final notes = (widget.patient.notes ?? '').trim();
+    final notes = (_notes ?? '').trim();
     return notes.isEmpty ? 'Kullanıcı notu bulunmuyor' : notes;
   }
 
@@ -178,6 +243,304 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     });
   }
 
+  Future<void> _openEditPatientDialog() async {
+    final firstNameController = TextEditingController(text: _firstName);
+    final lastNameController = TextEditingController(text: _lastName);
+    final emailController = TextEditingController(text: _email ?? '');
+    final phoneController = TextEditingController(text: _phone ?? '');
+    final birthDateController = TextEditingController(
+      text: _formatDateForInput(_birthDate),
+    );
+    final notesController = TextEditingController(text: _notes ?? '');
+
+    String selectedGender = (_gender ?? '').trim();
+
+    final result = await showDialog<_PatientEditResult>(
+      context: context,
+      builder: (_) {
+        String? localError;
+
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Kullanıcı Bilgilerini Düzenle'),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (localError != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.red.withOpacity(0.20),
+                            ),
+                          ),
+                          child: Text(
+                            localError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: firstNameController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Ad',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: lastNameController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Soyad',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'E-posta',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Telefon',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedGender.isEmpty ? null : selectedGender,
+                        decoration: const InputDecoration(
+                          labelText: 'Cinsiyet',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'MALE',
+                            child: Text('Erkek'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'FEMALE',
+                            child: Text('Kadın'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'OTHER',
+                            child: Text('Diğer'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          selectedGender = value ?? '';
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: birthDateController,
+                        decoration: InputDecoration(
+                          labelText: 'Doğum Tarihi',
+                          hintText: 'YYYY-MM-DD',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            onPressed: () async {
+                              final initialDate = _birthDate ?? DateTime(1990);
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: initialDate,
+                                firstDate: DateTime(1900),
+                                lastDate: DateTime.now(),
+                              );
+
+                              if (picked == null) return;
+
+                              birthDateController.text =
+                                  _formatDateForInput(picked);
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: notesController,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'Notlar',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isUpdatingPatient
+                      ? null
+                      : () => Navigator.pop(context),
+                  child: const Text('Vazgeç'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isUpdatingPatient
+                      ? null
+                      : () {
+                          try {
+                            final firstName =
+                                firstNameController.text.trim();
+                            final lastName = lastNameController.text.trim();
+
+                            if (firstName.isEmpty || lastName.isEmpty) {
+                              setLocalState(() {
+                                localError = 'Ad ve soyad zorunludur.';
+                              });
+                              return;
+                            }
+
+                            final parsedBirthDate = _parseDateInput(
+                              birthDateController.text,
+                            );
+
+                            Navigator.pop(
+                              context,
+                              _PatientEditResult(
+                                firstName: firstName,
+                                lastName: lastName,
+                                email: emailController.text.trim(),
+                                phone: phoneController.text.trim(),
+                                gender: selectedGender.trim(),
+                                birthDate: parsedBirthDate,
+                                notes: notesController.text.trim(),
+                              ),
+                            );
+                          } catch (e) {
+                            setLocalState(() {
+                              localError = e.toString();
+                            });
+                          }
+                        },
+                  icon: const Icon(Icons.save),
+                  label: const Text('Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    firstNameController.dispose();
+    lastNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    birthDateController.dispose();
+    notesController.dispose();
+
+    if (result == null) return;
+
+    await _updatePatient(result);
+  }
+
+  Future<void> _updatePatient(_PatientEditResult result) async {
+    final patientId = widget.patient.patientId;
+
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kullanıcı ID bulunamadı.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingPatient = true;
+    });
+
+    try {
+      final response = await _client
+          .from('patients')
+          .update({
+            'first_name': result.firstName,
+            'last_name': result.lastName,
+            'email': result.email.isEmpty ? null : result.email,
+            'phone': result.phone.isEmpty ? null : result.phone,
+            'gender': result.gender.isEmpty ? null : result.gender,
+            'birth_date':
+                result.birthDate == null ? null : result.birthDate!.toIso8601String(),
+            'notes': result.notes.isEmpty ? null : result.notes,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', patientId)
+          .select()
+          .maybeSingle();
+
+      if (response == null) {
+        throw Exception('Kullanıcı güncellenemedi. Kayıt bulunamadı.');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _firstName = result.firstName;
+        _lastName = result.lastName;
+        _email = result.email.isEmpty ? null : result.email;
+        _phone = result.phone.isEmpty ? null : result.phone;
+        _gender = result.gender.isEmpty ? null : result.gender;
+        _birthDate = result.birthDate;
+        _notes = result.notes.isEmpty ? null : result.notes;
+        _isUpdatingPatient = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kullanıcı bilgileri güncellendi.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUpdatingPatient = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kullanıcı güncellenemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final patient = widget.patient;
@@ -207,8 +570,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           _buildPatientInfoCard(patient),
                           const SizedBox(height: 16),
                           _buildNotesCard(),
-                          const SizedBox(height: 16),
-                          _buildKvkkCard(),
                         ],
                       ),
                     ),
@@ -258,7 +619,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  patient.fullName,
+                  _fullName,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -296,21 +657,16 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 ),
                 icon: const Icon(Icons.add, color: Colors.white),
                 label: const Text(
-                  'Yeni Oturum',
+                  'Yeni Ölçüm',
                   style: TextStyle(color: Colors.white),
                 ),
               ),
               OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Kullanıcı düzenleme ekranını sonra bağlayacağız.'),
-                    ),
-                  );
-                },
+                onPressed: _isUpdatingPatient ? null : _openEditPatientDialog,
                 icon: const Icon(Icons.edit),
-                label: const Text('Düzenle'),
+                label: Text(
+                  _isUpdatingPatient ? 'Kaydediliyor...' : 'Düzenle',
+                ),
               ),
             ],
           ),
@@ -324,12 +680,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       title: 'Kullanıcı Bilgileri',
       child: Column(
         children: [
-          _buildKeyValueRow('Ad Soyad', patient.fullName),
+          _buildKeyValueRow('Ad Soyad', _fullName),
           _buildKeyValueRow('Kullanıcı Kodu', patient.patientCode),
           _buildKeyValueRow('E-posta', _buildEmailText()),
           _buildKeyValueRow('Telefon', _buildPhoneText()),
-          _buildKeyValueRow('Cinsiyet', patient.displayGender),
-          _buildKeyValueRow('Doğum Tarihi', _formatDate(patient.birthDate)),
+          _buildKeyValueRow('Cinsiyet', _displayGender),
+          _buildKeyValueRow('Doğum Tarihi', _formatDate(_birthDate)),
         ],
       ),
     );
@@ -341,27 +697,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       child: Text(
         _buildNotesText(),
         style: const TextStyle(height: 1.5),
-      ),
-    );
-  }
-
-  Widget _buildKvkkCard() {
-    return _buildSectionCard(
-      title: 'KVKK / Onam Durumu',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildKeyValueRow('Onam Durumu', 'Henüz bağlanmadı'),
-          _buildKeyValueRow('Bilgilendirme', 'Supabase Kullanıcı kaydı aktif'),
-          _buildKeyValueRow('E-posta Gönderimi', 'Henüz tanımlanmadı'),
-          const SizedBox(height: 8),
-          Text(
-            'Bu alan daha sonra patient_kvkk_consents ve davet bağlantısı akışına bağlanacak.',
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -618,4 +953,24 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       ),
     );
   }
+}
+
+class _PatientEditResult {
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String phone;
+  final String gender;
+  final DateTime? birthDate;
+  final String notes;
+
+  const _PatientEditResult({
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.phone,
+    required this.gender,
+    required this.birthDate,
+    required this.notes,
+  });
 }

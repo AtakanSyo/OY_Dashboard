@@ -11,6 +11,7 @@ import 'package:oy_site/screens/dashboard/corporate_department_analysis_screen.d
 import 'package:oy_site/screens/dashboard/corporate_trends_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate_employees_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate_reports_screen.dart';
+import 'package:oy_site/screens/dashboard/expert_control_panel_screen.dart';
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
 import 'profile_screen.dart';
@@ -48,28 +49,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Widget> get _pages {
     switch (widget.currentUser.roleCode) {
-
-      // 👨‍⚕️ EXPERT
       case RoleCodes.expert:
         return [
-          PatientListScreen(currentUser: widget.currentUser, pressureRepository: widget.pressureRepository),        // 0
-          SessionListScreen(currentUser: widget.currentUser, pressureRepository: widget.pressureRepository),        // 1
-          OrdersScreen(currentUser: widget.currentUser),             // 3
-          SupportScreen(currentUser: widget.currentUser),            // 4
-          ExpertProfileScreen(currentUser: widget.currentUser),           // 6
+          ExpertControlPanelScreen(
+            currentUser: widget.currentUser,
+            onNewMeasurementTap: () => _onItemSelected(1),
+            onMeasurementHistoryTap: () => _onItemSelected(2),
+          ),
+          PatientListScreen(
+            currentUser: widget.currentUser,
+            pressureRepository: widget.pressureRepository,
+          ),
+          SessionListScreen(
+            currentUser: widget.currentUser,
+            pressureRepository: widget.pressureRepository,
+          ),
+          OrdersScreen(currentUser: widget.currentUser),
+          SupportScreen(currentUser: widget.currentUser),
+          ExpertProfileScreen(currentUser: widget.currentUser),
         ];
 
-      // 👤 CUSTOMER
       case RoleCodes.customer:
         return [
-          CustomerHomeScreen(currentUser: widget.currentUser),       // 0
-          CustomerAnalysisResultsScreen(currentUser: widget.currentUser), // 1
-          OrdersScreen(currentUser: widget.currentUser),             // 2
-          StoreScreen(currentUserEmail: widget.currentUser.email),   // 3
-          SupportScreen(currentUser: widget.currentUser),            // 4
-          CustomerProfileScreen(currentUser: widget.currentUser),           // 5
+          CustomerHomeScreen(currentUser: widget.currentUser),
+          CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
+          OrdersScreen(currentUser: widget.currentUser),
+          StoreScreen(currentUserEmail: widget.currentUser.email),
+          SupportScreen(currentUser: widget.currentUser),
+          CustomerProfileScreen(currentUser: widget.currentUser),
         ];
-      // 🏭 CORPORATE
+
       case RoleCodes.corporate:
         return [
           CorporateDashboardScreen(currentUser: widget.currentUser),
@@ -79,21 +88,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           CorporateReportsScreen(currentUser: widget.currentUser),
           CorporateProfileScreen(currentUser: widget.currentUser),
         ];
-      // 🏭 OPTIYOU TEAM
+
       case RoleCodes.optiYouTeam:
         return [
-          const SalesStatisticsScreen(),                             // 0
-          OptiYouOperationsBoardScreen(currentUser: widget.currentUser), // 1
-          OrdersScreen(currentUser: widget.currentUser),             // 2
-          SupportScreen(currentUser: widget.currentUser),            // 3
-          ProfileScreen(currentUser: widget.currentUser),            // 4
+          const SalesStatisticsScreen(),
+          OptiYouOperationsBoardScreen(currentUser: widget.currentUser),
+          OrdersScreen(currentUser: widget.currentUser),
+          SupportScreen(currentUser: widget.currentUser),
+          ProfileScreen(currentUser: widget.currentUser),
         ];
 
-      // 🔹 DEFAULT
       default:
         return [
-          SupportScreen(currentUser: widget.currentUser),            // 0
-          ProfileScreen(currentUser: widget.currentUser),            // 1
+          SupportScreen(currentUser: widget.currentUser),
+          ProfileScreen(currentUser: widget.currentUser),
         ];
     }
   }

@@ -153,7 +153,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _isLoading = false;
         _isProcessingUpload = true;
         _saveMessage =
-            '3D scan dosyaları ve analiz verileri Supabase’e kaydediliyor. Lütfen bekleyin.';
+            '3D scan dosyaları ve analiz verileri kaydediliyor. Lütfen bekleyin.';
       });
 
       await _saveScanDataToSupabase();
@@ -206,7 +206,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       if (!mounted) return;
       setState(() {
         _saveMessage =
-            '3D scan verileri geçici olarak hazırlandı. Session/patient/expert ID eksik olduğu için Supabase’e kaydedilmedi.';
+            '3D scan verileri geçici olarak hazırlandı. Henüz kaydedilmedi.';
       });
       return;
     }
@@ -233,7 +233,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       if (!mounted) return;
 
       setState(() {
-        _saveMessage = '3D scan verileri Supabase’e kaydedildi.';
+        _saveMessage = '3D scan verileri kaydedildi.';
       });
     } catch (e) {
       debugPrint('3D scan kayıt hatası: $e');
@@ -258,7 +258,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     setState(() {
       _isSavingAnalysis = true;
       _analysisSaved = false;
-      _saveMessage = 'Analiz sonucu Supabase’e kaydediliyor...';
+      _saveMessage = 'Analiz sonucu kaydediliyor...';
     });
 
     try {
@@ -294,7 +294,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
           _isSavingAnalysis = false;
           _analysisSaved = false;
           _saveMessage =
-              'Analiz geçici olarak hazırlandı. Kullanıcı veya Kullanıcı ID olmadığı için Supabase’e kaydedilmedi.';
+              'Analiz geçici olarak hazırlandı. Henüz kaydedilmedi.';
         });
         return;
       }
@@ -311,10 +311,10 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       setState(() {
         _isSavingAnalysis = false;
         _analysisSaved = true;
-        _saveMessage = 'Analiz Supabase’e kaydedildi. Yüklemeyi onaylayabilirsiniz.';
+        _saveMessage = 'Analiz kaydedildi. Yüklemeyi onaylayabilirsiniz.';
       });
     } catch (e) {
-      debugPrint('Supabase analiz kayıt hatası: $e');
+      debugPrint('Analiz kayıt hatası: $e');
 
       if (!mounted) return;
 
@@ -322,7 +322,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _isSavingAnalysis = false;
         _analysisSaved = false;
         _saveMessage =
-            'Analiz geçici olarak hazırlandı ancak Supabase’e kaydedilemedi: $e';
+            'Analiz geçici olarak hazırlandı ancak kaydedilemedi: $e';
       });
     }
   }

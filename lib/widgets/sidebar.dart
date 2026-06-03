@@ -23,7 +23,6 @@ class Sidebar extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 32),
-
           Column(
             children: [
               Container(
@@ -39,7 +38,7 @@ class Sidebar extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                "OY Dashboard",
+                'OY Dashboard',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -47,9 +46,7 @@ class Sidebar extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 28),
-
           Expanded(
             child: Column(
               children: [
@@ -75,46 +72,47 @@ class Sidebar extends StatelessWidget {
     switch (currentUser.roleCode) {
       case RoleCodes.expert:
         return const [
-          _SidebarMenuItem(Icons.groups, "Müşteriler"),
-          _SidebarMenuItem(Icons.fact_check, "Randevular"),
-          _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
-          _SidebarMenuItem(Icons.help_outline, "Destek"),
-          _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.dashboard_outlined, 'Kontrol Paneli'),
+          _SidebarMenuItem(Icons.groups, 'Müşteriler'),
+          _SidebarMenuItem(Icons.fact_check, 'Ölçüm Geçmişi'),
+          _SidebarMenuItem(Icons.shopping_bag, 'Siparişler'),
+          _SidebarMenuItem(Icons.help_outline, 'Destek'),
+          _SidebarMenuItem(Icons.person, 'Profil'),
         ];
 
       case RoleCodes.customer:
         return const [
-          _SidebarMenuItem(Icons.home, "Ana Sayfa"),
-          _SidebarMenuItem(Icons.insights_outlined, "Analiz Sonuçlarım"),
-          _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
-          _SidebarMenuItem(Icons.storefront, "Mağaza"),
-          _SidebarMenuItem(Icons.help_outline, "Destek"),
-          _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.home, 'Ana Sayfa'),
+          _SidebarMenuItem(Icons.insights_outlined, 'Analiz Sonuçlarım'),
+          _SidebarMenuItem(Icons.shopping_bag, 'Siparişler'),
+          _SidebarMenuItem(Icons.storefront, 'Mağaza'),
+          _SidebarMenuItem(Icons.help_outline, 'Destek'),
+          _SidebarMenuItem(Icons.person, 'Profil'),
         ];
 
       case RoleCodes.corporate:
         return const [
-          _SidebarMenuItem(Icons.dashboard_outlined, "Dashboard"),
-          _SidebarMenuItem(Icons.apartment_outlined, "Departman Analizi"),
-          _SidebarMenuItem(Icons.show_chart, "Trendler"),
-          _SidebarMenuItem(Icons.groups_outlined, "Çalışanlar"),
-          _SidebarMenuItem(Icons.description_outlined, "Raporlar"),
-          _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.dashboard_outlined, 'Dashboard'),
+          _SidebarMenuItem(Icons.apartment_outlined, 'Departman Analizi'),
+          _SidebarMenuItem(Icons.show_chart, 'Trendler'),
+          _SidebarMenuItem(Icons.groups_outlined, 'Çalışanlar'),
+          _SidebarMenuItem(Icons.description_outlined, 'Raporlar'),
+          _SidebarMenuItem(Icons.person, 'Profil'),
         ];
 
       case RoleCodes.optiYouTeam:
         return const [
-          _SidebarMenuItem(Icons.show_chart, "Satış İstatistikleri"),
-          _SidebarMenuItem(Icons.inventory_2_outlined, "Sipariş Operasyonlar"),
-          _SidebarMenuItem(Icons.shopping_bag, "Siparişler"),
-          _SidebarMenuItem(Icons.help_outline, "Destek"),
-          _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.show_chart, 'Satış İstatistikleri'),
+          _SidebarMenuItem(Icons.inventory_2_outlined, 'Sipariş Operasyonlar'),
+          _SidebarMenuItem(Icons.shopping_bag, 'Siparişler'),
+          _SidebarMenuItem(Icons.help_outline, 'Destek'),
+          _SidebarMenuItem(Icons.person, 'Profil'),
         ];
 
       default:
         return const [
-          _SidebarMenuItem(Icons.help_outline, "Destek"),
-          _SidebarMenuItem(Icons.person, "Profil"),
+          _SidebarMenuItem(Icons.help_outline, 'Destek'),
+          _SidebarMenuItem(Icons.person, 'Profil'),
         ];
     }
   }

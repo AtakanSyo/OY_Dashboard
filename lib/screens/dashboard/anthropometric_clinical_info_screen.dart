@@ -30,14 +30,11 @@ class _AnthropometricClinicalInfoScreenState
   late final TextEditingController _heightController;
   late final TextEditingController _weightController;
   late final TextEditingController _bmiController;
-  late final TextEditingController _shoeSizeController;
   late final TextEditingController _professionController;
   late final TextEditingController _dailyStandingHoursController;
   late final TextEditingController _jobDescriptionController;
   late final TextEditingController _sportDescriptionController;
   late final TextEditingController _currentComplaintController;
-  late final TextEditingController _diagnosisController;
-  late final TextEditingController _diabetesNoteController;
   late final TextEditingController _otherPathologiesController;
 
   bool _doesSport = false;
@@ -57,33 +54,34 @@ class _AnthropometricClinicalInfoScreenState
     _heightController = TextEditingController();
     _weightController = TextEditingController();
     _bmiController = TextEditingController();
-    _shoeSizeController = TextEditingController();
     _professionController = TextEditingController();
     _dailyStandingHoursController = TextEditingController();
     _jobDescriptionController = TextEditingController();
     _sportDescriptionController = TextEditingController();
     _currentComplaintController = TextEditingController();
-    _diagnosisController = TextEditingController();
-    _diabetesNoteController = TextEditingController();
     _otherPathologiesController = TextEditingController();
+
+    _heightController.addListener(_updateBmi);
+    _weightController.addListener(_updateBmi);
 
     _loadData();
   }
 
   @override
   void dispose() {
+    _heightController.removeListener(_updateBmi);
+    _weightController.removeListener(_updateBmi);
+
     _heightController.dispose();
     _weightController.dispose();
     _bmiController.dispose();
-    _shoeSizeController.dispose();
     _professionController.dispose();
     _dailyStandingHoursController.dispose();
     _jobDescriptionController.dispose();
     _sportDescriptionController.dispose();
     _currentComplaintController.dispose();
-    _diagnosisController.dispose();
-    _diabetesNoteController.dispose();
     _otherPathologiesController.dispose();
+
     super.dispose();
   }
 
@@ -109,16 +107,13 @@ class _AnthropometricClinicalInfoScreenState
       setState(() {
         _heightController.text = model.heightCm?.toString() ?? '';
         _weightController.text = model.weightKg?.toString() ?? '';
-        _bmiController.text = model.bmi?.toString() ?? '';
-        _shoeSizeController.text = model.shoeSizeEu?.toString() ?? '';
+
         _professionController.text = model.profession ?? '';
         _dailyStandingHoursController.text =
             model.dailyStandingHours?.toString() ?? '';
         _jobDescriptionController.text = model.jobDescription ?? '';
         _sportDescriptionController.text = model.sportDescription ?? '';
         _currentComplaintController.text = model.currentComplaint ?? '';
-        _diagnosisController.text = model.diagnosisPreDiagnosis ?? '';
-        _diabetesNoteController.text = model.diabetesNote ?? '';
         _otherPathologiesController.text = model.otherPathologies ?? '';
 
         _doesSport = model.doesSport;
@@ -133,6 +128,8 @@ class _AnthropometricClinicalInfoScreenState
 
         _isLoading = false;
       });
+
+      _updateBmi();
     } catch (e) {
       if (!mounted) return;
 
@@ -155,6 +152,27 @@ class _AnthropometricClinicalInfoScreenState
     return double.tryParse(text.replaceAll(',', '.'));
   }
 
+  double? _calculateBmi() {
+    final heightCm = _parseDouble(_heightController.text);
+    final weightKg = _parseDouble(_weightController.text);
+
+    if (heightCm == null || weightKg == null || heightCm <= 0 || weightKg <= 0) {
+      return null;
+    }
+
+    final heightM = heightCm / 100.0;
+    return weightKg / (heightM * heightM);
+  }
+
+  void _updateBmi() {
+    final bmi = _calculateBmi();
+    final nextText = bmi == null ? '' : bmi.toStringAsFixed(1);
+
+    if (_bmiController.text == nextText) return;
+
+    _bmiController.text = nextText;
+  }
+
   Future<void> _save() async {
     final sessionId = widget.session.sessionId;
     final expertUserId = widget.currentUser.userId;
@@ -172,21 +190,23 @@ class _AnthropometricClinicalInfoScreenState
     setState(() => _isSaving = true);
 
     try {
+      final calculatedBmi = _calculateBmi();
+
       final model = AnthropometricClinicalInfoModel(
         sessionId: sessionId,
         heightCm: _parseDouble(_heightController.text),
         weightKg: _parseDouble(_weightController.text),
-        bmi: _parseDouble(_bmiController.text),
-        shoeSizeEu: _parseDouble(_shoeSizeController.text),
+        bmi: calculatedBmi,
+        shoeSizeEu: null,
         profession: _professionController.text.trim(),
         dailyStandingHours: _parseDouble(_dailyStandingHoursController.text),
         jobDescription: _jobDescriptionController.text.trim(),
         doesSport: _doesSport,
         sportDescription: _sportDescriptionController.text.trim(),
         currentComplaint: _currentComplaintController.text.trim(),
-        diagnosisPreDiagnosis: _diagnosisController.text.trim(),
+        diagnosisPreDiagnosis: '',
         hasDiabetes: _hasDiabetes,
-        diabetesNote: _diabetesNoteController.text.trim(),
+        diabetesNote: '',
         halluxValgus: _halluxValgus,
         heelSpur: _heelSpur,
         flatFoot: _flatFoot,
@@ -275,13 +295,7 @@ class _AnthropometricClinicalInfoScreenState
                     const SizedBox(width: 24),
                     Expanded(
                       flex: 3,
-                      child: Column(
-                        children: [
-                          _buildComplaintSection(),
-                          const SizedBox(height: 16),
-                          _buildPathologySection(),
-                        ],
-                      ),
+                      child: _buildComplaintSection(),
                     ),
                   ],
                 ),
@@ -356,14 +370,10 @@ class _AnthropometricClinicalInfoScreenState
             label: 'Kilo (kg)',
           ),
           const SizedBox(height: 12),
-          _buildNumberField(
+          _buildReadOnlyField(
             controller: _bmiController,
             label: 'BMI',
-          ),
-          const SizedBox(height: 12),
-          _buildNumberField(
-            controller: _shoeSizeController,
-            label: 'Ayakkabı Numarası (EU)',
+            helperText: 'Boy ve kilo bilgisine göre otomatik hesaplanır.',
           ),
         ],
       ),
@@ -412,91 +422,100 @@ class _AnthropometricClinicalInfoScreenState
     return _buildSectionCard(
       title: 'Şikayet ve Klinik Değerlendirme',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTextField(
             controller: _currentComplaintController,
             label: 'Mevcut Şikayet',
             maxLines: 4,
           ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            controller: _diagnosisController,
-            label: 'Tanı / Ön Tanı',
-            maxLines: 4,
+          const SizedBox(height: 18),
+          Text(
+            'Patoloji / Klinik Bulgular',
+            style: TextStyle(
+              color: Colors.grey[800],
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
           ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Diyabet Var'),
+          const SizedBox(height: 8),
+          _buildPathologyCheckbox(
+            title: 'Diabetes Mellitus',
+            subtitle: 'Diyabet / Şeker hastalığı',
             value: _hasDiabetes,
-            onChanged: (v) => setState(() => _hasDiabetes = v),
+            onChanged: (v) => setState(() => _hasDiabetes = v ?? false),
           ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            controller: _diabetesNoteController,
-            label: 'Diyabet Notu',
-            maxLines: 2,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPathologySection() {
-    return _buildSectionCard(
-      title: 'Patolojiler',
-      child: Column(
-        children: [
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Hallux Valgus'),
+          _buildPathologyCheckbox(
+            title: 'Hallux Valgus',
+            subtitle: 'Başparmak çıkıntısı / bunyon',
             value: _halluxValgus,
             onChanged: (v) => setState(() => _halluxValgus = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Heel Spur'),
+          _buildPathologyCheckbox(
+            title: 'Calcaneal Spur',
+            subtitle: 'Topuk dikeni',
             value: _heelSpur,
             onChanged: (v) => setState(() => _heelSpur = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Flat Foot'),
+          _buildPathologyCheckbox(
+            title: 'Pes Planus',
+            subtitle: 'Düz taban',
             value: _flatFoot,
             onChanged: (v) => setState(() => _flatFoot = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Pes Cavus'),
+          _buildPathologyCheckbox(
+            title: 'Pes Cavus',
+            subtitle: 'Yüksek ark / çukur taban',
             value: _pesCavus,
             onChanged: (v) => setState(() => _pesCavus = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Morton Neuroma'),
+          _buildPathologyCheckbox(
+            title: 'Morton Neuroma',
+            subtitle: 'Morton nöroması / sinir sıkışması',
             value: _mortonNeuroma,
             onChanged: (v) => setState(() => _mortonNeuroma = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Achilles Problem'),
+          _buildPathologyCheckbox(
+            title: 'Achilles Tendinopathy',
+            subtitle: 'Aşil tendonu problemi',
             value: _achillesProblem,
             onChanged: (v) => setState(() => _achillesProblem = v ?? false),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Metatarsal Pain'),
+          _buildPathologyCheckbox(
+            title: 'Metatarsalgia',
+            subtitle: 'Metatarsalji / ayak ön bölge ağrısı',
             value: _metatarsalPain,
             onChanged: (v) => setState(() => _metatarsalPain = v ?? false),
           ),
           const SizedBox(height: 12),
           _buildTextField(
             controller: _otherPathologiesController,
-            label: 'Diğer Patolojiler',
+            label: 'Diğer Patolojiler / Klinik Notlar',
             maxLines: 3,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPathologyCheckbox({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      value: value,
+      onChanged: onChanged,
+      controlAffinity: ListTileControlAffinity.leading,
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(subtitle),
     );
   }
 
@@ -547,6 +566,22 @@ class _AnthropometricClinicalInfoScreenState
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(
         labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required TextEditingController controller,
+    required String label,
+    String? helperText,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: helperText,
         border: const OutlineInputBorder(),
       ),
     );

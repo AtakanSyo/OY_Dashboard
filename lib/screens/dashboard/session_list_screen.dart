@@ -263,7 +263,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
         backgroundColor: Colors.teal,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
-          'Yeni Oturum',
+          'Yeni Ölçüm',
           style: TextStyle(color: Colors.white),
         ),
       ),

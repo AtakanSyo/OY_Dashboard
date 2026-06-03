@@ -78,15 +78,14 @@ class _OrthoticDesignFormScreenState
         _approvedForOrder = false;
         _isLoading = false;
       });
-
       return;
     }
+
     if (!mounted) return;
 
     setState(() {
       _heelPad = form.heelPad;
-      _deepHeelCupController.text =
-          form.deepHeelCupMm?.toString() ?? '';
+      _deepHeelCupController.text = form.deepHeelCupMm?.toString() ?? '';
       _heelRaiseController.text = form.heelRaiseMm?.toString() ?? '';
       _medialArchSupport = form.medialArchSupport;
       _metatarsalPad = form.metatarsalPad;
@@ -177,34 +176,11 @@ class _OrthoticDesignFormScreenState
               children: [
                 _buildHeaderCard(),
                 const SizedBox(height: 24),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        children: [
-                          _buildSupportSection(),
-                          const SizedBox(height: 16),
-                          _buildReliefSection(),
-                          const SizedBox(height: 16),
-                          _buildNotesSection(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          _buildAiSection(),
-                          const SizedBox(height: 16),
-                          _buildApprovalSection(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                _buildSupportSection(),
+                const SizedBox(height: 16),
+                _buildReliefSection(),
+                const SizedBox(height: 16),
+                _buildNotesSection(),
               ],
             ),
           ),
@@ -235,16 +211,7 @@ class _OrthoticDesignFormScreenState
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -277,36 +244,38 @@ class _OrthoticDesignFormScreenState
         children: [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Heel Pad'),
+            title: const Text('Topuk Pedi (Heel Pad)'),
             value: _heelPad,
             onChanged: (v) => setState(() => _heelPad = v),
           ),
           _buildNumberField(
             controller: _deepHeelCupController,
-            label: 'Deep Heel Cup (mm)',
+            label: 'Derin Topuk Kapsülü (Deep Heel Cup) mm',
           ),
           const SizedBox(height: 12),
           _buildNumberField(
             controller: _heelRaiseController,
-            label: 'Heel Raise (mm)',
+            label: 'Topuk Yükseltme (Heel Raise) mm',
           ),
           const SizedBox(height: 12),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Medial Arch Support'),
+            title: const Text('Medial Ark Desteği (Medial Arch Support)'),
             value: _medialArchSupport,
             onChanged: (v) =>
                 setState(() => _medialArchSupport = v ?? false),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Metatarsal Pad'),
+            title: const Text('Metatarsal Ped (Metatarsal Pad)'),
             value: _metatarsalPad,
             onChanged: (v) => setState(() => _metatarsalPad = v ?? false),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Transverse Arch Support'),
+            title: const Text(
+              'Transvers Ark Desteği (Transverse Arch Support)',
+            ),
             value: _transverseArchSupport,
             onChanged: (v) =>
                 setState(() => _transverseArchSupport = v ?? false),
@@ -318,23 +287,23 @@ class _OrthoticDesignFormScreenState
 
   Widget _buildReliefSection() {
     return _buildSectionCard(
-      title: 'Relief / Bölgesel Düzenlemeler',
+      title: 'Rahatlatma / Bölgesel Düzenlemeler',
       child: Column(
         children: [
           _buildNumberField(
             controller: _posteriorReliefController,
-            label: 'Posterior Relief (mm)',
+            label: 'Posterior Rahatlatma (Posterior Relief) mm',
           ),
           const SizedBox(height: 12),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Morton Relief'),
+            title: const Text('Morton Rahatlatması (Morton Relief)'),
             value: _mortonRelief,
             onChanged: (v) => setState(() => _mortonRelief = v ?? false),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Bunion Pad'),
+            title: const Text('Bunyon Pedi (Bunion Pad)'),
             value: _bunionPad,
             onChanged: (v) => setState(() => _bunionPad = v ?? false),
           ),
@@ -357,51 +326,6 @@ class _OrthoticDesignFormScreenState
     );
   }
 
-  Widget _buildAiSection() {
-    return _buildSectionCard(
-      title: 'AI Recommendation',
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.teal.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          _aiRecommendationJson ?? 'AI recommendation henüz yok.',
-          style: const TextStyle(height: 1.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildApprovalSection() {
-    return _buildSectionCard(
-      title: 'Sipariş Onayı',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Approved For Order'),
-            value: _approvedForOrder,
-            onChanged: (v) => setState(() => _approvedForOrder = v ?? false),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _approvedForOrder
-                ? 'Bu form sipariş oluşturma için onaylandı.'
-                : 'Bu form henüz siparişe hazır değil.',
-            style: TextStyle(
-              color: _approvedForOrder ? Colors.green : Colors.orange,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSectionCard({
     required String title,
     required Widget child,
@@ -409,16 +333,7 @@ class _OrthoticDesignFormScreenState
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -433,6 +348,19 @@ class _OrthoticDesignFormScreenState
           child,
         ],
       ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 8,
+        ),
+      ],
     );
   }
 
