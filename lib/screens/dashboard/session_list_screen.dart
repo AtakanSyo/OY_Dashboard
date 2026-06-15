@@ -78,6 +78,11 @@ class _SessionListScreenState extends State<SessionListScreen> {
         _patients = patients;
         _isLoading = false;
       });
+
+      // Yenileme sırasında mevcut arama metnini tekrar uygula.
+      if (_searchController.text.trim().isNotEmpty) {
+        _filterSessions(_searchController.text);
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -88,19 +93,55 @@ class _SessionListScreenState extends State<SessionListScreen> {
     }
   }
 
+  Patient? _findPatientBySession(MeasurementSession session) {
+    final patientId = session.patientId;
+
+    for (final patient in _patients) {
+      if (patient.patientId == patientId) {
+        return patient;
+      }
+    }
+
+    return null;
+  }
+
+  String _patientNameForSession(MeasurementSession session) {
+    final patient = _findPatientBySession(session);
+
+    if (patient == null) {
+      return 'Kullanıcı bulunamadı';
+    }
+
+    final fullName = '${patient.firstName} ${patient.lastName}'.trim();
+
+    if (fullName.isNotEmpty) {
+      return fullName;
+    }
+
+    return patient.patientCode;
+  }
+
   void _filterSessions(String query) {
     final q = query.trim().toLowerCase();
 
     setState(() {
       if (q.isEmpty) {
-        _filteredSessions = _allSessions;
+        _filteredSessions = List<MeasurementSession>.from(_allSessions);
         return;
       }
 
       _filteredSessions = _allSessions.where((session) {
+        final patient = _findPatientBySession(session);
+        final patientName = patient == null
+            ? ''
+            : '${patient.firstName} ${patient.lastName}'.trim().toLowerCase();
+        final patientCode = patient?.patientCode.toLowerCase() ?? '';
+
         return session.sessionCode.toLowerCase().contains(q) ||
             session.effectiveStatus.toLowerCase().contains(q) ||
-            (session.sessionTime ?? '').toLowerCase().contains(q);
+            (session.sessionTime ?? '').toLowerCase().contains(q) ||
+            patientName.contains(q) ||
+            patientCode.contains(q);
       }).toList();
     });
   }
@@ -145,7 +186,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
     if (_patients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Önce Kullanıcı kaydı oluşturmalısınız.'),
+          content: Text('Önce kullanıcı kaydı oluşturmalısınız.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -235,7 +276,8 @@ class _SessionListScreenState extends State<SessionListScreen> {
               controller: _searchController,
               onChanged: _filterSessions,
               decoration: InputDecoration(
-                hintText: 'Oturum kodu, durum veya saat ile ara',
+                hintText:
+                    'Kullanıcı adı, kullanıcı kodu, oturum kodu, durum veya saat ile ara',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.trim().isEmpty
                     ? null
@@ -272,7 +314,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     if (_errorMessage != null) {
@@ -316,6 +360,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
         itemBuilder: (context, index) {
           final session = _filteredSessions[index];
           final statusColor = _statusColor(session.effectiveStatus);
+          final patientName = _patientNameForSession(session);
 
           return InkWell(
             onTap: () => _openSessionDetail(session),
@@ -380,13 +425,28 @@ class _SessionListScreenState extends State<SessionListScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tarih: ${_formatDate(session.sessionDate)}'
-                          '${session.sessionTime != null ? ' • Saat: ${session.sessionTime}' : ''}',
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
                         const SizedBox(height: 10),
+
+                        // Kullanıcı adı tarih bilgisinin solunda gösteriliyor.
+                        Wrap(
+                          spacing: 18,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _buildMetaItem(
+                              icon: Icons.person_outline,
+                              text: patientName,
+                              emphasize: true,
+                            ),
+                            _buildMetaItem(
+                              icon: Icons.calendar_today_outlined,
+                              text:
+                                  'Tarih: ${_formatDate(session.sessionDate)}'
+                                  '${session.sessionTime != null ? ' • Saat: ${session.sessionTime}' : ''}',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -444,11 +504,41 @@ class _SessionListScreenState extends State<SessionListScreen> {
     );
   }
 
+  Widget _buildMetaItem({
+    required IconData icon,
+    required String text,
+    bool emphasize = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: emphasize ? Colors.teal : Colors.grey[700],
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: emphasize ? Colors.teal.shade800 : Colors.grey[700],
+            fontWeight: emphasize ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTag(String text, bool active) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 7,
+      ),
       decoration: BoxDecoration(
-        color: active ? Colors.green.withOpacity(0.12) : Colors.grey.shade200,
+        color: active
+            ? Colors.green.withOpacity(0.12)
+            : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

@@ -259,22 +259,36 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
               ),
               const SizedBox(height: 18),
               Expanded(
-                child: kIsWeb
-                    ? _buildDropArea()
-                    : DropTarget(
-                        onDragDone: (detail) async {
-                          if (detail.files.isNotEmpty) {
-                            await _handleDroppedFile(detail.files.first);
-                          }
-                        },
-                        onDragEntered: (_) {
-                          setState(() => _isDragging = true);
-                        },
-                        onDragExited: (_) {
-                          setState(() => _isDragging = false);
-                        },
-                        child: _buildDropArea(),
-                      ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 4,
+                      child: _buildTemplatePreview(),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    Expanded(
+                      flex: 6,
+                      child: kIsWeb
+                          ? _buildDropArea()
+                          : DropTarget(
+                              onDragDone: (detail) async {
+                                if (detail.files.isNotEmpty) {
+                                  await _handleDroppedFile(detail.files.first);
+                                }
+                              },
+                              onDragEntered: (_) {
+                                setState(() => _isDragging = true);
+                              },
+                              onDragExited: (_) {
+                                setState(() => _isDragging = false);
+                              },
+                              child: _buildDropArea(),
+                            ),
+                    ),
+                  ],
+                ),
               ),
               if (_statusMessage != null) ...[
                 const SizedBox(height: 12),
@@ -318,6 +332,54 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTemplatePreview() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade300,
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Örnek Fotoğraf',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'İç tabanı aşağıdaki örneğe benzer şekilde fotoğraflayın.',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/analysis/insole_photo_template.png',
+                fit: BoxFit.contain,
+                width: double.infinity,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
