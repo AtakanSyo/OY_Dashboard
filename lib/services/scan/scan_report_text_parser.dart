@@ -280,7 +280,7 @@ class ScanReportTextParser {
 
   double? _extractArchIndex(String text, {required bool isLeft}) {
     final pattern = RegExp(
-      '(${_numberPattern})\\s+Arch Index\\s+(${_numberPattern})',
+      '($_numberPattern)\\s+Arch Index\\s+($_numberPattern)',
       caseSensitive: false,
     );
 

@@ -123,7 +123,7 @@ class _SalesStatisticsScreenState extends State<SalesStatisticsScreen> {
               SizedBox(
                 width: 180,
                 child: DropdownButtonFormField<String>(
-                  value: _selectedRange,
+                  initialValue: _selectedRange,
                   decoration: InputDecoration(
                     labelText: 'Dönem',
                     border: OutlineInputBorder(

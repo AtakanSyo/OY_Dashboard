@@ -230,7 +230,7 @@ class _AnthropometricClinicalInfoScreenState
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Antropometrik / klinik bilgiler kaydedildi.'),
+          content: Text('Antropometrik bilgiler kaydedildi.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -420,7 +420,7 @@ class _AnthropometricClinicalInfoScreenState
 
   Widget _buildComplaintSection() {
     return _buildSectionCard(
-      title: 'Şikayet ve Klinik Değerlendirme',
+      title: 'Şikayet ve Değerlendirme',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

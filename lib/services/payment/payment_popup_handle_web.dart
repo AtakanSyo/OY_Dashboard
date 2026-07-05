@@ -16,6 +16,5 @@ class PaymentPopupHandle {
 
 PaymentPopupHandle? openPaymentPopup() {
   final window = html.window.open('about:blank', '_blank');
-  if (window == null) return null;
   return PaymentPopupHandle(window);
 }

@@ -381,7 +381,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<String>(
-            value: _order.orderStatus,
+            initialValue: _order.orderStatus,
             decoration: const InputDecoration(
               labelText: 'Sipariş Durumu',
               border: OutlineInputBorder(),

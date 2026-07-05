@@ -336,7 +336,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedGender.isEmpty ? null : selectedGender,
+                        initialValue: selectedGender.isEmpty ? null : selectedGender,
                         decoration: const InputDecoration(
                           labelText: 'Cinsiyet',
                           border: OutlineInputBorder(),
@@ -494,7 +494,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             'phone': result.phone.isEmpty ? null : result.phone,
             'gender': result.gender.isEmpty ? null : result.gender,
             'birth_date':
-                result.birthDate == null ? null : result.birthDate!.toIso8601String(),
+                result.birthDate?.toIso8601String(),
             'notes': result.notes.isEmpty ? null : result.notes,
             'updated_at': DateTime.now().toIso8601String(),
           })

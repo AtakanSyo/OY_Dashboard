@@ -276,7 +276,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedStatus,
+                    initialValue: _selectedStatus,
                     decoration: InputDecoration(
                       labelText: 'Durum',
                       border: OutlineInputBorder(
@@ -313,7 +313,7 @@ class _OptiYouOrderListScreenState extends State<OptiYouOrderListScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedProductType,
+                    initialValue: _selectedProductType,
                     decoration: InputDecoration(
                       labelText: 'Ürün Tipi',
                       border: OutlineInputBorder(

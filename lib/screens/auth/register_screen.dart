@@ -770,7 +770,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _selectedRoleCode,
+          initialValue: _selectedRoleCode,
           decoration: InputDecoration(
             labelText: 'Kullanıcı Tipi',
             border: OutlineInputBorder(

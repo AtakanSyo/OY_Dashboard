@@ -6,7 +6,6 @@ import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
 import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
 import 'package:oy_site/data/repositories/supabase_order_repository.dart';
-import 'package:oy_site/models/order_operation_state_model.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {
   final AppUser currentUser;

@@ -560,7 +560,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  value: _connectedPort,
+                                  initialValue: _connectedPort,
                                   decoration: const InputDecoration(
                                     labelText: 'Port',
                                     border: OutlineInputBorder(),
