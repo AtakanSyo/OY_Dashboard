@@ -4,6 +4,7 @@ import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/payment_result_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'screens/auth/legal_consent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -43,6 +44,7 @@ class OYDashboardApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final paymentResult = _extractPaymentResultFromUrl();
     final inviteToken = _extractInviteTokenFromUrl();
+    final legalConsentToken = _extractLegalConsentTokenFromUrl();
 
     return MaterialApp(
       title: 'OY Dashboard',
@@ -62,9 +64,11 @@ class OYDashboardApp extends StatelessWidget {
                   inviteToken: inviteToken,
                   pressureRepository: pressureRepository,
                 )
-              : HomeScreen(
-                  pressureRepository: pressureRepository,
-                ),
+              : legalConsentToken != null
+                  ? LegalConsentScreen(token: legalConsentToken)
+                  : HomeScreen(
+                      pressureRepository: pressureRepository,
+                    ),
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';
 
@@ -91,6 +95,15 @@ class OYDashboardApp extends StatelessWidget {
               inviteToken: inviteToken,
               pressureRepository: pressureRepository,
             ),
+          );
+        }
+
+        if (routeName.startsWith('/legal-consent')) {
+          final uri = Uri.parse(routeName);
+          final token = uri.queryParameters['token'] ?? '';
+
+          return MaterialPageRoute(
+            builder: (_) => LegalConsentScreen(token: token),
           );
         }
 
@@ -146,6 +159,32 @@ class OYDashboardApp extends StatelessWidget {
     }
 
     final token = fragmentUri.queryParameters['invite'];
+    if (token == null || token.trim().isEmpty) return null;
+
+    return token.trim();
+  }
+
+  String? _extractLegalConsentTokenFromUrl() {
+    final directUri = Uri.base;
+
+    if (directUri.path == '/legal-consent') {
+      final token = directUri.queryParameters['token'];
+      if (token != null && token.trim().isNotEmpty) {
+        return token.trim();
+      }
+    }
+
+    final fragment = Uri.base.fragment;
+    if (fragment.isEmpty) return null;
+
+    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
+    final fragmentUri = Uri.tryParse(normalized);
+
+    if (fragmentUri == null || fragmentUri.path != '/legal-consent') {
+      return null;
+    }
+
+    final token = fragmentUri.queryParameters['token'];
     if (token == null || token.trim().isEmpty) return null;
 
     return token.trim();

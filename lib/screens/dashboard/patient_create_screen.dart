@@ -1,10 +1,9 @@
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient.dart';
+import 'package:oy_site/models/patient_consent_request_model.dart';
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_consent_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PatientCreateScreen extends StatefulWidget {
@@ -20,8 +19,6 @@ class PatientCreateScreen extends StatefulWidget {
 }
 
 class _PatientCreateScreenState extends State<PatientCreateScreen> {
-  static const String _appBaseUrl = 'https://optiyou.fit';
-
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _firstNameController = TextEditingController();
@@ -32,6 +29,8 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
 
   final SupabasePatientRepository _patientRepository =
       SupabasePatientRepository();
+  final SupabasePatientConsentRepository _consentRepository =
+      SupabasePatientConsentRepository();
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -53,17 +52,6 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
     final now = DateTime.now();
     final short = now.millisecondsSinceEpoch.toString().substring(7);
     return 'PT-$short';
-  }
-
-  String _generateConsentToken() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-    final encoded = base64UrlEncode(bytes).replaceAll('=', '');
-    return 'consent_$encoded';
-  }
-
-  String _buildConsentLink(String token) {
-    return '$_appBaseUrl/#/legal-consent?token=$token';
   }
 
   String _formatDate(DateTime? date) {
@@ -133,17 +121,20 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
       bool mailSent = false;
 
       if (email.isNotEmpty && savedPatient.patientId != null) {
+        final patientName =
+            '${savedPatient.firstName} ${savedPatient.lastName}'.trim();
+
         final request = await _createConsentRequest(
           patientId: savedPatient.patientId!,
           email: email,
+          patientName: patientName,
         );
 
-        consentLink = request.link;
+        consentLink = request.consentUrl;
 
         mailSent = await _sendConsentEmailIfAvailable(
           email: email,
-          patientName:
-              '${savedPatient.firstName} ${savedPatient.lastName}'.trim(),
+          patientName: patientName,
           consentLink: consentLink,
           token: request.token,
           requestId: request.requestId,
@@ -192,9 +183,10 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
     }
   }
 
-  Future<_ConsentRequestResult> _createConsentRequest({
+  Future<PatientConsentRequestModel> _createConsentRequest({
     required int patientId,
     required String email,
+    required String patientName,
   }) async {
     final expertUserId = widget.currentUser.userId;
 
@@ -202,36 +194,11 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
       throw Exception('Uzman kullanıcı ID bulunamadı.');
     }
 
-    final token = _generateConsentToken();
-    final now = DateTime.now();
-    final expiresAt = now.add(const Duration(days: 14));
-    final link = _buildConsentLink(token);
-
-    final response = await _client
-        .from('patient_consent_requests')
-        .insert({
-          'patient_id': patientId,
-          'expert_user_id': expertUserId,
-          'email': email,
-          'token': token,
-          'status': 'pending',
-          'expires_at': expiresAt.toIso8601String(),
-          'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        })
-        .select('id, token')
-        .maybeSingle();
-
-    if (response == null) {
-      throw Exception('KVKK/onam isteği oluşturulamadı.');
-    }
-
-    final map = Map<String, dynamic>.from(response as Map);
-
-    return _ConsentRequestResult(
-      requestId: int.tryParse(map['id'].toString()),
-      token: map['token']?.toString() ?? token,
-      link: link,
+    return _consentRepository.createConsentRequest(
+      patientId: patientId,
+      expertUserId: expertUserId,
+      email: email,
+      patientName: patientName,
     );
   }
 
@@ -644,16 +611,4 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
       ),
     );
   }
-}
-
-class _ConsentRequestResult {
-  final int? requestId;
-  final String token;
-  final String link;
-
-  const _ConsentRequestResult({
-    required this.requestId,
-    required this.token,
-    required this.link,
-  });
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_measurement_session_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_consent_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/patient.dart';
+import 'package:oy_site/models/patient_consent_request_model.dart';
 import 'package:oy_site/screens/dashboard/create_session_screen.dart';
 import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +28,8 @@ class PatientDetailScreen extends StatefulWidget {
 class _PatientDetailScreenState extends State<PatientDetailScreen> {
   final SupabaseMeasurementSessionRepository _sessionRepository =
       SupabaseMeasurementSessionRepository();
+  final SupabasePatientConsentRepository _consentRepository =
+      SupabasePatientConsentRepository();
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -34,6 +38,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   String? _errorMessage;
   List<MeasurementSession> _sessions = [];
+
+  bool _isLoadingConsent = true;
+  bool _isSendingConsent = false;
+  PatientConsentRequestModel? _consentRequest;
 
   late String _firstName;
   late String _lastName;
@@ -56,6 +64,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     _notes = widget.patient.notes;
 
     _loadSessions();
+    _loadConsentRequest();
   }
 
   String get _fullName {
@@ -112,6 +121,108 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         _errorMessage = 'Oturumlar yüklenirken hata oluştu: $e';
         _isLoadingSessions = false;
       });
+    }
+  }
+
+  Future<void> _loadConsentRequest() async {
+    final patientId = widget.patient.patientId;
+
+    if (patientId == null) {
+      setState(() => _isLoadingConsent = false);
+      return;
+    }
+
+    setState(() => _isLoadingConsent = true);
+
+    try {
+      final request = await _consentRepository.getLatestForPatient(
+        patientId: patientId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _consentRequest = request;
+        _isLoadingConsent = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() => _isLoadingConsent = false);
+    }
+  }
+
+  Future<void> _resendConsent() async {
+    final patientId = widget.patient.patientId;
+    final expertUserId = widget.currentUser.userId;
+    final email = (_email ?? '').trim();
+
+    if (patientId == null || expertUserId == null || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Onay bağlantısı gönderilemedi: kullanıcının e-posta adresi tanımlı değil.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSendingConsent = true);
+
+    try {
+      final request = await _consentRepository.createConsentRequest(
+        patientId: patientId,
+        expertUserId: expertUserId,
+        email: email,
+        patientName: _fullName,
+      );
+
+      final response = await _client.functions.invoke(
+        'send-patient-consent-email',
+        body: {
+          'email': email,
+          'patient_name': _fullName,
+          'consent_link': request.consentUrl,
+          'token': request.token,
+          'request_id': request.requestId,
+        },
+      );
+
+      final data = response.data;
+      final mailSent = data is Map
+          ? (data['success'] == true || data['ok'] == true)
+          : true;
+
+      if (!mounted) return;
+
+      setState(() {
+        _consentRequest = request;
+        _isSendingConsent = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            mailSent
+                ? 'KVKK onay bağlantısı $email adresine iletildi.'
+                : 'Onay bağlantısı oluşturuldu fakat e-posta gönderimi tamamlanamadı.',
+          ),
+          backgroundColor: mailSent ? Colors.green : Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isSendingConsent = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Onay bağlantısı gönderilemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -570,6 +681,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           _buildPatientInfoCard(patient),
                           const SizedBox(height: 16),
                           _buildNotesCard(),
+                          const SizedBox(height: 16),
+                          _buildConsentCard(),
                         ],
                       ),
                     ),
@@ -699,6 +812,65 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         style: const TextStyle(height: 1.5),
       ),
     );
+  }
+
+  Widget _buildConsentCard() {
+    return _buildSectionCard(
+      title: 'KVKK / Onam Durumu',
+      child: _isLoadingConsent
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildKeyValueRow('Onam Durumu', _consentStatusText),
+                if (_consentRequest != null) ...[
+                  _buildKeyValueRow(
+                    'Gönderildiği E-posta',
+                    _consentRequest!.email,
+                  ),
+                  _buildKeyValueRow(
+                    _consentRequest!.isAccepted
+                        ? 'Onay Tarihi'
+                        : 'Son Gönderim Tarihi',
+                    _consentRequest!.isAccepted
+                        ? _formatDate(_consentRequest!.acceptedAt)
+                        : _formatDate(_consentRequest!.createdAt),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isSendingConsent ? null : _resendConsent,
+                    icon: _isSendingConsent
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.email_outlined),
+                    label: Text(
+                      _consentRequest == null
+                          ? 'Onay Metnini Gönder'
+                          : 'Onay Metnini Tekrar Gönder',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  String get _consentStatusText {
+    final request = _consentRequest;
+
+    if (request == null) return 'Henüz gönderilmedi';
+    if (request.isAccepted) return 'Onaylandı';
+    if (request.isExpired) return 'Süresi doldu';
+    return 'Onay bekleniyor';
   }
 
   Widget _buildSessionSection() {
