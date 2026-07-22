@@ -46,6 +46,7 @@ flutter:
     - assets/images/products/
     - assets/images/addons/
     - assets/images/analysis/
+    - assets/images/orthotic_design/
     - assets/mock_data/
     - assets/scans/
     - assets/Results1.csv
