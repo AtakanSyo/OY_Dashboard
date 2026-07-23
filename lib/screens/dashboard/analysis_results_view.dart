@@ -114,6 +114,32 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     }
   }
 
+  FootHotspot _defaultHotspotForLayer(AnalysisLayer layer) {
+    switch (layer) {
+      case AnalysisLayer.general:
+        return FootHotspot.arch;
+      case AnalysisLayer.arch:
+        return FootHotspot.arch;
+      case AnalysisLayer.pressure:
+        return FootHotspot.metatarsal;
+      case AnalysisLayer.posture:
+        return FootHotspot.posture;
+      case AnalysisLayer.visuals:
+        return FootHotspot.arch;
+    }
+  }
+
+  Alignment _sideAwareAlignment(Alignment leftFootAlignment) {
+    if (_selectedFootSide == FootSelectionSide.left) {
+      return leftFootAlignment;
+    }
+
+    return Alignment(
+      -leftFootAlignment.x,
+      leftFootAlignment.y,
+    );
+  }
+
   void _openImagePreview(String title, String filePath) {
     showDialog<void>(
       context: context,
@@ -193,7 +219,11 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               const SizedBox(height: 18),
               _buildInteractiveFootSection(selected),
               const SizedBox(height: 18),
-              _buildLayerDetailSection(selected),
+              _buildGeneralLayer(selected),
+              if (_selectedLayer == AnalysisLayer.visuals) ...[
+                const SizedBox(height: 18),
+                _buildVisualLayer(selected),
+              ],
               const SizedBox(height: 18),
               _buildCompactTrendSection(),
             ],
@@ -412,21 +442,6 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  FootHotspot _defaultHotspotForLayer(AnalysisLayer layer) {
-    switch (layer) {
-      case AnalysisLayer.general:
-        return FootHotspot.arch;
-      case AnalysisLayer.arch:
-        return FootHotspot.arch;
-      case AnalysisLayer.pressure:
-        return FootHotspot.metatarsal;
-      case AnalysisLayer.posture:
-        return FootHotspot.posture;
-      case AnalysisLayer.visuals:
-        return FootHotspot.arch;
-    }
-  }
-
   Widget _buildInteractiveFootSection(CustomerAnalysisResult result) {
     return _buildSectionCard(
       title: 'Ayak Haritası',
@@ -556,6 +571,15 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     CustomerAnalysisResult result,
     CustomerFootSummary foot,
   ) {
+    final halluxTarget = _sideAwareAlignment(const Alignment(0.3, -0.34));
+    final halluxBox = _sideAwareAlignment(const Alignment(1.20, -0.42));
+
+    final metatarsalTarget = _sideAwareAlignment(const Alignment(0.00, -0.3));
+    final metatarsalBox = _sideAwareAlignment(const Alignment(0.40, -1.0));
+
+    final archTarget = _sideAwareAlignment(const Alignment(0.20, 0.05));
+    final archBox = _sideAwareAlignment(const Alignment(-0.20, 0.05));
+
     return Stack(
       children: [
         Positioned.fill(
@@ -567,24 +591,36 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             ),
           ),
         ),
+        _connector(
+          targetAlignment: halluxTarget,
+          boxAlignment: halluxBox,
+          selected: _selectedHotspot == FootHotspot.hallux,
+        ),
+        _connector(
+          targetAlignment: metatarsalTarget,
+          boxAlignment: metatarsalBox,
+          selected: _selectedHotspot == FootHotspot.metatarsal,
+        ),
+        _connector(
+          targetAlignment: archTarget,
+          boxAlignment: archBox,
+          selected: _selectedHotspot == FootHotspot.arch,
+        ),
         _hotspot(
           hotspot: FootHotspot.hallux,
-          targetAlignment: Alignment(0.02, -0.34),
-          boxAlignment: Alignment(0.62, -0.42),
+          boxAlignment: halluxBox,
           title: 'Halluks',
           value: _halluxValue(result),
         ),
         _hotspot(
           hotspot: FootHotspot.metatarsal,
-          targetAlignment: Alignment(0.10, -0.70),
-          boxAlignment: Alignment(0.60, -0.86),
+          boxAlignment: metatarsalBox,
           title: 'Metatars',
           value: _pressureShortValue(foot),
         ),
         _hotspot(
           hotspot: FootHotspot.arch,
-          targetAlignment: Alignment(-0.20, 0.05),
-          boxAlignment: Alignment(-0.70, 0.05),
+          boxAlignment: archBox,
           title: 'Ark',
           value: foot.archScore.toStringAsFixed(0),
         ),
@@ -593,6 +629,12 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildSideFootMap(CustomerAnalysisResult result) {
+    final heelTarget = _sideAwareAlignment(const Alignment(-0.62, 0.28));
+    final heelBox = _sideAwareAlignment(const Alignment(-0.82, 0.52));
+
+    final postureTarget = _sideAwareAlignment(const Alignment(-0.2, -0.28));
+    final postureBox = _sideAwareAlignment(const Alignment(0.42, -0.32));
+
     return Stack(
       children: [
         Positioned.fill(
@@ -604,17 +646,25 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             ),
           ),
         ),
+        _connector(
+          targetAlignment: heelTarget,
+          boxAlignment: heelBox,
+          selected: _selectedHotspot == FootHotspot.heel,
+        ),
+        _connector(
+          targetAlignment: postureTarget,
+          boxAlignment: postureBox,
+          selected: _selectedHotspot == FootHotspot.posture,
+        ),
         _hotspot(
           hotspot: FootHotspot.heel,
-          targetAlignment: Alignment(-0.62, 0.35),
-          boxAlignment: Alignment(-0.82, 0.65),
+          boxAlignment: heelBox,
           title: 'Topuk',
           value: _heelValue(result),
         ),
         _hotspot(
           hotspot: FootHotspot.posture,
-          targetAlignment: Alignment(0.02, -0.28),
-          boxAlignment: Alignment(0.55, -0.62),
+          boxAlignment: postureBox,
           title: 'Duruş',
           value: _postureValue(result),
         ),
@@ -622,97 +672,104 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
+  Widget _connector({
+    required Alignment targetAlignment,
+    required Alignment boxAlignment,
+    required bool selected,
+  }) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: CustomPaint(
+          painter: _HotspotConnectorPainter(
+            targetAlignment: targetAlignment,
+            boxAlignment: boxAlignment,
+            color: selected ? Colors.teal : Colors.grey,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _hotspot({
     required FootHotspot hotspot,
-    required Alignment targetAlignment,
     required Alignment boxAlignment,
     required String title,
     required String value,
   }) {
     final selected = hotspot == _selectedHotspot;
-    final color = selected ? Colors.teal : Colors.grey;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _HotspotConnectorPainter(
-              targetAlignment: targetAlignment,
-              boxAlignment: boxAlignment,
-              color: selected ? Colors.teal : Colors.grey,
-            ),
-          ),
-        ),
-        Align(
-          alignment: boxAlignment,
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _selectedHotspot = hotspot;
-              });
-            },
+    return Align(
+      alignment: boxAlignment,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedHotspot = hotspot;
+          });
+        },
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: selected ? Colors.teal : Colors.white,
             borderRadius: BorderRadius.circular(999),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: selected ? Colors.teal : Colors.white,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: selected ? Colors.teal : Colors.grey.shade300,
-                  width: selected ? 1.6 : 1,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 8,
-                  ),
-                ],
+            border: Border.all(
+              color: selected ? Colors.teal : Colors.grey.shade300,
+              width: selected ? 1.6 : 1,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 8,
               ),
-              child: Row(
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : Colors.teal,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: selected ? Colors.white : Colors.teal,
-                      shape: BoxShape.circle,
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: selected ? Colors.white : Colors.black87,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        value,
-                        style: TextStyle(
-                          color: selected ? Colors.white : Colors.grey[700],
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.grey[700],
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildSelectedHotspotCard(CustomerAnalysisResult result) {
     final detail = _hotspotDetail(result, _selectedHotspot);
+    final gradientBarSpec = _gradientBarSpecForHotspot(
+      result,
+      _selectedHotspot,
+    );
 
     return Container(
       width: double.infinity,
@@ -753,6 +810,10 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               );
             }).toList(),
           ),
+          if (gradientBarSpec != null) ...[
+            const SizedBox(height: 18),
+            _buildGradientValueBar(gradientBarSpec),
+          ],
           if (detail.description.trim().isNotEmpty) ...[
             const SizedBox(height: 18),
             Container(
@@ -821,6 +882,312 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
+  _GradientBarSpec? _gradientBarSpecForHotspot(
+    CustomerAnalysisResult result,
+    FootHotspot hotspot,
+  ) {
+    final foot = _selectedFoot(result);
+    final report = result.parsedReport;
+    final isLeft = _selectedFootSide == FootSelectionSide.left;
+
+    final archIndex = isLeft ? report?.leftArchIndex : report?.rightArchIndex;
+    final halluxAngle =
+        (isLeft ? report?.leftHalluxAngle : report?.rightHalluxAngle)?.abs();
+    final heelAngle =
+        (isLeft ? report?.leftPronatorAngle : report?.rightPronatorAngle)
+            ?.abs();
+    final kneeAngle =
+        (isLeft ? report?.leftKneeAngle : report?.rightKneeAngle)?.abs();
+
+    switch (hotspot) {
+      case FootHotspot.arch:
+        if (archIndex != null) {
+          return _GradientBarSpec(
+            title: 'Ark İndeksi',
+            value: archIndex,
+            valueText: archIndex.toStringAsFixed(2),
+            min: 0.12,
+            max: 0.35,
+            minLabel: 'Düşük ark',
+            centerLabel: 'Normal',
+            maxLabel: 'Yüksek ark',
+            helper: 'Yeşil aralık yaklaşık 0.21–0.26 aralığını temsil eder.',
+            colors: _balancedRiskGradientColors(),
+          );
+        }
+
+        return _GradientBarSpec(
+          title: 'Ark Skoru',
+          value: foot.archScore,
+          valueText: foot.archScore.toStringAsFixed(0),
+          min: 0,
+          max: 100,
+          minLabel: 'Düşük',
+          centerLabel: 'Orta',
+          maxLabel: 'İyi',
+          helper: 'Ark indeksi verisi bulunmadığı için ark skoru gösteriliyor.',
+          colors: _highValueBetterGradientColors(),
+        );
+
+      case FootHotspot.hallux:
+        if (halluxAngle == null) return null;
+
+        return _GradientBarSpec(
+          title: 'Halluks Açısı',
+          value: halluxAngle,
+          valueText: '${halluxAngle.toStringAsFixed(1)}°',
+          min: 0,
+          max: 25,
+          minLabel: '0°',
+          centerLabel: '10°',
+          maxLabel: '25°+',
+          helper: 'Düşük değer daha iyidir. 0–10° aralığı normal kabul edilir.',
+          colors: _lowValueBetterGradientColors(),
+        );
+
+      case FootHotspot.metatarsal:
+        return _GradientBarSpec(
+          title: 'Basınç Konfor Skoru',
+          value: foot.pressureScore,
+          valueText: foot.pressureScore.toStringAsFixed(0),
+          min: 0,
+          max: 100,
+          minLabel: 'Düşük',
+          centerLabel: 'Orta',
+          maxLabel: 'İyi',
+          helper:
+              'Yüksek skor daha dengeli ve konforlu basınç dağılımını temsil eder.',
+          colors: _highValueBetterGradientColors(),
+        );
+
+      case FootHotspot.heel:
+        if (heelAngle == null) return null;
+
+        return _GradientBarSpec(
+          title: 'Topuk Açısı',
+          value: heelAngle,
+          valueText: '${heelAngle.toStringAsFixed(1)}°',
+          min: 0,
+          max: 12,
+          minLabel: '0°',
+          centerLabel: '4°',
+          maxLabel: '12°+',
+          helper: 'Düşük değer daha iyidir. 0–4° aralığı normal kabul edilir.',
+          colors: _lowValueBetterGradientColors(),
+        );
+
+      case FootHotspot.posture:
+        if (kneeAngle == null) return null;
+
+        return _GradientBarSpec(
+          title: 'Diz Açısı',
+          value: kneeAngle,
+          valueText: '${kneeAngle.toStringAsFixed(1)}°',
+          min: 0,
+          max: 12,
+          minLabel: '0°',
+          centerLabel: '4°',
+          maxLabel: '12°+',
+          helper: 'Düşük değer daha iyidir. 0–4° aralığı normal kabul edilir.',
+          colors: _lowValueBetterGradientColors(),
+        );
+    }
+  }
+
+  List<Color> _balancedRiskGradientColors() {
+    return const [
+      Colors.red,
+      Colors.orange,
+      Colors.yellow,
+      Colors.green,
+      Colors.yellow,
+      Colors.orange,
+      Colors.red,
+    ];
+  }
+
+  List<Color> _lowValueBetterGradientColors() {
+    return const [
+      Colors.green,
+      Colors.yellow,
+      Colors.orange,
+      Colors.red,
+    ];
+  }
+
+  List<Color> _highValueBetterGradientColors() {
+    return const [
+      Colors.red,
+      Colors.orange,
+      Colors.yellow,
+      Colors.green,
+    ];
+  }
+
+  Widget _buildGradientValueBar(_GradientBarSpec spec) {
+    final normalized = _normalizeValue(
+      value: spec.value,
+      min: spec.min,
+      max: spec.max,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  spec.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  spec.valueText,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final markerLeft = ((normalized * width) - 10)
+                  .clamp(0.0, width - 20)
+                  .toDouble();
+
+              return SizedBox(
+                height: 36,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 14,
+                      child: Container(
+                        height: 13,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          gradient: LinearGradient(
+                            colors: spec.colors,
+                          ),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 0.7,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: markerLeft,
+                      top: 0,
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.arrow_drop_down,
+                            size: 24,
+                            color: Colors.black87,
+                          ),
+                          Container(
+                            width: 2,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  spec.minLabel,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              if (spec.centerLabel != null)
+                Expanded(
+                  child: Text(
+                    spec.centerLabel!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  spec.maxLabel,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (spec.helper.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              spec.helper,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  double _normalizeValue({
+    required double value,
+    required double min,
+    required double max,
+  }) {
+    if (max <= min) return 0;
+
+    return ((value - min) / (max - min)).clamp(0.0, 1.0).toDouble();
+  }
 
   _HotspotDetail _hotspotDetail(
     CustomerAnalysisResult result,
@@ -835,13 +1202,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     final archIndex = isLeft ? report?.leftArchIndex : report?.rightArchIndex;
     final archWidth =
         isLeft ? report?.leftArchWidthIndex : report?.rightArchWidthIndex;
-    final hallux = (isLeft ? report?.leftHalluxAngle : report?.rightHalluxAngle)
-        ?.abs();
+    final hallux =
+        (isLeft ? report?.leftHalluxAngle : report?.rightHalluxAngle)?.abs();
     final heel =
         (isLeft ? report?.leftPronatorAngle : report?.rightPronatorAngle)
             ?.abs();
-    final knee = (isLeft ? report?.leftKneeAngle : report?.rightKneeAngle)
-        ?.abs();
+    final knee =
+        (isLeft ? report?.leftKneeAngle : report?.rightKneeAngle)?.abs();
 
     switch (hotspot) {
       case FootHotspot.hallux:
@@ -1002,8 +1369,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   String _halluxValue(CustomerAnalysisResult result) {
     final report = result.parsedReport;
     final isLeft = _selectedFootSide == FootSelectionSide.left;
-    final value = (isLeft ? report?.leftHalluxAngle : report?.rightHalluxAngle)
-        ?.abs();
+    final value =
+        (isLeft ? report?.leftHalluxAngle : report?.rightHalluxAngle)?.abs();
 
     return value == null ? '—' : '${value.toStringAsFixed(1)}°';
   }
@@ -1029,21 +1396,6 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
   String _pressureShortValue(CustomerFootSummary foot) {
     return foot.pressureScore.toStringAsFixed(0);
-  }
-
-  Widget _buildLayerDetailSection(CustomerAnalysisResult result) {
-    switch (_selectedLayer) {
-      case AnalysisLayer.general:
-        return _buildGeneralLayer(result);
-      case AnalysisLayer.arch:
-        return _buildArchLayer(result);
-      case AnalysisLayer.pressure:
-        return _buildPressureLayer(result);
-      case AnalysisLayer.posture:
-        return _buildPostureLayer(result);
-      case AnalysisLayer.visuals:
-        return _buildVisualLayer(result);
-    }
   }
 
   Widget _buildGeneralLayer(CustomerAnalysisResult result) {
@@ -1075,97 +1427,6 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  Widget _buildArchLayer(CustomerAnalysisResult result) {
-    final parsedResults =
-        widget.results.where((e) => e.parsedReport != null).toList();
-
-    return _buildSectionCard(
-      title: 'Ark Analizi',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSelectedHotspotCard(result),
-          if (parsedResults.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            AnalysisScoreTrendChart(
-              title: 'Kemer Yüksekliği (mm)',
-              results: parsedResults,
-              leftScoreSelector: (item) =>
-                  item.parsedReport?.leftArchHeight ?? 0,
-              rightScoreSelector: (item) =>
-                  item.parsedReport?.rightArchHeight ?? 0,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPressureLayer(CustomerAnalysisResult result) {
-    return _buildSectionCard(
-      title: 'Basınç Analizi',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSelectedHotspotCard(result),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              AnalysisScoreTrendChart(
-                title: 'Basınç Konfor Skoru',
-                results: widget.results,
-                leftScoreSelector: (item) => item.leftFoot.pressureScore,
-                rightScoreSelector: (item) => item.rightFoot.pressureScore,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPostureLayer(CustomerAnalysisResult result) {
-    final parsedResults =
-        widget.results.where((e) => e.parsedReport != null).toList();
-
-    return _buildSectionCard(
-      title: 'Duruş ve Hizalanma',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSelectedHotspotCard(result),
-          if (parsedResults.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                AnalysisScoreTrendChart(
-                  title: 'Halluks Açısı (°)',
-                  results: parsedResults,
-                  leftScoreSelector: (item) =>
-                      item.parsedReport?.leftHalluxAngle ?? 0,
-                  rightScoreSelector: (item) =>
-                      item.parsedReport?.rightHalluxAngle ?? 0,
-                ),
-                AnalysisScoreTrendChart(
-                  title: 'Pronasyon Açısı (°)',
-                  results: parsedResults,
-                  leftScoreSelector: (item) =>
-                      item.parsedReport?.leftPronatorAngle ?? 0,
-                  rightScoreSelector: (item) =>
-                      item.parsedReport?.rightPronatorAngle ?? 0,
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildVisualLayer(CustomerAnalysisResult result) {
     return _buildSectionCard(
       title: 'Görseller',
@@ -1177,6 +1438,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildCompactTrendSection() {
+    if (widget.results.length < 2) {
+      return _buildSectionCard(
+        title: 'Zamana Göre Genel Değişim',
+        child: _buildTrendEmptyState(),
+      );
+    }
+
     return _buildSectionCard(
       title: 'Zamana Göre Genel Değişim',
       child: Wrap(
@@ -1206,6 +1474,36 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
+  Widget _buildTrendEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.timeline_outlined,
+            color: Colors.teal.shade700,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Zamana göre değişim grafikleri için en az iki ölçüm gereklidir. Yeni ölçümler eklendikçe basınç, stabilite ve ark skoru değişimleri burada görüntülenecektir.',
+              style: TextStyle(
+                color: Colors.grey[700],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFootVisuals({
     required bool isLeft,
     required CustomerAnalysisResult result,
@@ -1229,8 +1527,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ),
         _imageTile(
           title: '2D Ayak Görüntüsü',
-          filePath:
-              isLeft ? visuals.foot2dLeftImagePath : visuals.foot2dRightImagePath,
+          filePath: isLeft
+              ? visuals.foot2dLeftImagePath
+              : visuals.foot2dRightImagePath,
         ),
         _imageTile(
           title: 'Ayak-Bilek Açısı',
@@ -1452,6 +1751,32 @@ class _HotspotConnectorPainter extends CustomPainter {
         oldDelegate.boxAlignment != boxAlignment ||
         oldDelegate.color != color;
   }
+}
+
+class _GradientBarSpec {
+  final String title;
+  final double value;
+  final String valueText;
+  final double min;
+  final double max;
+  final String minLabel;
+  final String? centerLabel;
+  final String maxLabel;
+  final String helper;
+  final List<Color> colors;
+
+  const _GradientBarSpec({
+    required this.title,
+    required this.value,
+    required this.valueText,
+    required this.min,
+    required this.max,
+    required this.minLabel,
+    required this.centerLabel,
+    required this.maxLabel,
+    required this.helper,
+    required this.colors,
+  });
 }
 
 class _HotspotDetail {
