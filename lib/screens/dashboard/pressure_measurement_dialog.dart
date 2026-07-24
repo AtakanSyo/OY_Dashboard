@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
-import 'package:oy_site/services/serial/serial_port_factory.dart';
 import 'package:oy_site/data/repositories/supabase_session_pressure_repository.dart';
 import 'package:oy_site/models/session_pressure_recording_model.dart';
-import 'dart:convert';
+import 'package:oy_site/services/serial/serial_port_factory.dart';
 import 'package:oy_site/services/storage/supabase_storage_service.dart';
 
 class PressureMeasurementDialog extends StatefulWidget {
@@ -36,7 +38,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
   late final SerialPortService _serialService;
 
   final SupabaseSessionPressureRepository _pressureRepository =
-    SupabaseSessionPressureRepository();
+      SupabaseSessionPressureRepository();
 
   final SupabaseStorageService _storageService = SupabaseStorageService();
 
@@ -49,6 +51,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
   static const int rows = 32;
   static const int cols = 64;
   static const int frameLen = 2056;
+  static const int packageSize = rows * cols;
 
   double _maxValue = 96;
   int _threshold = 9;
@@ -64,6 +67,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
   bool _isRecording = false;
   bool _isPlaybackMode = false;
+  bool _isExporting = false;
 
   List<PressureRecording> _recordings = [];
   List<PressureFrameSnapshot> _currentRecordingFrames = [];
@@ -403,7 +407,8 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       if (!mounted) return;
 
       setState(() {
-        _status = '${recording.title} local kaydedildi, Supabase/Storage hatası: $e';
+        _status =
+            '${recording.title} local kaydedildi, Supabase/Storage hatası: $e';
       });
     }
   }
@@ -444,7 +449,11 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       'id': recording.id,
       'title': recording.title,
       'created_at': recording.createdAt.toIso8601String(),
+      'rows': rows,
+      'cols': cols,
+      'package_size': packageSize,
       'frame_count': recording.frames.length,
+      'duration_ms': _calculateDurationMs(recording.frames),
       'frames': recording.frames.map((frame) {
         return {
           'timestamp': frame.timestamp.toIso8601String(),
@@ -493,6 +502,226 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       _playbackFrameIndex = 0;
       _playbackHeatmapImage = null;
     });
+  }
+
+  Future<void> _exportRecordingsZip() async {
+    if (_recordings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dışa aktarılacak kayıt bulunamadı.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+      _status = 'Kayıtlar ZIP olarak hazırlanıyor...';
+    });
+
+    try {
+      final archive = Archive();
+
+      for (int i = 0; i < _recordings.length; i++) {
+        final recording = _recordings[i];
+
+        final folderName =
+            '${(i + 1).toString().padLeft(2, '0')}_${_safeFileName(recording.title)}';
+
+        _addTextFileToArchive(
+          archive: archive,
+          path: '$folderName/recording.json',
+          content: const JsonEncoder.withIndent('  ').convert(
+            _recordingToJson(recording),
+          ),
+        );
+
+        _addTextFileToArchive(
+          archive: archive,
+          path: '$folderName/recording.csv',
+          content: _buildRecordingCsv(recording),
+        );
+      }
+
+      final encodedZip = ZipEncoder().encode(archive);
+
+      if (encodedZip == null) {
+        throw Exception('ZIP dosyası oluşturulamadı.');
+      }
+
+      final exportDirectory = Directory(
+        '${Directory.current.path}${Platform.pathSeparator}exports'
+        '${Platform.pathSeparator}pressure_recordings',
+      );
+
+      if (!await exportDirectory.exists()) {
+        await exportDirectory.create(recursive: true);
+      }
+
+      final fileName =
+          'pressure_recordings_${_safeFileName(widget.sessionCode)}_${_exportTimestamp()}.zip';
+
+      final outputFile = File(
+        '${exportDirectory.path}${Platform.pathSeparator}$fileName',
+      );
+
+      await outputFile.writeAsBytes(encodedZip, flush: true);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isExporting = false;
+        _status = 'Kayıtlar ZIP olarak dışa aktarıldı: ${outputFile.path}';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kayıtlar ZIP olarak kaydedildi: ${outputFile.path}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isExporting = false;
+        _status = 'ZIP dışa aktarma hatası: $e';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ZIP dışa aktarma hatası: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _addTextFileToArchive({
+    required Archive archive,
+    required String path,
+    required String content,
+  }) {
+    final bytes = utf8.encode(content);
+    archive.addFile(
+      ArchiveFile(
+        path,
+        bytes.length,
+        bytes,
+      ),
+    );
+  }
+
+  String _buildRecordingCsv(PressureRecording recording) {
+    final buffer = StringBuffer();
+
+    final headers = <String>[
+      'SN',
+      'TIMESTAMP',
+      'PACKAGE_SIZE',
+      'MAX_VALUE',
+      'MIN_VALUE',
+      ...List.generate(packageSize, (index) => 'MAT_$index'),
+    ];
+
+    buffer.writeln(headers.join(','));
+
+    for (int frameIndex = 0;
+        frameIndex < recording.frames.length;
+        frameIndex++) {
+      final frame = recording.frames[frameIndex];
+      final flatValues = _flattenMatrix(frame.matrix);
+
+      final maxValue = flatValues.isEmpty ? 0 : flatValues.reduce(max);
+      final minValue = flatValues.isEmpty ? 0 : flatValues.reduce(min);
+
+      final row = <String>[
+        frameIndex.toString(),
+        _formatCsvTimestamp(frame.timestamp),
+        packageSize.toString(),
+        maxValue.toString(),
+        minValue.toString(),
+        ...flatValues.map((value) => value.toString()),
+      ];
+
+      buffer.writeln(row.map(_csvEscape).join(','));
+    }
+
+    return buffer.toString();
+  }
+
+  List<int> _flattenMatrix(List<List<int>> matrix) {
+    final values = <int>[];
+
+    for (final row in matrix) {
+      values.addAll(row);
+    }
+
+    if (values.length == packageSize) {
+      return values;
+    }
+
+    if (values.length > packageSize) {
+      return values.sublist(0, packageSize);
+    }
+
+    return [
+      ...values,
+      ...List<int>.filled(packageSize - values.length, 0),
+    ];
+  }
+
+  String _csvEscape(String value) {
+    if (!value.contains(',') &&
+        !value.contains('"') &&
+        !value.contains('\n') &&
+        !value.contains('\r')) {
+      return value;
+    }
+
+    return '"${value.replaceAll('"', '""')}"';
+  }
+
+  String _safeFileName(String value) {
+    final normalized = value.trim().isEmpty ? 'recording' : value.trim();
+
+    return normalized
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'I')
+        .replaceAll('ğ', 'g')
+        .replaceAll('Ğ', 'G')
+        .replaceAll('ü', 'u')
+        .replaceAll('Ü', 'U')
+        .replaceAll('ş', 's')
+        .replaceAll('Ş', 'S')
+        .replaceAll('ö', 'o')
+        .replaceAll('Ö', 'O')
+        .replaceAll('ç', 'c')
+        .replaceAll('Ç', 'C')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_\-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+  }
+
+  String _exportTimestamp() {
+    final now = DateTime.now();
+
+    return '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+  }
+
+  String _formatCsvTimestamp(DateTime value) {
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${value.month.toString().padLeft(2, '0')}-'
+        '${value.day.toString().padLeft(2, '0')} '
+        '${value.hour.toString().padLeft(2, '0')}:'
+        '${value.minute.toString().padLeft(2, '0')}:'
+        '${value.second.toString().padLeft(2, '0')}.'
+        '${value.millisecond.toString().padLeft(3, '0')}';
   }
 
   String _formatDateTime(DateTime value) {
@@ -590,8 +819,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                             children: [
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed:
-                                      _connectedPort == null ? null : _disconnect,
+                                  onPressed: _connectedPort == null
+                                      ? null
+                                      : _disconnect,
                                   child: const Text('Bağlantıyı Kes'),
                                 ),
                               ),
@@ -602,8 +832,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                             children: [
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed:
-                                      _connectedPort == null ? null : _toggleRecording,
+                                  onPressed: _connectedPort == null
+                                      ? null
+                                      : _toggleRecording,
                                   icon: Icon(
                                     _isRecording
                                         ? Icons.stop_circle_outlined
@@ -671,13 +902,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          const Text(
-                            'Kayıtlar',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          _buildRecordingsHeader(),
                           const SizedBox(height: 10),
                           Expanded(
                             child: _recordings.isEmpty
@@ -702,8 +927,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                                         const SizedBox(height: 10),
                                     itemBuilder: (context, index) {
                                       final recording = _recordings[index];
-                                      final isSelected = _selectedRecording?.id ==
-                                          recording.id;
+                                      final isSelected =
+                                          _selectedRecording?.id ==
+                                              recording.id;
 
                                       return InkWell(
                                         onTap: () => _openRecording(recording),
@@ -801,7 +1027,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                                       child: RepaintBoundary(
                                         child: CustomPaint(
                                           painter: activePreviewImage != null
-                                              ? HeatmapPainter(activePreviewImage)
+                                              ? HeatmapPainter(
+                                                  activePreviewImage,
+                                                )
                                               : null,
                                         ),
                                       ),
@@ -851,13 +1079,17 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                                   const SizedBox(height: 8),
                                   Slider(
                                     min: 0,
-                                    max: (_selectedRecording!.frames.length - 1)
-                                        .toDouble(),
+                                    max:
+                                        (_selectedRecording!.frames.length - 1)
+                                            .toDouble(),
                                     divisions:
                                         _selectedRecording!.frames.length > 1
-                                            ? _selectedRecording!.frames.length - 1
+                                            ? _selectedRecording!.frames.length -
+                                                1
                                             : 1,
-                                    value: _playbackFrameIndex.toDouble().clamp(
+                                    value: _playbackFrameIndex
+                                        .toDouble()
+                                        .clamp(
                                           0,
                                           (_selectedRecording!.frames.length - 1)
                                               .toDouble(),
@@ -884,6 +1116,38 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRecordingsHeader() {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Kayıtlar',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Tooltip(
+          message: _recordings.isEmpty
+              ? 'Dışa aktarılacak kayıt yok'
+              : 'Kayıtları ZIP olarak dışa aktar',
+          child: IconButton(
+            onPressed:
+                _recordings.isEmpty || _isExporting ? null : _exportRecordingsZip,
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_outlined),
+          ),
+        ),
+      ],
     );
   }
 
