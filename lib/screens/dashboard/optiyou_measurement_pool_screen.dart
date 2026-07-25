@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/order_model.dart';
-import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/optiyou_measurement_review_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiyouMeasurementPoolScreen extends StatefulWidget {
@@ -35,6 +35,8 @@ class _OptiyouMeasurementPoolScreenState
 
   String _searchText = '';
   String _statusFilter = 'all';
+  String _clinicFilter = 'all';
+  String _selectionFilter = 'all';
 
   String _selectedProductType = 'insole';
   String _selectedCurrencyCode = 'TRY';
@@ -209,8 +211,17 @@ class _OptiyouMeasurementPoolScreenState
         .toSet()
         .toList();
 
+    final clinicIds = sessions
+        .map((session) => session.clinicId)
+        .whereType<int>()
+        .where((id) => id > 0)
+        .toSet()
+        .toList();
+
     final patientNameById = <int, String>{};
     final expertNameById = <int, String>{};
+    final clinicNameById = <int, String>{};
+    final clinicCodeById = <int, String>{};
 
     if (patientIds.isNotEmpty) {
       try {
@@ -237,11 +248,9 @@ class _OptiyouMeasurementPoolScreenState
               ? fullName
               : patientCode.isNotEmpty
                   ? patientCode
-                  : 'Hasta #$id';
+                  : 'Kullanıcı #$id';
         }
-      } catch (_) {
-        // Hasta bilgisi okunamazsa kartlarda patient_id fallback gösterilir.
-      }
+      } catch (_) {}
     }
 
     if (expertUserIds.isNotEmpty) {
@@ -273,18 +282,50 @@ class _OptiyouMeasurementPoolScreenState
                   ? username
                   : 'Uzman #$id';
         }
-      } catch (_) {
-        // Uzman bilgisi okunamazsa kartlarda expert_user_id fallback gösterilir.
-      }
+      } catch (_) {}
+    }
+
+    if (clinicIds.isNotEmpty) {
+      try {
+        final response = await _client
+            .from('clinics')
+            .select('id, clinic_name, clinic_code')
+            .inFilter('id', clinicIds);
+
+        final clinicRows = (response as List<dynamic>)
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
+        for (final row in clinicRows) {
+          final id = _asInt(row['id']);
+          if (id == null) continue;
+
+          final clinicName = (row['clinic_name'] ?? '').toString().trim();
+          final clinicCode = (row['clinic_code'] ?? '').toString().trim();
+
+          clinicNameById[id] = clinicName.isNotEmpty
+              ? clinicName
+              : clinicCode.isNotEmpty
+                  ? clinicCode
+                  : 'Klinik #$id';
+
+          if (clinicCode.isNotEmpty) {
+            clinicCodeById[id] = clinicCode;
+          }
+        }
+      } catch (_) {}
     }
 
     return sessions.map((session) {
       final patientId = session.patientId;
       final expertUserId = session.expertUserId;
+      final clinicId = session.clinicId;
 
       return session.copyWith(
         patientName: patientId == null ? null : patientNameById[patientId],
         expertName: expertUserId == null ? null : expertNameById[expertUserId],
+        clinicName: clinicId == null ? null : clinicNameById[clinicId],
+        clinicCode: clinicId == null ? null : clinicCodeById[clinicId],
       );
     }).toList();
   }
@@ -294,10 +335,25 @@ class _OptiyouMeasurementPoolScreenState
 
     return _sessions.where((session) {
       final matchesStatus = _statusFilter == 'all' ||
-          session.effectiveStatus.toLowerCase() ==
-              _statusFilter.toLowerCase();
+          session.effectiveStatus.toLowerCase() == _statusFilter.toLowerCase();
 
       if (!matchesStatus) return false;
+
+      final matchesClinic = _clinicFilter == 'all' ||
+          (_clinicFilter == 'unknown'
+              ? session.clinicId == null || session.clinicId! <= 0
+              : session.clinicId?.toString() == _clinicFilter);
+
+      if (!matchesClinic) return false;
+
+      final isSelected =
+          session.id != null && _selectedSessionIds.contains(session.id);
+
+      final matchesSelection = _selectionFilter == 'all' ||
+          (_selectionFilter == 'selected' && isSelected) ||
+          (_selectionFilter == 'unselected' && !isSelected);
+
+      if (!matchesSelection) return false;
 
       if (query.isEmpty) return true;
 
@@ -306,8 +362,10 @@ class _OptiyouMeasurementPoolScreenState
         session.sessionCode,
         session.patientId?.toString() ?? '',
         session.patientName ?? '',
+        session.patientLabel,
         session.expertUserId?.toString() ?? '',
         session.expertLabel,
+        session.clinicLabel,
         session.status,
         session.effectiveStatus,
         session.formattedDate,
@@ -336,17 +394,20 @@ class _OptiyouMeasurementPoolScreenState
     });
   }
 
-  void _openSessionDetail(_MeasurementPoolSession session) {
-    Navigator.push(
+  Future<void> _openSessionDetail(_MeasurementPoolSession session) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SessionDetailScreen(
+        builder: (_) => OptiYouMeasurementReviewScreen(
           currentUser: widget.currentUser,
           session: session.toMeasurementSession(),
-          pressureRepository: widget.pressureRepository,
         ),
       ),
     );
+
+    if (mounted) {
+      await _loadSessions();
+    }
   }
 
   Future<void> _createOrderFromSelectedSessions() async {
@@ -544,7 +605,7 @@ class _OptiyouMeasurementPoolScreenState
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    '${session.sessionCode} • Hasta: ${session.patientLabel}',
+                                    '${session.sessionCode} • Kullanıcı: ${session.patientLabel}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -652,7 +713,8 @@ class _OptiyouMeasurementPoolScreenState
               session.id != null &&
               session.patientId != null &&
               session.clinicId != null &&
-              session.expertUserId != null,
+              session.expertUserId != null &&
+              session.clinicId! > 0,
         )
         .toList();
 
@@ -747,43 +809,20 @@ class _OptiyouMeasurementPoolScreenState
     final filteredSessions = _filteredSessions;
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPageHeader(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _buildToolbar(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredSessions.isEmpty
                     ? _buildEmptyState()
-                    : RefreshIndicator(
-                        onRefresh: _loadSessions,
-                        child: GridView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: filteredSessions.length,
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 380,
-                            mainAxisExtent: 238,
-                            crossAxisSpacing: 14,
-                            mainAxisSpacing: 14,
-                          ),
-                          itemBuilder: (context, index) {
-                            final session = filteredSessions[index];
-                            final selected = session.id != null &&
-                                _selectedSessionIds.contains(session.id);
-
-                            return _buildSessionCard(
-                              session: session,
-                              selected: selected,
-                            );
-                          },
-                        ),
-                      ),
+                    : _buildGroupedSessionList(filteredSessions),
           ),
         ],
       ),
@@ -801,16 +840,17 @@ class _OptiyouMeasurementPoolScreenState
               const Text(
                 'Ölçüm Havuzu',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Text(
-                'Uzmanlar tarafından onaylanan ölçüm oturumlarını görüntüleyebilir, bir veya birden fazla ölçüm seçerek sipariş oluşturma akışını başlatabilirsin.',
+                'Uzmanlar tarafından onaylanan ölçümleri klinik bazında görüntüleyebilir ve seçili ölçümlerden sipariş oluşturabilirsin.',
                 style: TextStyle(
                   color: Colors.grey[700],
-                  height: 1.4,
+                  height: 1.35,
+                  fontSize: 13,
                 ),
               ),
             ],
@@ -823,11 +863,11 @@ class _OptiyouMeasurementPoolScreenState
               : _createOrderFromSelectedSessions,
           icon: _isCreatingOrder
               ? const SizedBox(
-                  width: 18,
-                  height: 18,
+                  width: 17,
+                  height: 17,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.shopping_bag_outlined),
+              : const Icon(Icons.shopping_bag_outlined, size: 18),
           label: Text(
             _selectedSessionIds.isEmpty
                 ? 'Sipariş Oluştur'
@@ -837,8 +877,12 @@ class _OptiyouMeasurementPoolScreenState
             backgroundColor: Colors.teal,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 16,
+              horizontal: 16,
+              vertical: 13,
+            ),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -848,80 +892,593 @@ class _OptiyouMeasurementPoolScreenState
 
   Widget _buildToolbar() {
     final statuses = _availableStatuses;
+    final clinicFilters = _availableClinicFilters;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText:
-                    'Session ID, session kodu, hasta, uzman veya tarih ile ara',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 1050;
+
+          return Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: isWide ? 360 : constraints.maxWidth,
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Session kodu, kullanıcı, uzman, klinik veya tarih ile ara',
+                    hintStyle: const TextStyle(fontSize: 13),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchText = value;
+                    });
+                  },
                 ),
-                isDense: true,
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchText = value;
-                });
-              },
-            ),
+              SizedBox(
+                width: 165,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _statusFilter,
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  decoration: InputDecoration(
+                    labelText: 'Durum',
+                    labelStyle: const TextStyle(fontSize: 13),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Tümü'),
+                    ),
+                    ...statuses.map(
+                      (status) => DropdownMenuItem(
+                        value: status,
+                        child: Text(_statusLabel(status)),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _statusFilter = value;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 230,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _clinicFilter,
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  decoration: InputDecoration(
+                    labelText: 'Klinik',
+                    labelStyle: const TextStyle(fontSize: 13),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Tüm klinikler'),
+                    ),
+                    ...clinicFilters.map(
+                      (clinic) => DropdownMenuItem(
+                        value: clinic.value,
+                        child: Text(
+                          clinic.label,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _clinicFilter = value;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 150,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectionFilter,
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  decoration: InputDecoration(
+                    labelText: 'Seçim',
+                    labelStyle: const TextStyle(fontSize: 13),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Tümü'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'selected',
+                      child: Text('Seçili'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'unselected',
+                      child: Text('Seçilmemiş'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _selectionFilter = value;
+                    });
+                  },
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _loadSessions,
+                icon: const Icon(Icons.refresh, size: 17),
+                label: const Text('Yenile'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+              ),
+              if (_selectedSessionIds.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: _clearSelection,
+                  icon: const Icon(Icons.clear, size: 17),
+                  label: const Text('Seçimi Temizle'),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGroupedSessionList(List<_MeasurementPoolSession> sessions) {
+    final groups = _groupSessionsByClinic(sessions);
+
+    return RefreshIndicator(
+      onRefresh: _loadSessions,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: groups.length,
+        itemBuilder: (context, index) {
+          return _buildClinicGroupCard(groups[index]);
+        },
+      ),
+    );
+  }
+
+  List<_ClinicSessionGroup> _groupSessionsByClinic(
+    List<_MeasurementPoolSession> sessions,
+  ) {
+    final grouped = <String, List<_MeasurementPoolSession>>{};
+    final labelByKey = <String, String>{};
+
+    for (final session in sessions) {
+      final key = session.clinicId == null || session.clinicId! <= 0
+          ? 'clinic_unknown'
+          : 'clinic_${session.clinicId}';
+
+      grouped.putIfAbsent(key, () => <_MeasurementPoolSession>[]).add(session);
+      labelByKey[key] = session.clinicLabel;
+    }
+
+    final groups = grouped.entries.map((entry) {
+      final groupSessions = entry.value.toList()
+        ..sort((a, b) {
+          final aDate = a.completedAt ?? a.updatedAt ?? a.createdAt;
+          final bDate = b.completedAt ?? b.updatedAt ?? b.createdAt;
+
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+
+          return bDate.compareTo(aDate);
+        });
+
+      return _ClinicSessionGroup(
+        clinicLabel: labelByKey[entry.key] ?? 'Klinik bilgisi yok',
+        sessions: groupSessions,
+        isUnknownClinic: entry.key == 'clinic_unknown',
+      );
+    }).toList();
+
+    groups.sort((a, b) {
+      if (a.isUnknownClinic && !b.isUnknownClinic) return 1;
+      if (!a.isUnknownClinic && b.isUnknownClinic) return -1;
+
+      return a.clinicLabel.compareTo(b.clinicLabel);
+    });
+
+    return groups;
+  }
+
+  Widget _buildClinicGroupCard(_ClinicSessionGroup group) {
+    final selectedCount = group.sessions
+        .where(
+          (session) =>
+              session.id != null && _selectedSessionIds.contains(session.id),
+        )
+        .length;
+
+    final groupColor = group.isUnknownClinic ? Colors.orange : Colors.teal;
+    final groupIcon = group.isUnknownClinic
+        ? Icons.warning_amber_outlined
+        : Icons.local_hospital_outlined;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: group.isUnknownClinic
+              ? Colors.orange.withOpacity(0.25)
+              : Colors.grey.shade200,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 190,
-            child: DropdownButtonFormField<String>(
-              initialValue: _statusFilter,
-              decoration: InputDecoration(
-                labelText: 'Durum',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: groupColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                isDense: true,
+                child: Icon(
+                  groupIcon,
+                  color: groupColor,
+                  size: 18,
+                ),
               ),
-              items: [
-                const DropdownMenuItem(
-                  value: 'all',
-                  child: Text('Tümü'),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  group.clinicLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                ...statuses.map(
-                  (status) => DropdownMenuItem(
-                    value: status,
-                    child: Text(_statusLabel(status)),
+              ),
+              const SizedBox(width: 8),
+              _buildSmallCountChip(
+                label: '${group.sessions.length} ölçüm',
+                color: Colors.blueGrey,
+              ),
+              if (selectedCount > 0) ...[
+                const SizedBox(width: 8),
+                _buildSmallCountChip(
+                  label: '$selectedCount seçili',
+                  color: Colors.teal,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 11),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = constraints.maxWidth;
+
+              final cardWidth = maxWidth >= 1120
+                  ? (maxWidth - 36) / 4
+                  : maxWidth >= 820
+                      ? (maxWidth - 24) / 3
+                      : maxWidth >= 540
+                          ? (maxWidth - 12) / 2
+                          : maxWidth;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: group.sessions.map((session) {
+                  final selected = session.id != null &&
+                      _selectedSessionIds.contains(session.id);
+
+                  return SizedBox(
+                    width: cardWidth,
+                    child: _buildSessionCard(
+                      session: session,
+                      selected: selected,
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallCountChip({
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.18)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color.shade700Safe,
+          fontSize: 10.5,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionCard({
+    required _MeasurementPoolSession session,
+    required bool selected,
+  }) {
+    final accentColor = selected ? Colors.teal : Colors.blueGrey;
+
+    return InkWell(
+      onTap: () => _toggleSessionSelection(session.id),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: selected ? Colors.teal.withOpacity(0.08) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? Colors.teal : Colors.grey.shade300,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    selected ? Icons.check_circle : Icons.analytics_outlined,
+                    color: selected ? Colors.teal : Colors.blueGrey.shade700,
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    session.sessionCode.isEmpty
+                        ? 'Session #${session.id ?? '—'}'
+                        : session.sessionCode,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                _buildStatusChip(session.effectiveStatus),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildCardInfoRow(
+              icon: Icons.account_circle_outlined,
+              label: 'Kullanıcı',
+              value: session.patientLabel,
+            ),
+            const SizedBox(height: 5),
+            _buildCardInfoRow(
+              icon: Icons.person_outline,
+              label: 'Uzman',
+              value: session.expertLabel,
+            ),
+            const SizedBox(height: 5),
+            _buildCardInfoRow(
+              icon: Icons.verified_outlined,
+              label: 'Onay',
+              value: session.formattedCompletedDate,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _openSessionDetail(session),
+                  icon: const Icon(Icons.open_in_new, size: 14),
+                  label: const Text('Detay'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.teal,
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.teal.withOpacity(0.10)
+                        : Colors.grey.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    selected ? 'Seçildi' : 'Seç',
+                    style: TextStyle(
+                      color: selected ? Colors.teal : Colors.grey[700],
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
-              onChanged: (value) {
-                if (value == null) return;
-
-                setState(() {
-                  _statusFilter = value;
-                });
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          OutlinedButton.icon(
-            onPressed: _loadSessions,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Yenile'),
-          ),
-          if (_selectedSessionIds.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: _clearSelection,
-              icon: const Icon(Icons.clear),
-              label: const Text('Seçimi Temizle'),
             ),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: Colors.grey[700]),
+        const SizedBox(width: 5),
+        SizedBox(
+          width: 56,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 10.5,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            value.trim().isEmpty ? '—' : value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    final normalized = status.toLowerCase().trim();
+
+    Color color;
+    String label;
+
+    switch (normalized) {
+      case _SessionStatusCodes.completed:
+      case 'tamamlandı':
+      case 'tamamlandi':
+        color = Colors.green;
+        label = 'Tamamlandı';
+        break;
+      case _SessionStatusCodes.inProgress:
+      case 'devam ediyor':
+      case 'devam_ediyor':
+        color = Colors.orange;
+        label = 'Devam Ediyor';
+        break;
+      case _SessionStatusCodes.draft:
+      case 'taslak':
+        color = Colors.blueGrey;
+        label = 'Taslak';
+        break;
+      case _SessionStatusCodes.cancelled:
+      case 'iptal':
+        color = Colors.red;
+        label = 'İptal';
+        break;
+      default:
+        color = Colors.grey;
+        label = status.trim().isEmpty ? 'Durum Yok' : status;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color.shade700Safe,
+          fontSize: 9.5,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -993,206 +1550,32 @@ class _OptiyouMeasurementPoolScreenState
     return statuses;
   }
 
-  Widget _buildSessionCard({
-    required _MeasurementPoolSession session,
-    required bool selected,
-  }) {
-    final accentColor = selected ? Colors.teal : Colors.grey;
+  List<_ClinicFilterItem> get _availableClinicFilters {
+    final clinicMap = <String, String>{};
 
-    return InkWell(
-      onTap: () => _toggleSessionSelection(session.id),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? Colors.teal.withOpacity(0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? Colors.teal : Colors.grey.shade300,
-            width: selected ? 1.8 : 1,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: accentColor.withOpacity(0.12),
-                  child: Icon(
-                    selected
-                        ? Icons.check_circle
-                        : Icons.analytics_outlined,
-                    color: selected ? Colors.teal : Colors.grey[700],
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    session.sessionCode.isEmpty
-                        ? 'Session #${session.id ?? '—'}'
-                        : session.sessionCode,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                _buildStatusChip(session.effectiveStatus),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _buildCardInfoRow(
-              icon: Icons.confirmation_number_outlined,
-              label: 'Session ID',
-              value: session.id?.toString() ?? '—',
-            ),
-            const SizedBox(height: 8),
-            _buildCardInfoRow(
-              icon: Icons.person_outline,
-              label: 'Uzman',
-              value: session.expertLabel,
-            ),
-            const SizedBox(height: 8),
-            _buildCardInfoRow(
-              icon: Icons.account_circle_outlined,
-              label: 'Hasta',
-              value: session.patientLabel,
-            ),
-            const SizedBox(height: 8),
-            _buildCardInfoRow(
-              icon: Icons.verified_outlined,
-              label: 'Onay Tarihi',
-              value: session.formattedCompletedDate,
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () => _openSessionDetail(session),
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('Detay'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  selected ? 'Seçildi' : 'Seç',
-                  style: TextStyle(
-                    color: selected ? Colors.teal : Colors.grey[700],
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    for (final session in _sessions) {
+      final key = session.clinicId == null || session.clinicId! <= 0
+          ? 'unknown'
+          : session.clinicId.toString();
 
-  Widget _buildCardInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 90,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value.trim().isEmpty ? '—' : value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatusChip(String status) {
-    final normalized = status.toLowerCase().trim();
-
-    Color color;
-    String label;
-
-    switch (normalized) {
-      case _SessionStatusCodes.completed:
-      case 'tamamlandı':
-      case 'tamamlandi':
-        color = Colors.green;
-        label = 'Tamamlandı';
-        break;
-      case _SessionStatusCodes.inProgress:
-      case 'devam ediyor':
-      case 'devam_ediyor':
-        color = Colors.orange;
-        label = 'Devam Ediyor';
-        break;
-      case _SessionStatusCodes.draft:
-      case 'taslak':
-        color = Colors.blueGrey;
-        label = 'Taslak';
-        break;
-      case _SessionStatusCodes.cancelled:
-      case 'iptal':
-        color = Colors.red;
-        label = 'İptal';
-        break;
-      default:
-        color = Colors.grey;
-        label = status.trim().isEmpty ? 'Durum Yok' : status;
+      clinicMap[key] = session.clinicLabel;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.25)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color.shade700Safe,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+    final items = clinicMap.entries.map((entry) {
+      return _ClinicFilterItem(
+        value: entry.key,
+        label: entry.value,
+      );
+    }).toList();
+
+    items.sort((a, b) {
+      if (a.value == 'unknown' && b.value != 'unknown') return 1;
+      if (a.value != 'unknown' && b.value == 'unknown') return -1;
+
+      return a.label.compareTo(b.label);
+    });
+
+    return items;
   }
 
   Widget _buildEmptyState() {
@@ -1285,6 +1668,8 @@ class _MeasurementPoolSession {
 
   final String? patientName;
   final String? expertName;
+  final String? clinicName;
+  final String? clinicCode;
 
   const _MeasurementPoolSession({
     required this.id,
@@ -1307,6 +1692,8 @@ class _MeasurementPoolSession {
     required this.updatedAt,
     required this.patientName,
     required this.expertName,
+    required this.clinicName,
+    required this.clinicCode,
   });
 
   factory _MeasurementPoolSession.fromMap(Map<String, dynamic> map) {
@@ -1331,12 +1718,16 @@ class _MeasurementPoolSession {
       updatedAt: _asDateTime(map['updated_at']),
       patientName: null,
       expertName: null,
+      clinicName: null,
+      clinicCode: null,
     );
   }
 
   _MeasurementPoolSession copyWith({
     String? patientName,
     String? expertName,
+    String? clinicName,
+    String? clinicCode,
   }) {
     return _MeasurementPoolSession(
       id: id,
@@ -1359,6 +1750,8 @@ class _MeasurementPoolSession {
       updatedAt: updatedAt,
       patientName: patientName ?? this.patientName,
       expertName: expertName ?? this.expertName,
+      clinicName: clinicName ?? this.clinicName,
+      clinicCode: clinicCode ?? this.clinicCode,
     );
   }
 
@@ -1440,7 +1833,30 @@ class _MeasurementPoolSession {
 
     if (patientId == null) return '—';
 
-    return 'Hasta #$patientId';
+    return 'Kullanıcı #$patientId';
+  }
+
+  String get clinicLabel {
+    final name = clinicName?.trim();
+    final code = clinicCode?.trim();
+
+    if (name != null && name.isNotEmpty && code != null && code.isNotEmpty) {
+      return '$name ($code)';
+    }
+
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    if (code != null && code.isNotEmpty) {
+      return code;
+    }
+
+    if (clinicId == null || clinicId! <= 0) {
+      return 'Klinik bilgisi yok';
+    }
+
+    return 'Klinik #$clinicId';
   }
 
   String get formattedDate {
@@ -1499,6 +1915,28 @@ class _MeasurementPoolSession {
 
     return DateTime.tryParse(text);
   }
+}
+
+class _ClinicSessionGroup {
+  final String clinicLabel;
+  final List<_MeasurementPoolSession> sessions;
+  final bool isUnknownClinic;
+
+  const _ClinicSessionGroup({
+    required this.clinicLabel,
+    required this.sessions,
+    required this.isUnknownClinic,
+  });
+}
+
+class _ClinicFilterItem {
+  final String value;
+  final String label;
+
+  const _ClinicFilterItem({
+    required this.value,
+    required this.label,
+  });
 }
 
 class _BulkOrderCreateResult {

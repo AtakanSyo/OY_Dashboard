@@ -28,6 +28,9 @@ class OptiYouOrderDetailScreen extends StatefulWidget {
 }
 
 class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
+  static const String _camFileType = 'cam_file';
+  static const String _gcodeFileType = 'gcode_file';
+
   final SupabaseOrderOperationRepository _operationRepository =
       SupabaseOrderOperationRepository();
 
@@ -37,6 +40,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   OrderOperationStateModel? _operationState;
   MeasurementSession? _session;
+  late String _currentOrderStatus;
+  DateTime? _currentShippedAt;
+  DateTime? _currentDeliveredAt;
 
   final Map<String, OrderOperationFileModel> _operationFiles = {};
 
@@ -57,8 +63,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   String? _leftDesignStlName;
   String? _rightDesignStlName;
-  String? _leftProductionFileName;
-  String? _rightProductionFileName;
+  String? _camFileName;
+  String? _gcodeFileName;
 
   final TextEditingController _qualityNoteController = TextEditingController();
   final TextEditingController _shippingTrackingController =
@@ -67,6 +73,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   @override
   void initState() {
     super.initState();
+
+    _currentOrderStatus = order.orderStatus;
+    _currentShippedAt = order.shippedAt;
+    _currentDeliveredAt = order.deliveredAt;
+
     _loadOperationData();
   }
 
@@ -138,12 +149,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
             _operationFiles[OrderOperationFileTypes.leftDesignStl]?.fileName;
         _rightDesignStlName =
             _operationFiles[OrderOperationFileTypes.rightDesignStl]?.fileName;
-        _leftProductionFileName =
-            _operationFiles[OrderOperationFileTypes.leftProductionFile]
-                ?.fileName;
-        _rightProductionFileName =
-            _operationFiles[OrderOperationFileTypes.rightProductionFile]
-                ?.fileName;
+
+        _camFileName = _operationFiles[_camFileType]?.fileName;
+        _gcodeFileName = _operationFiles[_gcodeFileType]?.fileName;
 
         _isLoadingOperation = false;
       });
@@ -231,6 +239,69 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     return loaded;
   }
 
+  String _deriveOrderStatusFromOperation() {
+    if (_currentOrderStatus == OrderStatuses.cancelled) {
+      return OrderStatuses.cancelled;
+    }
+
+    if (_orderClosed) {
+      return OrderStatuses.delivered;
+    }
+
+    final hasTrackingNo = _shippingTrackingController.text.trim().isNotEmpty;
+
+    if (_packagingCompleted && hasTrackingNo) {
+      return OrderStatuses.shipped;
+    }
+
+    if (_productionStarted || _productionCompleted) {
+      return OrderStatuses.production;
+    }
+
+    if (_designCompleted) {
+      return OrderStatuses.designing;
+    }
+
+    return OrderStatuses.pending;
+  }
+
+  Future<void> _syncOrderStatusIfNeeded({
+    required int orderId,
+  }) async {
+    final nextStatus = _deriveOrderStatusFromOperation();
+
+    final updateMap = <String, dynamic>{};
+
+    if (nextStatus != _currentOrderStatus) {
+      updateMap['order_status'] = nextStatus;
+    }
+
+    DateTime? nextShippedAt = _currentShippedAt;
+    DateTime? nextDeliveredAt = _currentDeliveredAt;
+
+    if (nextStatus == OrderStatuses.shipped && nextShippedAt == null) {
+      nextShippedAt = DateTime.now();
+      updateMap['shipped_at'] = nextShippedAt.toIso8601String();
+    }
+
+    if (nextStatus == OrderStatuses.delivered && nextDeliveredAt == null) {
+      nextDeliveredAt = DateTime.now();
+      updateMap['delivered_at'] = nextDeliveredAt.toIso8601String();
+    }
+
+    if (updateMap.isEmpty) return;
+
+    await _client.from('orders').update(updateMap).eq('id', orderId);
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentOrderStatus = nextStatus;
+      _currentShippedAt = nextShippedAt;
+      _currentDeliveredAt = nextDeliveredAt;
+    });
+  }
+
   Future<void> _persistOperationState() async {
     final orderId = order.orderId;
     final userId = widget.currentUser.userId;
@@ -246,8 +317,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         sessionId: order.sessionId,
         patientId: order.patientId,
         assignedUserId: userId,
-        boardColumnCode:
-            _operationState?.boardColumnCode ??
+        boardColumnCode: _operationState?.boardColumnCode ??
             widget.operationItem.currentColumnCode,
         designCompleted: _designCompleted,
         productionStarted: _productionStarted,
@@ -261,8 +331,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         shippingTrackingNo: _shippingTrackingController.text.trim(),
         orderClosed: _orderClosed,
       );
-
       final saved = await _operationRepository.upsertState(state: state);
+
+      await _syncOrderStatusIfNeeded(orderId: orderId);
 
       if (!mounted) return;
 
@@ -415,35 +486,55 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         return;
       }
 
-      final candidates = rows.where((row) {
-        final text = [
-          row.fileType,
-          row.fileName,
-          row.storagePath,
-        ].join(' ').toLowerCase();
+      final preferredSideNormalized =
+          preferredSideKeywords.map(_normalizeSearchText).toList();
 
-        final sideMatches = preferredSideKeywords.any(text.contains);
-        final looksLikeStl =
-            text.contains('.stl') || text.contains('stl') || text.contains('scan');
+      final stlRows = rows.where(_looksLikeStlScanRecord).toList();
 
-        return sideMatches && looksLikeStl;
+      if (stlRows.isEmpty) {
+        _showMessage('Bu oturum için STL formatında 3D scan dosyası bulunamadı.');
+        return;
+      }
+
+      final exactSideMatches = stlRows.where((row) {
+        final text = _storageRecordSearchText(row);
+
+        return preferredSideNormalized.any((keyword) {
+          return text.contains(keyword);
+        });
       }).toList();
 
-      final fallbackCandidates = rows.where((row) {
-        final text = [
-          row.fileType,
-          row.fileName,
-          row.storagePath,
-        ].join(' ').toLowerCase();
+      if (exactSideMatches.length == 1) {
+        await _openStorageRecord(
+          exactSideMatches.first,
+          emptyMessage: '$label için storage bilgisi bulunamadı.',
+        );
+        return;
+      }
 
-        return text.contains('.stl') || text.contains('stl') || text.contains('scan');
-      }).toList();
+      if (exactSideMatches.length > 1) {
+        final selected = await _showStorageRecordPicker(
+          title: '$label seç',
+          records: exactSideMatches,
+        );
 
-      final selected = candidates.isNotEmpty
-          ? candidates.first
-          : fallbackCandidates.isNotEmpty
-              ? fallbackCandidates.first
-              : rows.first;
+        if (selected == null) return;
+
+        await _openStorageRecord(
+          selected,
+          emptyMessage: '$label için storage bilgisi bulunamadı.',
+        );
+        return;
+      }
+
+      final selected = await _showStorageRecordPicker(
+        title: '$label bulunamadı, STL dosyası seç',
+        records: stlRows,
+        helperText:
+            'Bu oturumda $label olarak net eşleşen dosya bulunamadı. Yanlış dosya açmamak için lütfen doğru STL dosyasını seç.',
+      );
+
+      if (selected == null) return;
 
       await _openStorageRecord(
         selected,
@@ -452,6 +543,128 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     } catch (e) {
       _showMessage('$label indirilemedi: $e');
     }
+  }
+
+  String _normalizeSearchText(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ş', 's')
+        .replaceAll('ö', 'o')
+        .replaceAll('ç', 'c')
+        .trim();
+  }
+
+  String _storageRecordSearchText(_StorageRecord record) {
+    return _normalizeSearchText(
+      [
+        record.fileType,
+        record.fileName,
+        record.storagePath ?? '',
+        record.storageBucket ?? '',
+      ].join(' '),
+    );
+  }
+
+  bool _looksLikeStlScanRecord(_StorageRecord record) {
+    final text = _storageRecordSearchText(record);
+
+    final hasStlExtension = text.contains('.stl');
+    final hasStlType = text.contains('stl');
+    final hasScanHint =
+        text.contains('scan') ||
+        text.contains('3d') ||
+        text.contains('foot') ||
+        text.contains('ayak');
+
+    final looksLikeReferencePhoto =
+        text.contains('photo') ||
+        text.contains('foto') ||
+        text.contains('image') ||
+        text.contains('jpg') ||
+        text.contains('jpeg') ||
+        text.contains('png');
+
+    if (looksLikeReferencePhoto) return false;
+
+    return hasStlExtension || (hasStlType && hasScanHint);
+  }
+
+  Future<_StorageRecord?> _showStorageRecordPicker({
+    required String title,
+    required List<_StorageRecord> records,
+    String? helperText,
+  }) async {
+    if (!mounted) return null;
+
+    return showDialog<_StorageRecord>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 560,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (helperText != null && helperText.trim().isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.25),
+                    ),
+                  ),
+                  child: Text(
+                    helperText,
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: records.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  itemBuilder: (context, index) {
+                    final row = records[index];
+
+                    return ListTile(
+                      leading: const Icon(
+                        Icons.view_in_ar_outlined,
+                        color: Colors.teal,
+                      ),
+                      title: Text(
+                        row.displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(row.subtitle),
+                      onTap: () => Navigator.pop(context, row),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _downloadPressureRecordings() async {
@@ -515,6 +728,43 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     }
   }
 
+  Future<void> _downloadReferenceInsolePhoto() async {
+    try {
+      final rows = await _fetchReferencePhotos();
+
+      if (rows.isEmpty) {
+        _showMessage('Bu oturum için referans iç taban fotoğrafı bulunamadı.');
+        return;
+      }
+
+      final preferred = rows.where((row) {
+        final text = [
+          row.fileType,
+          row.fileName,
+          row.storagePath,
+        ].join(' ').toLowerCase();
+
+        return text.contains('insole') ||
+            text.contains('ic_taban') ||
+            text.contains('iç_taban') ||
+            text.contains('iç taban') ||
+            text.contains('taban') ||
+            text.contains('reference') ||
+            text.contains('referans');
+      }).toList();
+
+      final selected = preferred.isNotEmpty ? preferred.first : rows.first;
+
+      await _openStorageRecord(
+        selected,
+        emptyMessage:
+            'Referans iç taban fotoğrafı için storage bilgisi bulunamadı.',
+      );
+    } catch (e) {
+      _showMessage('Referans iç taban fotoğrafı indirilemedi: $e');
+    }
+  }
+
   Future<List<_StorageRecord>> _fetchSessionScanFiles() async {
     final response = await _client
         .from('session_scan_files')
@@ -522,9 +772,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           id,
           file_type,
           file_name,
+          mime_type,
+          size_bytes,
           storage_bucket,
           storage_path,
           public_url,
+          upload_status,
           created_at
         ''')
         .eq('session_id', order.sessionId)
@@ -603,6 +856,49 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         publicUrl: null,
         createdAt: recordedAt ?? createdAt,
         subtitleExtra: details,
+      );
+    }).toList();
+  }
+
+  Future<List<_StorageRecord>> _fetchReferencePhotos() async {
+    final response = await _client
+        .from('session_reference_photos')
+        .select()
+        .eq('session_id', order.sessionId)
+        .order('created_at', ascending: false);
+
+    final rows = (response as List<dynamic>)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+
+    return rows.map((row) {
+      final id = _asInt(row['id']);
+
+      final fileType = (row['file_type'] ??
+              row['photo_type'] ??
+              row['reference_type'] ??
+              'reference_photo')
+          .toString();
+
+      final fileName = (row['file_name'] ??
+              row['title'] ??
+              row['photo_title'] ??
+              'Referans iç taban fotoğrafı #${id ?? '—'}')
+          .toString();
+
+      final bucket = (row['storage_bucket'] ?? '').toString();
+      final path = (row['storage_path'] ?? '').toString();
+      final publicUrl = (row['public_url'] ?? '').toString();
+      final createdAt = _asDateTime(row['created_at']);
+
+      return _StorageRecord(
+        id: id,
+        fileType: fileType,
+        fileName: fileName,
+        storageBucket: bucket.isEmpty ? null : bucket,
+        storagePath: path.isEmpty ? null : path,
+        publicUrl: publicUrl.isEmpty ? null : publicUrl,
+        createdAt: createdAt,
       );
     }).toList();
   }
@@ -787,12 +1083,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   Widget _buildPrimaryInfoCard() {
     return _buildSectionCard(
-      title: 'Sipariş ve Hasta Bilgileri',
+      title: 'Sipariş ve Kullanıcı Bilgileri',
       child: Column(
         children: [
           _buildHighlightInfoRow(
             icon: Icons.account_circle_outlined,
-            label: 'Hasta',
+            label: 'Kullanıcı',
             value: widget.operationItem.patientName,
             color: Colors.teal,
           ),
@@ -819,7 +1115,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 : 'Oturum bilgisi okunamadı',
           ),
           _buildKeyValueRow('Ürün', _productLabel(order.productType)),
-          _buildKeyValueRow('Durum', _statusLabel(order.orderStatus)),
+          _buildKeyValueRow('Durum', _statusLabel(_currentOrderStatus)),
         ],
       ),
     );
@@ -959,12 +1255,71 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     );
   }
 
+  Widget _buildExpandableFileSection({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    String? subtitle,
+    bool initiallyExpanded = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 2,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          leading: Icon(
+            icon,
+            color: Colors.teal,
+            size: 20,
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          subtitle: subtitle == null
+              ? null
+              : Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: child,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildUploadedFileRow({
     required String label,
     required String? fileName,
     required VoidCallback onUpload,
     required VoidCallback onDownload,
   }) {
+    final hasFile = fileName != null && fileName.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
@@ -976,24 +1331,73 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.insert_drive_file_outlined, color: Colors.teal),
+          Icon(
+            Icons.insert_drive_file_outlined,
+            color: hasFile ? Colors.teal : Colors.grey,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              fileName == null ? '$label: Dosya yok' : '$label: $fileName',
+              hasFile ? '$label: $fileName' : '$label: Dosya yok',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: hasFile ? Colors.black87 : Colors.grey[600],
+              ),
             ),
           ),
           IconButton(
             tooltip: 'İndir',
-            onPressed: fileName == null ? null : onDownload,
+            onPressed: hasFile ? onDownload : null,
             icon: const Icon(Icons.download_outlined),
           ),
           OutlinedButton.icon(
             onPressed: onUpload,
             icon: const Icon(Icons.upload_file),
             label: const Text('Yükle'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExistingFileDownloadRow({
+    required String label,
+    required String? fileName,
+    required VoidCallback onDownload,
+  }) {
+    final hasFile = fileName != null && fileName.trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.insert_drive_file_outlined,
+            color: hasFile ? Colors.teal : Colors.grey,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              hasFile ? '$label: $fileName' : '$label: Dosya yok',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: hasFile ? Colors.black87 : Colors.grey[600],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'İndir / Aç',
+            onPressed: hasFile ? onDownload : null,
+            icon: const Icon(Icons.download_outlined),
           ),
         ],
       ),
@@ -1105,54 +1509,69 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Girdi Dosyaları',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          _buildInputDownloadRow(
-            label: 'Sol ayak 3D scan STL',
-            onDownload: _downloadLeftScanFile,
-          ),
-          _buildInputDownloadRow(
-            label: 'Sağ ayak 3D scan STL',
-            onDownload: _downloadRightScanFile,
-          ),
-          _buildInputDownloadRow(
-            label: 'Basınç kayıtları',
-            onDownload: _downloadPressureRecordings,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Tasarım Çıktıları',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          _buildUploadedFileRow(
-            label: 'Sol ürün tasarım STL',
-            fileName: _leftDesignStlName,
-            onUpload: () => _pickAndUploadOperationFile(
-              title: 'Sol ürün tasarım STL seç',
-              fileType: OrderOperationFileTypes.leftDesignStl,
-              onSelected: (name) => _leftDesignStlName = name,
-            ),
-            onDownload: () => _downloadOperationFile(
-              OrderOperationFileTypes.leftDesignStl,
-              'Sol ürün tasarım STL',
+          const SizedBox(height: 14),
+          _buildExpandableFileSection(
+            title: 'Kullanılacak Ölçüm Dosyaları',
+            subtitle:
+                'Tasarım için gerekli 3D scan, plantar basınç ve referans iç taban fotoğrafı.',
+            icon: Icons.folder_open_outlined,
+            initiallyExpanded: false,
+            child: Column(
+              children: [
+                _buildInputDownloadRow(
+                  label: 'Sol ayak 3D scan STL',
+                  onDownload: _downloadLeftScanFile,
+                ),
+                _buildInputDownloadRow(
+                  label: 'Sağ ayak 3D scan STL',
+                  onDownload: _downloadRightScanFile,
+                ),
+                _buildInputDownloadRow(
+                  label: 'Basınç kayıtları',
+                  onDownload: _downloadPressureRecordings,
+                ),
+                _buildInputDownloadRow(
+                  label: 'Referans iç taban fotoğrafı',
+                  onDownload: _downloadReferenceInsolePhoto,
+                ),
+              ],
             ),
           ),
-          _buildUploadedFileRow(
-            label: 'Sağ ürün tasarım STL',
-            fileName: _rightDesignStlName,
-            onUpload: () => _pickAndUploadOperationFile(
-              title: 'Sağ ürün tasarım STL seç',
-              fileType: OrderOperationFileTypes.rightDesignStl,
-              onSelected: (name) => _rightDesignStlName = name,
-            ),
-            onDownload: () => _downloadOperationFile(
-              OrderOperationFileTypes.rightDesignStl,
-              'Sağ ürün tasarım STL',
+          _buildExpandableFileSection(
+            title: 'Yüklenecek Tasarım Çıktıları',
+            subtitle:
+                'Tasarım tamamlandıktan sonra sol ve sağ ürün STL dosyalarını buraya yükle.',
+            icon: Icons.upload_file_outlined,
+            initiallyExpanded: false,
+            child: Column(
+              children: [
+                _buildUploadedFileRow(
+                  label: 'Sol ürün tasarım STL',
+                  fileName: _leftDesignStlName,
+                  onUpload: () => _pickAndUploadOperationFile(
+                    title: 'Sol ürün tasarım STL seç',
+                    fileType: OrderOperationFileTypes.leftDesignStl,
+                    onSelected: (name) => _leftDesignStlName = name,
+                  ),
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.leftDesignStl,
+                    'Sol ürün tasarım STL',
+                  ),
+                ),
+                _buildUploadedFileRow(
+                  label: 'Sağ ürün tasarım STL',
+                  fileName: _rightDesignStlName,
+                  onUpload: () => _pickAndUploadOperationFile(
+                    title: 'Sağ ürün tasarım STL seç',
+                    fileType: OrderOperationFileTypes.rightDesignStl,
+                    onSelected: (name) => _rightDesignStlName = name,
+                  ),
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.rightDesignStl,
+                    'Sağ ürün tasarım STL',
+                  ),
+                ),
+              ],
             ),
           ),
           CheckboxListTile(
@@ -1175,36 +1594,74 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       index: 2,
       title: 'Üretim Hazırlığı ve Üretim',
       description:
-          'Üretim dosyaları yüklenir. CNC için G-code, 3D baskı için slice dosyası veya ürüne özel üretim dosyası kullanılabilir.',
+          'Üretim için tasarım STL dosyaları referans alınır. CAM dosyası ve G-code dosyası tekil olarak yüklenir.',
       icon: Icons.precision_manufacturing_outlined,
       completed: _productionCompleted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildUploadedFileRow(
-            label: 'Sol ürün üretim dosyası',
-            fileName: _leftProductionFileName,
-            onUpload: () => _pickAndUploadOperationFile(
-              title: 'Sol ürün üretim dosyası seç',
-              fileType: OrderOperationFileTypes.leftProductionFile,
-              onSelected: (name) => _leftProductionFileName = name,
-            ),
-            onDownload: () => _downloadOperationFile(
-              OrderOperationFileTypes.leftProductionFile,
-              'Sol ürün üretim dosyası',
+          _buildExpandableFileSection(
+            title: 'Üretimde Kullanılacak Tasarım Dosyaları',
+            subtitle:
+                'Üretim dosyası hazırlanırken tasarım adımında yüklenen sol ve sağ STL dosyaları kullanılır.',
+            icon: Icons.download_outlined,
+            initiallyExpanded: false,
+            child: Column(
+              children: [
+                _buildExistingFileDownloadRow(
+                  label: 'Sol ürün tasarım STL',
+                  fileName: _leftDesignStlName,
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.leftDesignStl,
+                    'Sol ürün tasarım STL',
+                  ),
+                ),
+                _buildExistingFileDownloadRow(
+                  label: 'Sağ ürün tasarım STL',
+                  fileName: _rightDesignStlName,
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.rightDesignStl,
+                    'Sağ ürün tasarım STL',
+                  ),
+                ),
+              ],
             ),
           ),
-          _buildUploadedFileRow(
-            label: 'Sağ ürün üretim dosyası',
-            fileName: _rightProductionFileName,
-            onUpload: () => _pickAndUploadOperationFile(
-              title: 'Sağ ürün üretim dosyası seç',
-              fileType: OrderOperationFileTypes.rightProductionFile,
-              onSelected: (name) => _rightProductionFileName = name,
-            ),
-            onDownload: () => _downloadOperationFile(
-              OrderOperationFileTypes.rightProductionFile,
-              'Sağ ürün üretim dosyası',
+          _buildExpandableFileSection(
+            title: 'Yüklenecek Üretim Dosyaları',
+            subtitle:
+                'CAM hazırlığı ve makineye gönderilecek G-code dosyası burada tutulur. Bu dosyalar sağ/sol ayrılmaz.',
+            icon: Icons.upload_file_outlined,
+            initiallyExpanded: false,
+            child: Column(
+              children: [
+                _buildUploadedFileRow(
+                  label: 'CAM dosyası',
+                  fileName: _camFileName,
+                  onUpload: () => _pickAndUploadOperationFile(
+                    title: 'CAM dosyası seç',
+                    fileType: _camFileType,
+                    onSelected: (name) => _camFileName = name,
+                  ),
+                  onDownload: () => _downloadOperationFile(
+                    _camFileType,
+                    'CAM dosyası',
+                  ),
+                ),
+                _buildUploadedFileRow(
+                  label: 'G-code dosyası',
+                  fileName: _gcodeFileName,
+                  onUpload: () => _pickAndUploadOperationFile(
+                    title: 'G-code dosyası seç',
+                    fileType: _gcodeFileType,
+                    onSelected: (name) => _gcodeFileName = name,
+                  ),
+                  onDownload: () => _downloadOperationFile(
+                    _gcodeFileType,
+                    'G-code dosyası',
+                  ),
+                ),
+              ],
             ),
           ),
           CheckboxListTile(
@@ -1246,7 +1703,69 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       icon: Icons.fact_check_outlined,
       completed: completed,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildExpandableFileSection(
+            title: 'Kontrol Referansları',
+            subtitle:
+                'Kalite kontrol sırasında tasarım formu, analiz raporu, tasarım STL, CAM ve G-code dosyaları referans alınır.',
+            icon: Icons.rule_folder_outlined,
+            initiallyExpanded: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.assignment_outlined,
+                      label: 'Tasarım Formunu Görüntüle',
+                      onPressed: _openDesignForm,
+                    ),
+                    _buildActionButton(
+                      icon: Icons.analytics_outlined,
+                      label: 'Analiz Raporunu Görüntüle',
+                      onPressed: _openAnalysisResults,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildExistingFileDownloadRow(
+                  label: 'Sol ürün tasarım STL',
+                  fileName: _leftDesignStlName,
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.leftDesignStl,
+                    'Sol ürün tasarım STL',
+                  ),
+                ),
+                _buildExistingFileDownloadRow(
+                  label: 'Sağ ürün tasarım STL',
+                  fileName: _rightDesignStlName,
+                  onDownload: () => _downloadOperationFile(
+                    OrderOperationFileTypes.rightDesignStl,
+                    'Sağ ürün tasarım STL',
+                  ),
+                ),
+                _buildExistingFileDownloadRow(
+                  label: 'CAM dosyası',
+                  fileName: _camFileName,
+                  onDownload: () => _downloadOperationFile(
+                    _camFileType,
+                    'CAM dosyası',
+                  ),
+                ),
+                _buildExistingFileDownloadRow(
+                  label: 'G-code dosyası',
+                  fileName: _gcodeFileName,
+                  onDownload: () => _downloadOperationFile(
+                    _gcodeFileType,
+                    'G-code dosyası',
+                  ),
+                ),
+              ],
+            ),
+          ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
             value: _qcDesignMatch,
@@ -1380,7 +1899,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       );
     }
 
-    final statusColor = _statusColor(order.orderStatus);
+    final statusColor = _statusColor(_currentOrderStatus);
     final priorityColor = _priorityColor(widget.operationItem.priorityLabel);
 
     return Scaffold(
@@ -1459,7 +1978,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
-                                    _statusLabel(order.orderStatus),
+                                    _statusLabel(_currentOrderStatus),
                                     style: TextStyle(
                                       color: statusColor,
                                       fontWeight: FontWeight.w700,
@@ -1509,11 +2028,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                                       ),
                                       _buildKeyValueRow(
                                         'Kargo Tarihi',
-                                        _formatDate(order.shippedAt),
+                                        _formatDate(_currentShippedAt),
                                       ),
                                       _buildKeyValueRow(
                                         'Teslim Tarihi',
-                                        _formatDate(order.deliveredAt),
+                                        _formatDate(_currentDeliveredAt),
                                       ),
                                       const SizedBox(height: 8),
                                       _buildKeyValueRow(

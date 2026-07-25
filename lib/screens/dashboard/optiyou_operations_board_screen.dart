@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
+import 'package:oy_site/data/repositories/supabase_order_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
-import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
-import 'package:oy_site/data/repositories/supabase_order_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {
@@ -69,17 +69,23 @@ class _OptiYouOperationsBoardScreenState
           orderId: order.orderId ?? 0,
         );
 
+        final patientName = relatedLabels.patientNames[order.patientId] ??
+            'Kullanıcı #${order.patientId}';
+
+        final expertName = relatedLabels.expertNames[order.expertUserId] ??
+            'Uzman #${order.expertUserId}';
+
+        final clinicName = order.clinicId > 0
+            ? relatedLabels.clinicNames[order.clinicId] ?? '-'
+            : '-';
+
         final item = OptiYouOrderOperationItem(
           order: order,
-          patientName: relatedLabels.patientNames[order.patientId] ??
-              'Hasta #${order.patientId}',
-          expertName: relatedLabels.expertNames[order.expertUserId] ??
-              'Uzman #${order.expertUserId}',
-          clinicName: relatedLabels.clinicNames[order.clinicId] ??
-              'Klinik #${order.clinicId}',
+          patientName: patientName,
+          expertName: expertName,
+          clinicName: clinicName,
           priorityLabel: 'Orta',
-          currentColumnCode:
-              state?.boardColumnCode ??
+          currentColumnCode: state?.boardColumnCode ??
               OptiYouOperationColumnCodes.designWaiting,
           hasMissingData: false,
           missingDataSummary: '',
@@ -109,12 +115,23 @@ class _OptiYouOperationsBoardScreenState
   Future<_OrderRelatedLabels> _loadRelatedLabels(
     List<OrderModel> orders,
   ) async {
-    final patientIds = orders.map((order) => order.patientId).toSet().toList();
+    final patientIds = orders
+        .map((order) => order.patientId)
+        .where((id) => id > 0)
+        .toSet()
+        .toList();
 
-    final clinicIds = orders.map((order) => order.clinicId).toSet().toList();
+    final clinicIds = orders
+        .map((order) => order.clinicId)
+        .where((id) => id > 0)
+        .toSet()
+        .toList();
 
-    final expertUserIds =
-        orders.map((order) => order.expertUserId).toSet().toList();
+    final expertUserIds = orders
+        .map((order) => order.expertUserId)
+        .where((id) => id > 0)
+        .toSet()
+        .toList();
 
     final patientNames = <int, String>{};
     final clinicNames = <int, String>{};
@@ -145,10 +162,10 @@ class _OptiYouOperationsBoardScreenState
               ? fullName
               : patientCode.isNotEmpty
                   ? patientCode
-                  : 'Hasta #$id';
+                  : 'Kullanıcı #$id';
         }
       } catch (_) {
-        // Hasta bilgisi okunamazsa fallback kullanılacak.
+        // Kullanıcı bilgisi okunamazsa fallback kullanılacak.
       }
     }
 
@@ -156,25 +173,29 @@ class _OptiYouOperationsBoardScreenState
       try {
         final response = await _client
             .from('clinics')
-            .select('clinic_id, clinic_name, clinic_code')
-            .inFilter('clinic_id', clinicIds);
+            .select('id, clinic_name, clinic_code')
+            .inFilter('id', clinicIds);
 
         final rows = (response as List<dynamic>)
             .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
 
         for (final row in rows) {
-          final id = _asInt(row['clinic_id']);
+          final id = _asInt(row['id']);
           if (id == null) continue;
 
           final clinicName = (row['clinic_name'] ?? '').toString().trim();
           final clinicCode = (row['clinic_code'] ?? '').toString().trim();
 
-          clinicNames[id] = clinicName.isNotEmpty
-              ? clinicName
-              : clinicCode.isNotEmpty
-                  ? clinicCode
-                  : 'Klinik #$id';
+          if (clinicName.isNotEmpty && clinicCode.isNotEmpty) {
+            clinicNames[id] = '$clinicName ($clinicCode)';
+          } else if (clinicName.isNotEmpty) {
+            clinicNames[id] = clinicName;
+          } else if (clinicCode.isNotEmpty) {
+            clinicNames[id] = clinicCode;
+          } else {
+            clinicNames[id] = '-';
+          }
         }
       } catch (_) {
         // Klinik bilgisi okunamazsa fallback kullanılacak.
@@ -201,6 +222,7 @@ class _OptiYouOperationsBoardScreenState
           final firstName = (row['first_name'] ?? '').toString().trim();
           final lastName = (row['last_name'] ?? '').toString().trim();
           final username = (row['username'] ?? '').toString().trim();
+          final email = (row['email'] ?? '').toString().trim();
 
           final fullName = '$firstName $lastName'.trim();
 
@@ -208,7 +230,9 @@ class _OptiYouOperationsBoardScreenState
               ? fullName
               : username.isNotEmpty && !username.contains('@')
                   ? username
-                  : 'Uzman #$id';
+                  : email.isNotEmpty
+                      ? email
+                      : 'Uzman #$id';
         }
       } catch (_) {
         // Uzman bilgisi okunamazsa fallback kullanılacak.
@@ -426,7 +450,7 @@ class _OptiYouOperationsBoardScreenState
                     onChanged: _applySearch,
                     decoration: InputDecoration(
                       hintText:
-                          'Sipariş no, hasta, uzman, klinik veya ürün ile ara',
+                          'Sipariş no, kullanıcı, uzman, klinik veya ürün ile ara',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -555,7 +579,7 @@ class _OptiYouOperationsBoardScreenState
                       crossAxisCount: 2,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
-                      childAspectRatio: 0.8,
+                      childAspectRatio: 0.6,
                     ),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
@@ -574,8 +598,8 @@ class _OptiYouOperationsBoardScreenState
     final priorityColor = _priorityColor(item.priorityLabel);
 
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => OptiYouOrderDetailScreen(
@@ -584,6 +608,10 @@ class _OptiYouOperationsBoardScreenState
             ),
           ),
         );
+
+        if (mounted) {
+          await _loadItems();
+        }
       },
       borderRadius: BorderRadius.circular(14),
       child: _buildOrderCardContent(
@@ -608,9 +636,7 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: item.hasMissingData
-            ? Border.all(color: Colors.red.withOpacity(0.35))
-            : null,
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -647,7 +673,7 @@ class _OptiYouOperationsBoardScreenState
           ),
           const SizedBox(height: 8),
           _buildInfoText(
-            label: 'Hasta',
+            label: 'Kullanıcı',
             value: item.patientName,
             fontWeight: FontWeight.w600,
           ),
@@ -682,7 +708,7 @@ class _OptiYouOperationsBoardScreenState
                   enabled: canMoveLeft,
                   onTap: canMoveLeft ? () => _moveLeft(item) : null,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 2),
                 _buildStepArrowButton(
                   icon: Icons.chevron_right,
                   enabled: canMoveRight,
@@ -743,18 +769,18 @@ class _OptiYouOperationsBoardScreenState
     required VoidCallback? onTap,
   }) {
     return Material(
-      color: enabled ? Colors.grey.shade200 : Colors.grey.shade100,
-      borderRadius: BorderRadius.circular(8),
+      color: enabled ? Colors.grey.shade100 : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: SizedBox(
-          width: 28,
-          height: 28,
+          width: 22,
+          height: 22,
           child: Icon(
             icon,
-            size: 18,
-            color: enabled ? Colors.black87 : Colors.grey.shade400,
+            size: 15,
+            color: enabled ? Colors.grey.shade800 : Colors.grey.shade400,
           ),
         ),
       ),

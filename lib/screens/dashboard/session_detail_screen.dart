@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:oy_site/data/repositories/supabase_measurement_session_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
+import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:oy_site/screens/dashboard/anthropometric_clinical_info_screen.dart';
+import 'package:oy_site/screens/dashboard/expert_profile_screen.dart';
 import 'package:oy_site/screens/dashboard/insole_photo_upload_dialog.dart';
 import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
 import 'package:oy_site/screens/dashboard/pressure_measurement_dialog.dart';
 import 'package:oy_site/screens/dashboard/scan_folder_upload_dialog.dart';
 import 'package:oy_site/screens/dashboard/session_analysis_results_screen.dart';
-import 'package:flutter/services.dart';
-import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
-import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:oy_site/data/repositories/supabase_measurement_session_repository.dart';
-import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -34,16 +36,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   late MeasurementSession _currentSession;
 
   final SupabaseMeasurementSessionRepository _sessionRepository =
-    SupabaseMeasurementSessionRepository();
+      SupabaseMeasurementSessionRepository();
 
   final SupabasePatientInviteRepository _inviteRepository =
       SupabasePatientInviteRepository();
 
   final SupabasePatientRepository _patientRepository =
-    SupabasePatientRepository();
+      SupabasePatientRepository();
+
+  SupabaseClient get _client => Supabase.instance.client;
 
   PatientInviteModel? _latestInvite;
   bool _isCreatingInvite = false;
+  bool _isLoadingDisplayInfo = true;
+
+  String? _patientDisplayName;
+  String? _patientCode;
+  String? _clinicDisplayName;
+  String? _clinicCode;
+  String? _expertDisplayName;
+  String? _assignedOptiyouDisplayName;
 
   String? _scanFolderPath;
   List<String> _scanFolderFiles = [];
@@ -52,6 +64,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   void initState() {
     super.initState();
     _currentSession = widget.session;
+    _loadDisplayInfo();
   }
 
   bool get _hasUploadedScanFolder =>
@@ -61,6 +74,220 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       _currentSession.clinicalInfoCompleted &&
       _hasUploadedScanFolder &&
       _currentSession.hasPlantarCsv;
+
+  Future<void> _loadDisplayInfo() async {
+    setState(() {
+      _isLoadingDisplayInfo = true;
+    });
+
+    await Future.wait([
+      _loadPatientDisplayInfo(),
+      _loadClinicDisplayInfo(),
+      _loadExpertDisplayInfo(),
+      _loadAssignedOptiyouDisplayInfo(),
+    ]);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingDisplayInfo = false;
+    });
+  }
+
+  Future<void> _loadPatientDisplayInfo() async {
+    try {
+      final response = await _client
+          .from('patients')
+          .select('id, first_name, last_name, patient_code')
+          .eq('id', _currentSession.patientId)
+          .maybeSingle();
+
+      if (response == null) return;
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final firstName = (row['first_name'] ?? '').toString().trim();
+      final lastName = (row['last_name'] ?? '').toString().trim();
+      final patientCode = (row['patient_code'] ?? '').toString().trim();
+      final fullName = '$firstName $lastName'.trim();
+
+      if (!mounted) return;
+
+      setState(() {
+        _patientDisplayName =
+            fullName.isNotEmpty ? fullName : 'Hasta #${_currentSession.patientId}';
+        _patientCode = patientCode.isEmpty ? null : patientCode;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _patientDisplayName = 'Hasta #${_currentSession.patientId}';
+      });
+    }
+  }
+
+  Future<void> _loadClinicDisplayInfo() async {
+    try {
+      final clinicId = _currentSession.clinicId;
+
+      if (clinicId <= 0) {
+        if (!mounted) return;
+
+        setState(() {
+          _clinicDisplayName = 'Klinik bilgisi eksik';
+        });
+        return;
+      }
+
+      final response = await _client
+          .from('clinics')
+          .select('id, clinic_name, clinic_code, clinic_type')
+          .eq('id', clinicId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _clinicDisplayName = 'Klinik #$clinicId';
+        });
+        return;
+      }
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final clinicName = (row['clinic_name'] ?? '').toString().trim();
+      final clinicCode = (row['clinic_code'] ?? '').toString().trim();
+
+      if (!mounted) return;
+
+      setState(() {
+        _clinicDisplayName =
+            clinicName.isNotEmpty ? clinicName : 'Klinik #$clinicId';
+        _clinicCode = clinicCode.isEmpty ? null : clinicCode;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _clinicDisplayName = 'Klinik #${_currentSession.clinicId}';
+      });
+    }
+  }
+
+  Future<void> _loadExpertDisplayInfo() async {
+    try {
+      final response = await _client
+          .from('user_profiles_full')
+          .select('user_id, first_name, last_name, username, email, title')
+          .eq('user_id', _currentSession.expertUserId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _expertDisplayName =
+              _currentSession.expertUserId == widget.currentUser.userId
+                  ? widget.currentUser.displayName
+                  : 'Uzman #${_currentSession.expertUserId}';
+        });
+        return;
+      }
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final firstName = (row['first_name'] ?? '').toString().trim();
+      final lastName = (row['last_name'] ?? '').toString().trim();
+      final username = (row['username'] ?? '').toString().trim();
+      final email = (row['email'] ?? '').toString().trim();
+      final title = (row['title'] ?? '').toString().trim();
+
+      final fullName = '$firstName $lastName'.trim();
+      final displayName = fullName.isNotEmpty
+          ? title.isNotEmpty
+              ? '$title $fullName'
+              : fullName
+          : username.isNotEmpty
+              ? username
+              : email.isNotEmpty
+                  ? email
+                  : 'Uzman #${_currentSession.expertUserId}';
+
+      if (!mounted) return;
+
+      setState(() {
+        _expertDisplayName = displayName;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _expertDisplayName =
+            _currentSession.expertUserId == widget.currentUser.userId
+                ? widget.currentUser.displayName
+                : 'Uzman #${_currentSession.expertUserId}';
+      });
+    }
+  }
+
+  Future<void> _loadAssignedOptiyouDisplayInfo() async {
+    final assignedId = _currentSession.assignedOptityouUserId;
+
+    if (assignedId == null || assignedId <= 0) {
+      if (!mounted) return;
+
+      setState(() {
+        _assignedOptiyouDisplayName = 'Atama yok';
+      });
+      return;
+    }
+
+    try {
+      final response = await _client
+          .from('user_profiles_full')
+          .select('user_id, first_name, last_name, username, email, title')
+          .eq('user_id', assignedId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _assignedOptiyouDisplayName = 'OptiYou #$assignedId';
+        });
+        return;
+      }
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final firstName = (row['first_name'] ?? '').toString().trim();
+      final lastName = (row['last_name'] ?? '').toString().trim();
+      final username = (row['username'] ?? '').toString().trim();
+      final email = (row['email'] ?? '').toString().trim();
+      final title = (row['title'] ?? '').toString().trim();
+
+      final fullName = '$firstName $lastName'.trim();
+      final displayName = fullName.isNotEmpty
+          ? title.isNotEmpty
+              ? '$title $fullName'
+              : fullName
+          : username.isNotEmpty
+              ? username
+              : email.isNotEmpty
+                  ? email
+                  : 'OptiYou #$assignedId';
+
+      if (!mounted) return;
+
+      setState(() {
+        _assignedOptiyouDisplayName = displayName;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _assignedOptiyouDisplayName = 'OptiYou #$assignedId';
+      });
+    }
+  }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
@@ -99,6 +326,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
   }
 
+  String _safeValue(String? value) {
+    final text = (value ?? '').trim();
+    return text.isEmpty ? '—' : text;
+  }
+
+  void _openExpertProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExpertProfileScreen(
+          currentUser: widget.currentUser,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) {
+        _loadDisplayInfo();
+      }
+    });
+  }
+
   Widget _buildSectionCard({
     required String title,
     required Widget child,
@@ -133,7 +380,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildKeyValueRow(String label, String value) {
+  Widget _buildKeyValueRow(
+    String label,
+    String value, {
+    Widget? trailing,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -147,13 +398,113 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 6),
+                  trailing,
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClinicProfileButton() {
+    return Tooltip(
+      message: 'Uzman profilindeki klinik bilgisini görüntüle / düzenle',
+      child: InkWell(
+        onTap: _openExpertProfile,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.teal.withOpacity(0.10),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.account_circle_outlined,
+            size: 18,
+            color: Colors.teal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionInfoCard() {
+    final patientText = _patientCode == null
+        ? _safeValue(_patientDisplayName)
+        : '${_safeValue(_patientDisplayName)} ($_patientCode)';
+
+    final clinicText = _clinicCode == null
+        ? _safeValue(_clinicDisplayName)
+        : '${_safeValue(_clinicDisplayName)} ($_clinicCode)';
+
+    return _buildSectionCard(
+      title: 'Temel Bilgiler',
+      child: Column(
+        children: [
+          if (_isLoadingDisplayInfo)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Hasta, klinik ve uzman bilgileri yükleniyor...',
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                ],
               ),
             ),
+          _buildKeyValueRow(
+            'Hasta',
+            patientText,
+          ),
+          _buildKeyValueRow(
+            'Klinik',
+            clinicText,
+            trailing: _buildClinicProfileButton(),
+          ),
+          _buildKeyValueRow(
+            'Uzman',
+            _safeValue(_expertDisplayName),
+          ),
+          const Divider(height: 22),
+          _buildKeyValueRow(
+            'Oturum Kodu',
+            _currentSession.sessionCode,
+          ),
+          _buildKeyValueRow(
+            'Oluşturulma',
+            _formatDate(_currentSession.createdAt),
+          ),
+          _buildKeyValueRow(
+            'Güncellenme',
+            _formatDate(_currentSession.updatedAt),
+          ),
+          _buildKeyValueRow(
+            'Tamamlanma',
+            _formatDate(_currentSession.completedAt),
           ),
         ],
       ),
@@ -834,47 +1185,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       flex: 2,
                       child: Column(
                         children: [
-                          _buildSectionCard(
-                            title: 'Temel Bilgiler',
-                            child: Column(
-                              children: [
-                                _buildKeyValueRow(
-                                  'Session ID',
-                                  _currentSession.sessionId?.toString() ?? '—',
-                                ),
-                                _buildKeyValueRow(
-                                  'Clinic ID',
-                                  _currentSession.clinicId.toString(),
-                                ),
-                                _buildKeyValueRow(
-                                  'Patient ID',
-                                  _currentSession.patientId.toString(),
-                                ),
-                                _buildKeyValueRow(
-                                  'Expert User ID',
-                                  _currentSession.expertUserId.toString(),
-                                ),
-                                _buildKeyValueRow(
-                                  'Assigned OptiYou User ID',
-                                  _currentSession.assignedOptityouUserId
-                                          ?.toString() ??
-                                      '—',
-                                ),
-                                _buildKeyValueRow(
-                                  'Oluşturulma',
-                                  _formatDate(_currentSession.createdAt),
-                                ),
-                                _buildKeyValueRow(
-                                  'Güncellenme',
-                                  _formatDate(_currentSession.updatedAt),
-                                ),
-                                _buildKeyValueRow(
-                                  'Tamamlanma',
-                                  _formatDate(_currentSession.completedAt),
-                                ),
-                              ],
-                            ),
-                          ),
+                          _buildSessionInfoCard(),
                           const SizedBox(height: 16),
                           _buildAnalysisResultsCard(),
                           const SizedBox(height: 16),
