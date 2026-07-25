@@ -3,6 +3,7 @@ import 'package:oy_site/data/repositories/supabase_measurement_session_repositor
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/patient.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreateSessionScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -23,6 +24,8 @@ class CreateSessionScreen extends StatefulWidget {
 class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final SupabaseMeasurementSessionRepository _sessionRepository =
       SupabaseMeasurementSessionRepository();
+
+  SupabaseClient get _client => Supabase.instance.client;
 
   Patient? _selectedPatient;
   DateTime _selectedDate = DateTime.now();
@@ -47,16 +50,72 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   String? _formatTimeOfDay(TimeOfDay? time) {
     if (time == null) return null;
+
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
+
     return '$hour:$minute';
+  }
+
+  Future<int?> _resolveCurrentExpertClinicId() async {
+    final localClinicId = widget.currentUser.clinicId;
+
+    if (localClinicId != null && localClinicId > 0) {
+      return localClinicId;
+    }
+
+    final userId = widget.currentUser.userId;
+
+    if (userId == null) return null;
+
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('clinic_id')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final row = Map<String, dynamic>.from(response as Map);
+      return _asInt(row['clinic_id']);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _resolveCurrentExpertClinicName({
+    required int clinicId,
+  }) async {
+    final localClinicName = (widget.currentUser.clinicName ?? '').trim();
+
+    if (localClinicName.isNotEmpty) {
+      return localClinicName;
+    }
+
+    try {
+      final response = await _client
+          .from('clinics')
+          .select('clinic_name')
+          .eq('id', clinicId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final clinicName = (row['clinic_name'] ?? '').toString().trim();
+
+      return clinicName.isEmpty ? null : clinicName;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _createSession() async {
     if (_selectedPatient == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Lütfen bir Kullanıcı seçin.'),
+          content: Text('Lütfen bir kullanıcı seçin.'),
         ),
       );
       return;
@@ -68,7 +127,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     if (patientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Kullanıcı ID bulunamadı. Lütfen Kullanıcıyı tekrar seçin.'),
+          content: Text(
+            'Kullanıcı ID bulunamadı. Lütfen kullanıcıyı tekrar seçin.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -90,9 +151,17 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     });
 
     try {
+      final clinicId = await _resolveCurrentExpertClinicId();
+
+      if (clinicId == null || clinicId <= 0) {
+        throw Exception(
+          'Klinik bilgisi bulunamadı. Lütfen Profil ekranından klinik bilginizi tamamlayın.',
+        );
+      }
+
       final session = MeasurementSession(
         sessionId: null,
-        clinicId: widget.currentUser.clinicId ?? 0,
+        clinicId: clinicId,
         patientId: patientId,
         expertUserId: expertUserId,
         assignedOptityouUserId: null,
@@ -145,6 +214,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     }
   }
 
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+
+    return int.tryParse(value.toString());
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool patientLocked = widget.initialPatient != null;
@@ -175,6 +252,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   style: TextStyle(color: Colors.grey[700]),
                 ),
                 const SizedBox(height: 24),
+
                 DropdownButtonFormField<Patient>(
                   initialValue: _selectedPatient,
                   decoration: const InputDecoration(
@@ -184,7 +262,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   items: widget.patients.map((patient) {
                     return DropdownMenuItem<Patient>(
                       value: patient,
-                      child: Text('${patient.fullName} (${patient.patientCode})'),
+                      child: Text(
+                        '${patient.fullName} (${patient.patientCode})',
+                      ),
                     );
                   }).toList(),
                   onChanged: patientLocked
@@ -195,7 +275,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           });
                         },
                 ),
+
                 const SizedBox(height: 20),
+
                 InkWell(
                   onTap: () async {
                     final picked = await showDatePicker(
@@ -223,7 +305,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 InkWell(
                   onTap: () async {
                     final picked = await showTimePicker(
@@ -249,22 +333,62 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 24),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Klinik ID: ${widget.currentUser.clinicId ?? '-'}\n'
-                    'Uzman: ${widget.currentUser.displayName}\n'
-                    'Yeni ölçüm oturumu başlangıç durumu: draft',
-                    style: const TextStyle(height: 1.5),
-                  ),
+
+                FutureBuilder<int?>(
+                  future: _resolveCurrentExpertClinicId(),
+                  builder: (context, snapshot) {
+                    final clinicId = snapshot.data;
+                    final hasClinic = clinicId != null && clinicId > 0;
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildInfoBox(
+                        color: Colors.blueGrey,
+                        icon: Icons.hourglass_empty,
+                        title: 'Klinik bilgisi kontrol ediliyor',
+                        body:
+                            'Yeni ölçüm oturumunun bağlanacağı klinik bilgisi okunuyor.',
+                      );
+                    }
+
+                    if (!hasClinic) {
+                      return _buildInfoBox(
+                        color: Colors.orange,
+                        icon: Icons.warning_amber_outlined,
+                        title: 'Klinik bilgisi eksik',
+                        body:
+                            'Yeni ölçüm oturumu oluşturabilmek için önce Profil ekranından klinik bilginizi tamamlayın.',
+                      );
+                    }
+
+                    return FutureBuilder<String?>(
+                      future: _resolveCurrentExpertClinicName(
+                        clinicId: clinicId,
+                      ),
+                      builder: (context, clinicNameSnapshot) {
+                        final clinicName =
+                            (clinicNameSnapshot.data ?? '').trim();
+
+                        return _buildInfoBox(
+                          color: Colors.teal,
+                          icon: Icons.local_hospital_outlined,
+                          title: 'Oturum bu klinikte oluşturulacak',
+                          body: clinicName.isEmpty
+                              ? 'Klinik ID: $clinicId\n'
+                                  'Uzman: ${widget.currentUser.displayName}\n'
+                                  'Yeni ölçüm oturumu başlangıç durumu: draft'
+                              : 'Klinik: $clinicName\n'
+                                  'Uzman: ${widget.currentUser.displayName}\n'
+                                  'Yeni ölçüm oturumu başlangıç durumu: draft',
+                        );
+                      },
+                    );
+                  },
                 ),
+
                 const SizedBox(height: 30),
+
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -292,6 +416,51 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoBox({
+    required Color color,
+    required IconData icon,
+    required String title,
+    required String body,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.24),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  body,
+                  style: const TextStyle(height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

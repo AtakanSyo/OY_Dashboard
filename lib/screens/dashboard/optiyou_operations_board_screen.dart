@@ -6,6 +6,7 @@ import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
 import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
 import 'package:oy_site/data/repositories/supabase_order_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -22,14 +23,16 @@ class OptiYouOperationsBoardScreen extends StatefulWidget {
 
 class _OptiYouOperationsBoardScreenState
     extends State<OptiYouOperationsBoardScreen> {
-
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _horizontalScrollController = ScrollController();
-  final SupabaseOrderRepository _orderRepository =
-      SupabaseOrderRepository();
+
+  final SupabaseOrderRepository _orderRepository = SupabaseOrderRepository();
 
   final SupabaseOrderOperationRepository _operationRepository =
       SupabaseOrderOperationRepository();
+
+  SupabaseClient get _client => Supabase.instance.client;
+
   List<OptiYouOrderOperationItem> _allItems = [];
   List<OptiYouOrderOperationItem> _filteredItems = [];
 
@@ -57,6 +60,7 @@ class _OptiYouOperationsBoardScreenState
 
     try {
       final orders = await _orderRepository.getAllOrders();
+      final relatedLabels = await _loadRelatedLabels(orders);
 
       final List<OptiYouOrderOperationItem> items = [];
 
@@ -67,9 +71,12 @@ class _OptiYouOperationsBoardScreenState
 
         final item = OptiYouOrderOperationItem(
           order: order,
-          patientName: 'Patient #${order.patientId}',
-          expertName: 'Expert #${order.expertUserId}',
-          clinicName: 'Clinic #${order.clinicId}',
+          patientName: relatedLabels.patientNames[order.patientId] ??
+              'Hasta #${order.patientId}',
+          expertName: relatedLabels.expertNames[order.expertUserId] ??
+              'Uzman #${order.expertUserId}',
+          clinicName: relatedLabels.clinicNames[order.clinicId] ??
+              'Klinik #${order.clinicId}',
           priorityLabel: 'Orta',
           currentColumnCode:
               state?.boardColumnCode ??
@@ -99,6 +106,122 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
+  Future<_OrderRelatedLabels> _loadRelatedLabels(
+    List<OrderModel> orders,
+  ) async {
+    final patientIds = orders.map((order) => order.patientId).toSet().toList();
+
+    final clinicIds = orders.map((order) => order.clinicId).toSet().toList();
+
+    final expertUserIds =
+        orders.map((order) => order.expertUserId).toSet().toList();
+
+    final patientNames = <int, String>{};
+    final clinicNames = <int, String>{};
+    final expertNames = <int, String>{};
+
+    if (patientIds.isNotEmpty) {
+      try {
+        final response = await _client
+            .from('patients')
+            .select('id, first_name, last_name, patient_code')
+            .inFilter('id', patientIds);
+
+        final rows = (response as List<dynamic>)
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
+        for (final row in rows) {
+          final id = _asInt(row['id']);
+          if (id == null) continue;
+
+          final firstName = (row['first_name'] ?? '').toString().trim();
+          final lastName = (row['last_name'] ?? '').toString().trim();
+          final patientCode = (row['patient_code'] ?? '').toString().trim();
+
+          final fullName = '$firstName $lastName'.trim();
+
+          patientNames[id] = fullName.isNotEmpty
+              ? fullName
+              : patientCode.isNotEmpty
+                  ? patientCode
+                  : 'Hasta #$id';
+        }
+      } catch (_) {
+        // Hasta bilgisi okunamazsa fallback kullanılacak.
+      }
+    }
+
+    if (clinicIds.isNotEmpty) {
+      try {
+        final response = await _client
+            .from('clinics')
+            .select('clinic_id, clinic_name, clinic_code')
+            .inFilter('clinic_id', clinicIds);
+
+        final rows = (response as List<dynamic>)
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
+        for (final row in rows) {
+          final id = _asInt(row['clinic_id']);
+          if (id == null) continue;
+
+          final clinicName = (row['clinic_name'] ?? '').toString().trim();
+          final clinicCode = (row['clinic_code'] ?? '').toString().trim();
+
+          clinicNames[id] = clinicName.isNotEmpty
+              ? clinicName
+              : clinicCode.isNotEmpty
+                  ? clinicCode
+                  : 'Klinik #$id';
+        }
+      } catch (_) {
+        // Klinik bilgisi okunamazsa fallback kullanılacak.
+      }
+    }
+
+    if (expertUserIds.isNotEmpty) {
+      try {
+        final response = await _client
+            .from('user_profiles_full')
+            .select(
+              'user_id, first_name, last_name, username, email, role_code, role_name',
+            )
+            .inFilter('user_id', expertUserIds);
+
+        final rows = (response as List<dynamic>)
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
+        for (final row in rows) {
+          final id = _asInt(row['user_id']);
+          if (id == null) continue;
+
+          final firstName = (row['first_name'] ?? '').toString().trim();
+          final lastName = (row['last_name'] ?? '').toString().trim();
+          final username = (row['username'] ?? '').toString().trim();
+
+          final fullName = '$firstName $lastName'.trim();
+
+          expertNames[id] = fullName.isNotEmpty
+              ? fullName
+              : username.isNotEmpty && !username.contains('@')
+                  ? username
+                  : 'Uzman #$id';
+        }
+      } catch (_) {
+        // Uzman bilgisi okunamazsa fallback kullanılacak.
+      }
+    }
+
+    return _OrderRelatedLabels(
+      patientNames: patientNames,
+      clinicNames: clinicNames,
+      expertNames: expertNames,
+    );
+  }
+
   void _applySearch(String query) {
     final q = query.trim().toLowerCase();
 
@@ -110,10 +233,12 @@ class _OptiYouOperationsBoardScreenState
 
       _filteredItems = _allItems.where((item) {
         return item.order.orderNo.toLowerCase().contains(q) ||
+            item.patientName.toLowerCase().contains(q) ||
             item.expertName.toLowerCase().contains(q) ||
             item.clinicName.toLowerCase().contains(q) ||
             item.priorityLabel.toLowerCase().contains(q) ||
-            item.order.productType.toLowerCase().contains(q);
+            item.order.productType.toLowerCase().contains(q) ||
+            item.order.orderStatus.toLowerCase().contains(q);
       }).toList();
     });
   }
@@ -273,6 +398,13 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
   @override
   Widget build(BuildContext context) {
     final columns = OptiYouOperationColumnCodes.all;
@@ -293,13 +425,20 @@ class _OptiYouOperationsBoardScreenState
                     controller: _searchController,
                     onChanged: _applySearch,
                     decoration: InputDecoration(
-                      hintText: 'Sipariş no, uzman, klinik veya ürün ile ara',
+                      hintText:
+                          'Sipariş no, hasta, uzman, klinik veya ürün ile ara',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _loadItems,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Yenile'),
                 ),
               ],
             ),
@@ -411,7 +550,8 @@ class _OptiYouOperationsBoardScreenState
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.all(10),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
@@ -468,6 +608,9 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: item.hasMissingData
+            ? Border.all(color: Colors.red.withOpacity(0.35))
+            : null,
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -488,42 +631,47 @@ class _OptiYouOperationsBoardScreenState
             ),
           ),
           const SizedBox(height: 6),
-
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              _buildTinyChip(
+                _productLabel(order.productType),
+                Colors.teal,
+              ),
+              _buildTinyChip(
+                _statusLabel(order.orderStatus),
+                statusColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildInfoText(
+            label: 'Hasta',
+            value: item.patientName,
+            fontWeight: FontWeight.w600,
+          ),
+          const SizedBox(height: 4),
+          _buildInfoText(
+            label: 'Uzman',
+            value: item.expertName,
+          ),
+          const SizedBox(height: 4),
+          _buildInfoText(
+            label: 'Klinik',
+            value: item.clinicName,
+          ),
+          const SizedBox(height: 4),
           Text(
-            item.patientName,
+            'Tarih: ${_formatDate(order.orderedAt)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.grey[800],
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-
-          Text(
-            'Uzman: ${item.expertName}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 4),
-
-          Text(
-            'Klinik: ${item.clinicName}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
               color: Colors.grey[600],
-              fontSize: 11,
+              fontSize: 10.5,
             ),
           ),
-
           const Spacer(),
-
           Align(
             alignment: Alignment.bottomRight,
             child: Row(
@@ -544,6 +692,47 @@ class _OptiYouOperationsBoardScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInfoText({
+    required String label,
+    required String value,
+    FontWeight fontWeight = FontWeight.normal,
+  }) {
+    return Text(
+      '$label: $value',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Colors.grey[800],
+        fontSize: 11,
+        fontWeight: fontWeight,
+      ),
+    );
+  }
+
+  Widget _buildTinyChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: color.withOpacity(0.24),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -571,4 +760,16 @@ class _OptiYouOperationsBoardScreenState
       ),
     );
   }
+}
+
+class _OrderRelatedLabels {
+  final Map<int, String> patientNames;
+  final Map<int, String> clinicNames;
+  final Map<int, String> expertNames;
+
+  const _OrderRelatedLabels({
+    required this.patientNames,
+    required this.clinicNames,
+    required this.expertNames,
+  });
 }

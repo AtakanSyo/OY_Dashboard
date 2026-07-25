@@ -12,6 +12,8 @@ import 'package:oy_site/screens/dashboard/corporate_trends_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate_employees_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate_reports_screen.dart';
 import 'package:oy_site/screens/dashboard/expert_control_panel_screen.dart';
+import 'package:oy_site/screens/dashboard/optiyou_measurement_pool_screen.dart';
+
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
 import 'profile_screen.dart';
@@ -92,6 +94,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case RoleCodes.optiYouTeam:
         return [
           const SalesStatisticsScreen(),
+          OptiyouMeasurementPoolScreen(
+            currentUser: widget.currentUser,
+            pressureRepository: widget.pressureRepository,
+
+          ),
           OptiYouOperationsBoardScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
           SupportScreen(currentUser: widget.currentUser),

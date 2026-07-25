@@ -2,10 +2,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/models/order_operation_file_model.dart';
 import 'package:oy_site/models/order_operation_state_model.dart';
+import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
+import 'package:oy_site/screens/dashboard/session_analysis_results_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class OptiYouOrderDetailScreen extends StatefulWidget {
@@ -27,9 +31,13 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   final SupabaseOrderOperationRepository _operationRepository =
       SupabaseOrderOperationRepository();
 
+  SupabaseClient get _client => Supabase.instance.client;
+
   OrderModel get order => widget.operationItem.order;
 
   OrderOperationStateModel? _operationState;
+  MeasurementSession? _session;
+
   final Map<String, OrderOperationFileModel> _operationFiles = {};
 
   bool _isLoadingOperation = true;
@@ -88,6 +96,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         orderId: orderId,
       );
 
+      final session = await _loadSessionForOrder();
+
       final effectiveState = state ??
           OrderOperationStateModel.empty(
             orderId: orderId,
@@ -99,6 +109,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       if (!mounted) return;
 
       setState(() {
+        _session = session;
         _operationState = effectiveState;
 
         _designCompleted = effectiveState.designCompleted;
@@ -144,6 +155,82 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     }
   }
 
+  Future<MeasurementSession?> _loadSessionForOrder() async {
+    try {
+      final response = await _client
+          .from('measurement_sessions')
+          .select('''
+            id,
+            clinic_id,
+            patient_id,
+            expert_user_id,
+            assigned_optityou_user_id,
+            session_code,
+            session_date,
+            session_time,
+            status,
+            has_3d_scan,
+            has_plantar_csv,
+            has_insole_photo,
+            order_created,
+            clinical_info_completed,
+            design_form_completed,
+            completed_at,
+            created_at,
+            updated_at
+          ''')
+          .eq('id', order.sessionId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return _measurementSessionFromMap(
+        Map<String, dynamic>.from(response as Map),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  MeasurementSession _measurementSessionFromMap(Map<String, dynamic> map) {
+    return MeasurementSession(
+      sessionId: _asInt(map['id'] ?? map['session_id']),
+      clinicId: _asInt(map['clinic_id']) ?? order.clinicId,
+      patientId: _asInt(map['patient_id']) ?? order.patientId,
+      expertUserId: _asInt(map['expert_user_id']) ?? order.expertUserId,
+      assignedOptityouUserId: _asInt(map['assigned_optityou_user_id']),
+      sessionCode: (map['session_code'] ?? '').toString(),
+      sessionDate: _asDateTime(map['session_date']) ??
+          _asDateTime(map['created_at']) ??
+          DateTime.now(),
+      sessionTime: map['session_time']?.toString(),
+      status: (map['status'] ?? SessionStatuses.draft).toString(),
+      has3dScan: _asBool(map['has_3d_scan']),
+      hasPlantarCsv: _asBool(map['has_plantar_csv']),
+      hasInsolePhoto: _asBool(map['has_insole_photo']),
+      orderCreated: _asBool(map['order_created']),
+      clinicalInfoCompleted: _asBool(map['clinical_info_completed']),
+      designFormCompleted: _asBool(map['design_form_completed']),
+      completedAt: _asDateTime(map['completed_at']),
+      createdAt: _asDateTime(map['created_at']),
+      updatedAt: _asDateTime(map['updated_at']),
+    );
+  }
+
+  Future<MeasurementSession?> _ensureSessionLoaded() async {
+    if (_session != null) return _session;
+
+    final loaded = await _loadSessionForOrder();
+
+    if (!mounted) return loaded;
+
+    setState(() {
+      _session = loaded;
+    });
+
+    return loaded;
+  }
+
   Future<void> _persistOperationState() async {
     final orderId = order.orderId;
     final userId = widget.currentUser.userId;
@@ -159,6 +246,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         sessionId: order.sessionId,
         patientId: order.patientId,
         assignedUserId: userId,
+        boardColumnCode:
+            _operationState?.boardColumnCode ??
+            widget.operationItem.currentColumnCode,
         designCompleted: _designCompleted,
         productionStarted: _productionStarted,
         productionCompleted: _productionCompleted,
@@ -255,18 +345,306 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
     try {
       final url = await _operationRepository.createSignedUrl(file: file);
-      final uri = Uri.parse(url);
-
-      final opened = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!opened) {
-        _showMessage('Dosya bağlantısı açılamadı.');
-      }
+      await _openUrl(url);
     } catch (e) {
       _showMessage('Dosya indirilemedi: $e');
+    }
+  }
+
+  Future<void> _openDesignForm() async {
+    final session = await _ensureSessionLoaded();
+
+    if (session == null) {
+      _showMessage('Bu siparişe bağlı ölçüm oturumu okunamadı.');
+      return;
+    }
+
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrthoticDesignFormScreen(
+          currentUser: widget.currentUser,
+          session: session,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAnalysisResults() async {
+    final session = await _ensureSessionLoaded();
+
+    if (session == null) {
+      _showMessage('Bu siparişe bağlı ölçüm oturumu okunamadı.');
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SessionAnalysisResultsScreen(
+          currentUser: widget.currentUser,
+          session: session,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadLeftScanFile() async {
+    await _downloadScanFile(
+      label: 'Sol ayak 3D scan STL',
+      preferredSideKeywords: const ['left', 'sol'],
+    );
+  }
+
+  Future<void> _downloadRightScanFile() async {
+    await _downloadScanFile(
+      label: 'Sağ ayak 3D scan STL',
+      preferredSideKeywords: const ['right', 'sag', 'sağ'],
+    );
+  }
+
+  Future<void> _downloadScanFile({
+    required String label,
+    required List<String> preferredSideKeywords,
+  }) async {
+    try {
+      final rows = await _fetchSessionScanFiles();
+
+      if (rows.isEmpty) {
+        _showMessage('Bu oturum için 3D scan dosyası bulunamadı.');
+        return;
+      }
+
+      final candidates = rows.where((row) {
+        final text = [
+          row.fileType,
+          row.fileName,
+          row.storagePath,
+        ].join(' ').toLowerCase();
+
+        final sideMatches = preferredSideKeywords.any(text.contains);
+        final looksLikeStl =
+            text.contains('.stl') || text.contains('stl') || text.contains('scan');
+
+        return sideMatches && looksLikeStl;
+      }).toList();
+
+      final fallbackCandidates = rows.where((row) {
+        final text = [
+          row.fileType,
+          row.fileName,
+          row.storagePath,
+        ].join(' ').toLowerCase();
+
+        return text.contains('.stl') || text.contains('stl') || text.contains('scan');
+      }).toList();
+
+      final selected = candidates.isNotEmpty
+          ? candidates.first
+          : fallbackCandidates.isNotEmpty
+              ? fallbackCandidates.first
+              : rows.first;
+
+      await _openStorageRecord(
+        selected,
+        emptyMessage: '$label için storage bilgisi bulunamadı.',
+      );
+    } catch (e) {
+      _showMessage('$label indirilemedi: $e');
+    }
+  }
+
+  Future<void> _downloadPressureRecordings() async {
+    try {
+      final rows = await _fetchPressureRecordings();
+
+      if (rows.isEmpty) {
+        _showMessage('Bu oturum için basınç kaydı bulunamadı.');
+        return;
+      }
+
+      if (rows.length == 1) {
+        await _openStorageRecord(
+          rows.first,
+          emptyMessage: 'Basınç kaydı için storage bilgisi bulunamadı.',
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      final selected = await showDialog<_StorageRecord>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Basınç Kaydı Seç'),
+          content: SizedBox(
+            width: 520,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: rows.length,
+              separatorBuilder: (_, __) => const Divider(height: 12),
+              itemBuilder: (context, index) {
+                final row = rows[index];
+
+                return ListTile(
+                  leading: const Icon(Icons.speed, color: Colors.teal),
+                  title: Text(row.displayName),
+                  subtitle: Text(row.subtitle),
+                  onTap: () => Navigator.pop(context, row),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kapat'),
+            ),
+          ],
+        ),
+      );
+
+      if (selected == null) return;
+
+      await _openStorageRecord(
+        selected,
+        emptyMessage: 'Basınç kaydı için storage bilgisi bulunamadı.',
+      );
+    } catch (e) {
+      _showMessage('Basınç kayıtları indirilemedi: $e');
+    }
+  }
+
+  Future<List<_StorageRecord>> _fetchSessionScanFiles() async {
+    final response = await _client
+        .from('session_scan_files')
+        .select('''
+          id,
+          file_type,
+          file_name,
+          storage_bucket,
+          storage_path,
+          public_url,
+          created_at
+        ''')
+        .eq('session_id', order.sessionId)
+        .order('created_at', ascending: false);
+
+    final rows = (response as List<dynamic>)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+
+    return rows.map((row) {
+      final id = _asInt(row['id']);
+      final fileType = (row['file_type'] ?? '').toString();
+      final fileName = (row['file_name'] ?? '').toString();
+      final bucket = (row['storage_bucket'] ?? '').toString();
+      final path = (row['storage_path'] ?? '').toString();
+      final publicUrl = (row['public_url'] ?? '').toString();
+      final createdAt = _asDateTime(row['created_at']);
+
+      return _StorageRecord(
+        id: id,
+        fileType: fileType,
+        fileName: fileName,
+        storageBucket: bucket.isEmpty ? null : bucket,
+        storagePath: path.isEmpty ? null : path,
+        publicUrl: publicUrl.isEmpty ? null : publicUrl,
+        createdAt: createdAt,
+      );
+    }).toList();
+  }
+
+  Future<List<_StorageRecord>> _fetchPressureRecordings() async {
+    final response = await _client
+        .from('session_pressure_recordings')
+        .select('''
+          id,
+          title,
+          frame_count,
+          duration_ms,
+          max_pressure,
+          avg_pressure,
+          storage_bucket,
+          storage_path,
+          upload_status,
+          recorded_at,
+          created_at
+        ''')
+        .eq('session_id', order.sessionId)
+        .order('recorded_at', ascending: false);
+
+    final rows = (response as List<dynamic>)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+
+    return rows.map((row) {
+      final id = _asInt(row['id']);
+      final title = (row['title'] ?? '').toString();
+      final bucket = (row['storage_bucket'] ?? '').toString();
+      final path = (row['storage_path'] ?? '').toString();
+      final recordedAt = _asDateTime(row['recorded_at']);
+      final createdAt = _asDateTime(row['created_at']);
+
+      final frameCount = _asInt(row['frame_count']);
+      final durationMs = _asInt(row['duration_ms']);
+
+      final details = <String>[
+        if (frameCount != null) '$frameCount frame',
+        if (durationMs != null) '${(durationMs / 1000).toStringAsFixed(1)} sn',
+      ].join(' • ');
+
+      return _StorageRecord(
+        id: id,
+        fileType: 'pressure_recording',
+        fileName: title.isNotEmpty ? title : 'Basınç kaydı #${id ?? '—'}',
+        storageBucket: bucket.isEmpty ? null : bucket,
+        storagePath: path.isEmpty ? null : path,
+        publicUrl: null,
+        createdAt: recordedAt ?? createdAt,
+        subtitleExtra: details,
+      );
+    }).toList();
+  }
+
+  Future<void> _openStorageRecord(
+    _StorageRecord record, {
+    required String emptyMessage,
+  }) async {
+    if (record.publicUrl != null && record.publicUrl!.trim().isNotEmpty) {
+      await _openUrl(record.publicUrl!);
+      return;
+    }
+
+    final bucket = record.storageBucket;
+    final path = record.storagePath;
+
+    if (bucket == null ||
+        bucket.trim().isEmpty ||
+        path == null ||
+        path.trim().isEmpty) {
+      _showMessage(emptyMessage);
+      return;
+    }
+
+    final signedUrl = await _client.storage.from(bucket).createSignedUrl(
+          path,
+          3600,
+        );
+
+    await _openUrl(signedUrl);
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened) {
+      _showMessage('Dosya bağlantısı açılamadı.');
     }
   }
 
@@ -351,14 +729,6 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     );
   }
 
-  void _openDesignForm() {
-    _showMessage('Ortez tasarım formu görüntüleme akışı sonra bağlanacak.');
-  }
-
-  void _downloadPlaceholder(String label) {
-    _showMessage('$label indirme akışı sonra bağlanacak.');
-  }
-
   Widget _buildSectionCard({
     required String title,
     required Widget child,
@@ -405,9 +775,100 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              value,
+              value.trim().isEmpty ? '—' : value,
               textAlign: TextAlign.right,
               style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryInfoCard() {
+    return _buildSectionCard(
+      title: 'Sipariş ve Hasta Bilgileri',
+      child: Column(
+        children: [
+          _buildHighlightInfoRow(
+            icon: Icons.account_circle_outlined,
+            label: 'Hasta',
+            value: widget.operationItem.patientName,
+            color: Colors.teal,
+          ),
+          const SizedBox(height: 10),
+          _buildHighlightInfoRow(
+            icon: Icons.local_hospital_outlined,
+            label: 'Klinik',
+            value: widget.operationItem.clinicName,
+            color: Colors.blue,
+          ),
+          const SizedBox(height: 10),
+          _buildHighlightInfoRow(
+            icon: Icons.person_outline,
+            label: 'Uzman',
+            value: widget.operationItem.expertName,
+            color: Colors.deepPurple,
+          ),
+          const Divider(height: 26),
+          _buildKeyValueRow('Sipariş No', order.orderNo),
+          _buildKeyValueRow(
+            'Oturum',
+            _session?.sessionCode.trim().isNotEmpty == true
+                ? _session!.sessionCode
+                : 'Oturum bilgisi okunamadı',
+          ),
+          _buildKeyValueRow('Ürün', _productLabel(order.productType)),
+          _buildKeyValueRow('Durum', _statusLabel(order.orderStatus)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHighlightInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.20)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withOpacity(0.14),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.trim().isEmpty ? '—' : value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -563,7 +1024,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'İndir',
+            tooltip: 'İndir / Aç',
             onPressed: onDownload,
             icon: const Icon(Icons.download_outlined),
           ),
@@ -640,8 +1101,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               _buildActionButton(
                 icon: Icons.analytics_outlined,
                 label: 'Analiz Raporunu Görüntüle',
-                onPressed: () =>
-                    _showMessage('Analiz raporu görüntüleme akışı sonra bağlanacak.'),
+                onPressed: _openAnalysisResults,
               ),
             ],
           ),
@@ -653,15 +1113,15 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           const SizedBox(height: 10),
           _buildInputDownloadRow(
             label: 'Sol ayak 3D scan STL',
-            onDownload: () => _downloadPlaceholder('Sol ayak 3D scan STL'),
+            onDownload: _downloadLeftScanFile,
           ),
           _buildInputDownloadRow(
             label: 'Sağ ayak 3D scan STL',
-            onDownload: () => _downloadPlaceholder('Sağ ayak 3D scan STL'),
+            onDownload: _downloadRightScanFile,
           ),
           _buildInputDownloadRow(
             label: 'Basınç kayıtları',
-            onDownload: () => _downloadPlaceholder('Basınç kayıtları'),
+            onDownload: _downloadPressureRecordings,
           ),
           const SizedBox(height: 16),
           const Text(
@@ -975,12 +1435,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '${_productLabel(order.productType)} • ${widget.operationItem.expertName}',
+                                    '${_productLabel(order.productType)} • ${widget.operationItem.patientName}',
                                     style: TextStyle(color: Colors.grey[700]),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Operasyon kullanıcısı: ${widget.currentUser.displayName}',
+                                    '${widget.operationItem.clinicName} • ${widget.operationItem.expertName}',
                                     style: TextStyle(color: Colors.grey[600]),
                                   ),
                                 ],
@@ -1037,39 +1497,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                             flex: 2,
                             child: Column(
                               children: [
-                                _buildSectionCard(
-                                  title: 'Sipariş Referans Bilgileri',
-                                  child: Column(
-                                    children: [
-                                      _buildKeyValueRow(
-                                        'Order ID',
-                                        order.orderId?.toString() ?? '—',
-                                      ),
-                                      _buildKeyValueRow(
-                                        'Session ID',
-                                        order.sessionId.toString(),
-                                      ),
-                                      _buildKeyValueRow(
-                                        'Patient ID',
-                                        order.patientId.toString(),
-                                      ),
-                                      _buildKeyValueRow(
-                                        'Clinic',
-                                        widget.operationItem.clinicName,
-                                      ),
-                                      _buildKeyValueRow(
-                                        'Expert',
-                                        widget.operationItem.expertName,
-                                      ),
-                                      _buildKeyValueRow(
-                                        'Assigned OptiYou User ID',
-                                        order.assignedOptityouUserId
-                                                ?.toString() ??
-                                            '—',
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                _buildPrimaryInfoCard(),
                                 const SizedBox(height: 16),
                                 _buildSectionCard(
                                   title: 'Tarih ve Fiyat Bilgileri',
@@ -1144,5 +1572,73 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  static bool _asBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+
+    final text = value.toString().toLowerCase().trim();
+
+    return text == 'true' || text == '1' || text == 'yes';
+  }
+
+  static DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+
+    return DateTime.tryParse(text);
+  }
+}
+
+class _StorageRecord {
+  final int? id;
+  final String fileType;
+  final String fileName;
+  final String? storageBucket;
+  final String? storagePath;
+  final String? publicUrl;
+  final DateTime? createdAt;
+  final String? subtitleExtra;
+
+  const _StorageRecord({
+    required this.id,
+    required this.fileType,
+    required this.fileName,
+    required this.storageBucket,
+    required this.storagePath,
+    required this.publicUrl,
+    required this.createdAt,
+    this.subtitleExtra,
+  });
+
+  String get displayName {
+    if (fileName.trim().isNotEmpty) return fileName;
+    if (fileType.trim().isNotEmpty) return fileType;
+    return 'Dosya #${id ?? '—'}';
+  }
+
+  String get subtitle {
+    final parts = <String>[
+      if (fileType.trim().isNotEmpty) fileType,
+      if (createdAt != null)
+        '${createdAt!.day.toString().padLeft(2, '0')}.'
+            '${createdAt!.month.toString().padLeft(2, '0')}.'
+            '${createdAt!.year}',
+      if (subtitleExtra != null && subtitleExtra!.trim().isNotEmpty)
+        subtitleExtra!,
+    ];
+
+    return parts.isEmpty ? 'Storage dosyası' : parts.join(' • ');
   }
 }

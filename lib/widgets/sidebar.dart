@@ -103,6 +103,7 @@ class Sidebar extends StatelessWidget {
       case RoleCodes.optiYouTeam:
         return const [
           _SidebarMenuItem(Icons.show_chart, 'Satış İstatistikleri'),
+          _SidebarMenuItem(Icons.hub_outlined, 'Ölçüm Havuzu'),
           _SidebarMenuItem(Icons.inventory_2_outlined, 'Sipariş Operasyonlar'),
           _SidebarMenuItem(Icons.shopping_bag, 'Siparişler'),
           _SidebarMenuItem(Icons.help_outline, 'Destek'),
