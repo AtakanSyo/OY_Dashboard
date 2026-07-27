@@ -24,11 +24,21 @@ class OrthoticDesignFormScreen extends StatefulWidget {
 class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
   static const String _assetBase = 'assets/images/orthotic_design';
 
+  static const String _materialComfortSoft = 'comfort_soft';
+  static const String _materialSupportMediumFirm = 'support_medium_firm';
+
+  static const List<String> _materialTypes = [
+    _materialComfortSoft,
+    _materialSupportMediumFirm,
+  ];
+
   final SupabaseOrthoticDesignFormRepository _repository =
       SupabaseOrthoticDesignFormRepository();
 
   bool _isLoading = true;
   bool _isSaving = false;
+
+  late String _selectedMaterialType;
 
   late TextEditingController _medialArchLeftController;
   late TextEditingController _medialArchRightController;
@@ -121,6 +131,8 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
   }
 
   void _setDefaultValues() {
+    _selectedMaterialType = _materialComfortSoft;
+
     _lateralArchLeftMm = 0;
     _lateralArchRightMm = 0;
 
@@ -177,6 +189,11 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
       }
 
       _applyDesignParametersJson(form.aiRecommendationJson);
+      final savedMaterialType = form.materialType;
+
+      if (savedMaterialType != null && _materialTypes.contains(savedMaterialType)) {
+        _selectedMaterialType = savedMaterialType;
+      }
 
       _isLoading = false;
     });
@@ -228,7 +245,8 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
         sessionId: widget.session.sessionId ?? 0,
         expertUserId: widget.currentUser.userId ?? 0,
 
-        // Eski model alanları korunuyor.
+        materialType: _selectedMaterialType,
+
         heelPad: hasHeelPad,
         deepHeelCupMm: _heelCupStandard5mm
             ? 5
@@ -242,11 +260,7 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
         bunionPad: false,
 
         expertNotes: _expertNotesController.text.trim(),
-
-        // Geçici kayıt alanı.
-        // Sonraki adımda bunu design_parameters_json kolonuna taşıyacağız.
         aiRecommendationJson: designParametersJson,
-
         approvedForOrder: _approvedForOrder,
         updatedAt: DateTime.now(),
       );
@@ -288,6 +302,11 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
       'source': 'orthotic_design_form_screen',
       'updated_at': DateTime.now().toIso8601String(),
       'design_parameters': {
+        'material_selection': {
+          'material_type': _selectedMaterialType,
+          'label': _materialLabel(_selectedMaterialType),
+          'description': _materialDescription(_selectedMaterialType),
+        },
         'medial_arch': {
           'left_mm': _parseDouble(_medialArchLeftController.text),
           'right_mm': _parseDouble(_medialArchRightController.text),
@@ -357,6 +376,13 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
       final params = root['design_parameters'] == null
           ? root
           : _mapFromJson(root['design_parameters']);
+
+      final materialSelection = _mapFromJson(params['material_selection']);
+      final materialType = (materialSelection['material_type'] ?? '').toString();
+
+      if (_materialTypes.contains(materialType)) {
+        _selectedMaterialType = materialType;
+      }
 
       final medialArch = _mapFromJson(params['medial_arch']);
       final lateralArch = _mapFromJson(params['lateral_arch']);
@@ -497,6 +523,28 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
     return '${widget.session.sessionCode} • ${widget.currentUser.displayName}';
   }
 
+  String _materialLabel(String materialType) {
+    switch (materialType) {
+      case _materialComfortSoft:
+        return 'Konfor Odaklı Yumuşak Malzeme';
+      case _materialSupportMediumFirm:
+        return 'Ortopedik Destek Odaklı Orta-Sert Malzeme';
+      default:
+        return 'Malzeme seçilmedi';
+    }
+  }
+
+  String _materialDescription(String materialType) {
+    switch (materialType) {
+      case _materialComfortSoft:
+        return 'Daha yumuşak temas hissi sağlar. Günlük kullanımda konforu artırmak, basınç noktalarını yumuşatmak ve uzun süreli kullanım rahatlığı sağlamak için tercih edilir.';
+      case _materialSupportMediumFirm:
+        return 'Ayağı daha iyi sabitleyen, kavis desteğini daha net taşıyan ve ortopedik yönlendirme sağlayan daha kontrollü bir malzemedir. Destek ihtiyacı yüksek kullanıcılarda tercih edilir.';
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -522,6 +570,8 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
               children: [
                 _buildHeaderCard(),
                 const SizedBox(height: 24),
+                _buildMaterialSelectionSection(),
+                const SizedBox(height: 18),
                 _buildArchSection(),
                 const SizedBox(height: 18),
                 _buildHeelCupSection(),
@@ -582,13 +632,174 @@ class _OrthoticDesignFormScreenState extends State<OrthoticDesignFormScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Bu formda iç taban üretimi için gerekli kavis, topuk, basış, duvar ve ped parametreleri girilir.',
+            'Bu formda iç taban üretimi için gerekli malzeme, kavis, topuk, basış, duvar ve ped parametreleri girilir.',
             style: TextStyle(
               color: Colors.grey[700],
               height: 1.35,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialSelectionSection() {
+    return _buildSectionCard(
+      title: 'Malzeme Seçimi',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'İç taban üretiminde kullanılacak ana malzemeyi seçin. Bu seçim üretim ekibinin malzeme hazırlığını ve ürün sertlik karakterini belirler.',
+            style: TextStyle(
+              color: Colors.grey[700],
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 720;
+
+              final cards = [
+                _buildMaterialOptionCard(
+                  materialType: _materialComfortSoft,
+                  title: _materialLabel(_materialComfortSoft),
+                  description: _materialDescription(_materialComfortSoft),
+                  icon: Icons.spa_outlined,
+                ),
+                _buildMaterialOptionCard(
+                  materialType: _materialSupportMediumFirm,
+                  title: _materialLabel(_materialSupportMediumFirm),
+                  description:
+                      _materialDescription(_materialSupportMediumFirm),
+                  icon: Icons.health_and_safety_outlined,
+                ),
+              ];
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    cards[0],
+                    const SizedBox(height: 12),
+                    cards[1],
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: cards[0]),
+                  const SizedBox(width: 14),
+                  Expanded(child: cards[1]),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialOptionCard({
+    required String materialType,
+    required String title,
+    required String description,
+    required IconData icon,
+  }) {
+    final selected = _selectedMaterialType == materialType;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedMaterialType = materialType;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? Colors.teal.withOpacity(0.08) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? Colors.teal : Colors.grey.shade300,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Radio<String>(
+              value: materialType,
+              groupValue: _selectedMaterialType,
+              activeColor: Colors.teal,
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _selectedMaterialType = value;
+                });
+              },
+            ),
+            const SizedBox(width: 4),
+            CircleAvatar(
+              radius: 22,
+              backgroundColor:
+                  selected ? Colors.teal.withOpacity(0.14) : Colors.white,
+              child: Icon(
+                icon,
+                color: selected ? Colors.teal : Colors.grey[700],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: selected ? Colors.teal.shade900 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      height: 1.35,
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Seçili malzeme',
+                        style: TextStyle(
+                          color: Colors.teal.shade800,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,8 @@ class OrthoticDesignFormModel {
   final int sessionId;
   final int expertUserId;
 
+  final String? materialType;
+
   final bool heelPad;
   final double? deepHeelCupMm;
   final double? heelRaiseMm;
@@ -26,6 +28,7 @@ class OrthoticDesignFormModel {
     this.designFormId,
     required this.sessionId,
     required this.expertUserId,
+    this.materialType,
     this.heelPad = false,
     this.deepHeelCupMm,
     this.heelRaiseMm,
@@ -46,6 +49,7 @@ class OrthoticDesignFormModel {
     int? designFormId,
     int? sessionId,
     int? expertUserId,
+    String? materialType,
     bool? heelPad,
     double? deepHeelCupMm,
     double? heelRaiseMm,
@@ -65,6 +69,7 @@ class OrthoticDesignFormModel {
       designFormId: designFormId ?? this.designFormId,
       sessionId: sessionId ?? this.sessionId,
       expertUserId: expertUserId ?? this.expertUserId,
+      materialType: materialType ?? this.materialType,
       heelPad: heelPad ?? this.heelPad,
       deepHeelCupMm: deepHeelCupMm ?? this.deepHeelCupMm,
       heelRaiseMm: heelRaiseMm ?? this.heelRaiseMm,
@@ -89,6 +94,7 @@ class OrthoticDesignFormModel {
       designFormId: map['design_form_id'] as int?,
       sessionId: map['session_id'] as int? ?? 0,
       expertUserId: map['expert_user_id'] as int? ?? 0,
+      materialType: map['material_type'] as String?,
       heelPad: map['heel_pad'] as bool? ?? false,
       deepHeelCupMm: _toDoubleOrNull(map['deep_heel_cup_mm']),
       heelRaiseMm: _toDoubleOrNull(map['heel_raise_mm']),
@@ -112,6 +118,7 @@ class OrthoticDesignFormModel {
       'design_form_id': designFormId,
       'session_id': sessionId,
       'expert_user_id': expertUserId,
+      'material_type': materialType,
       'heel_pad': heelPad,
       'deep_heel_cup_mm': deepHeelCupMm,
       'heel_raise_mm': heelRaiseMm,
@@ -133,12 +140,15 @@ class OrthoticDesignFormModel {
     if (value == null) return null;
     if (value is double) return value;
     if (value is int) return value.toDouble();
-    return double.tryParse(value.toString());
+    if (value is num) return value.toDouble();
+
+    return double.tryParse(value.toString().replaceAll(',', '.'));
   }
 
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
+
     return DateTime.tryParse(value.toString());
   }
 }
