@@ -63,6 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
+    } on AccountApprovalException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.message);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = _localizeAuthError(e.message));

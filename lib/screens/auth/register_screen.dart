@@ -59,6 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get _hasInvite =>
       _activeInviteToken != null && _activeInviteToken!.trim().isNotEmpty;
+      
 
   static const List<Map<String, String>> _roles = [
     {'code': RoleCodes.expert, 'label': 'Uzman'},
@@ -394,6 +395,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await _loadInvite();
   }
 
+  bool _requiresManualApproval(String? roleCode) {
+    return roleCode == RoleCodes.expert || roleCode == RoleCodes.optiYouTeam;
+  }
+
   void _goToLogin() {
     if (widget.pressureRepository != null) {
       Navigator.pushReplacement(
@@ -643,9 +648,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          _hasInvite
-              ? 'Hesabınız oluşturuldu ve ölçüm kaydınız hesabınızla ilişkilendirildi. Giriş yaptıktan sonra ölçüm sonuçlarınızı görüntüleyebilirsiniz.'
-              : 'Hesabınızı etkinleştirmek için ${_emailController.text.trim()} adresine gönderilen onay e-postasındaki bağlantıya tıklayın.',
+          _requiresManualApproval(_selectedRoleCode)
+              ? 'Kayıt başvurunuz alındı. Optiyou ekibi hesabınızı onayladıktan sonra giriş yapabilirsiniz.'
+              : _hasInvite
+                  ? 'Hesabınız oluşturuldu ve ölçüm kaydınız hesabınızla ilişkilendirildi. Giriş yaptıktan sonra ölçüm sonuçlarınızı görüntüleyebilirsiniz.'
+                  : 'Hesabınızı etkinleştirmek için ${_emailController.text.trim()} adresine gönderilen onay e-postasındaki bağlantıya tıklayın.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey[700]),
         ),
