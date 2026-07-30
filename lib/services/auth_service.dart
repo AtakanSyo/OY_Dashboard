@@ -69,4 +69,26 @@ class AuthService {
   /// Stream of auth state changes.
   Stream<AuthState> get onAuthStateChange =>
       _client.auth.onAuthStateChange;
+
+  Future<void> sendPasswordResetEmail({
+    required String email,
+    String? redirectTo,
+  }) async {
+    await Supabase.instance.client.auth.resetPasswordForEmail(
+      email,
+      redirectTo: redirectTo,
+    );
+  }
+
+  Future<void> updatePassword({
+    required String newPassword,
+  }) async {
+    await Supabase.instance.client.auth.updateUser(
+      UserAttributes(
+        password: newPassword,
+      ),
+    );
+  }
 }
+
+

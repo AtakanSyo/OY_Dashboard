@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/screens/auth/forgot_password_screen.dart';
 import 'package:oy_site/screens/auth/register_screen.dart';
 import 'package:oy_site/screens/home_screen.dart';
 import 'package:oy_site/services/auth_service.dart';
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _errorMessage = 'Lütfen e-posta girin.');
       return;
     }
+
     if (password.isEmpty) {
       setState(() => _errorMessage = 'Lütfen şifrenizi girin.');
       return;
@@ -64,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = _localizeAuthError(e.message));
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _errorMessage = 'Bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
@@ -72,18 +74,33 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _openForgotPasswordScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: _emailController.text.trim(),
+        ),
+      ),
+    );
+  }
+
   String _localizeAuthError(String message) {
     final lower = message.toLowerCase();
+
     if (lower.contains('invalid login') ||
         lower.contains('invalid credentials')) {
       return 'E-posta veya şifre hatalı.';
     }
+
     if (lower.contains('email not confirmed')) {
       return 'E-posta adresiniz doğrulanmamış.';
     }
+
     if (lower.contains('too many requests')) {
       return 'Çok fazla deneme yaptınız. Lütfen bekleyin.';
     }
+
     return message;
   }
 
@@ -146,9 +163,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                   ),
                 ),
                 onChanged: (_) {
@@ -156,9 +177,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     setState(() => _errorMessage = null);
                   }
                 },
-                onSubmitted: (_) => _isLoading ? null : _login(),
+                onSubmitted: (_) {
+                  if (!_isLoading) _login();
+                },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading ? null : _openForgotPasswordScreen,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.teal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 4,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Şifremi unuttum'),
+                ),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -205,15 +244,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => HomeScreen(
-                      pressureRepository: widget.pressureRepository,
-                    ),
-                  ),
-                  (_) => false,
-                ),
+                onPressed: _isLoading
+                    ? null
+                    : () => Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HomeScreen(
+                              pressureRepository: widget.pressureRepository,
+                            ),
+                          ),
+                          (_) => false,
+                        ),
                 icon: const Icon(Icons.arrow_back, size: 18),
                 label: const Text('Ana Sayfa'),
                 style: TextButton.styleFrom(
