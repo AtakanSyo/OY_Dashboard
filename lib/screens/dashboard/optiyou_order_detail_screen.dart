@@ -11,6 +11,7 @@ import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
 import 'package:oy_site/screens/dashboard/session_analysis_results_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:oy_site/screens/dashboard/reference_insole_analysis_screen.dart';
 
 class OptiYouOrderDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -455,6 +456,18 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         builder: (_) => SessionAnalysisResultsScreen(
           currentUser: widget.currentUser,
           session: session,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReferenceInsoleAnalysis() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReferenceInsoleAnalysisScreen(
+          currentUser: widget.currentUser,
+          operationItem: widget.operationItem,
         ),
       ),
     );
@@ -1506,6 +1519,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 icon: Icons.analytics_outlined,
                 label: 'Analiz Raporunu Görüntüle',
                 onPressed: _openAnalysisResults,
+              ),
+              _buildActionButton(
+                icon: Icons.straighten_outlined,
+                label: 'Referans İç Taban Analizi',
+                onPressed: _openReferenceInsoleAnalysis,
               ),
             ],
           ),
