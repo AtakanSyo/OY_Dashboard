@@ -12,6 +12,7 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/public/welcome_qr_screen.dart';
 
 class AppConfig {
   static bool useMock = true;
@@ -94,12 +95,20 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
     });
   }
 
+  void _openDashboardFromWelcome(AppUser user) {
+    _navigatorKey.currentState?.pushReplacementNamed(
+      '/dashboard',
+      arguments: user,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final paymentResult = _extractPaymentResultFromUrl();
     final inviteToken = _extractInviteTokenFromUrl();
     final legalConsentToken = _extractLegalConsentTokenFromUrl();
     final isResetPasswordRoute = _isResetPasswordRouteFromUrl();
+    final isWelcomeRoute = _isWelcomeRouteFromUrl();
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
@@ -117,18 +126,33 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
             )
           : isResetPasswordRoute
               ? const ResetPasswordScreen()
-              : inviteToken != null
-                  ? RegisterScreen(
-                      inviteToken: inviteToken,
+              : isWelcomeRoute
+                  ? WelcomeQrScreen(
                       pressureRepository: widget.pressureRepository,
+                      onOpenApp: _openDashboardFromWelcome,
                     )
-                  : legalConsentToken != null
-                      ? LegalConsentScreen(token: legalConsentToken)
-                      : HomeScreen(
+                  : inviteToken != null
+                      ? RegisterScreen(
+                          inviteToken: inviteToken,
                           pressureRepository: widget.pressureRepository,
-                        ),
+                        )
+                      : legalConsentToken != null
+                          ? LegalConsentScreen(token: legalConsentToken)
+                          : HomeScreen(
+                              pressureRepository: widget.pressureRepository,
+                            ),
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';
+
+        if (routeName.startsWith('/welcome')) {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => WelcomeQrScreen(
+              pressureRepository: widget.pressureRepository,
+              onOpenApp: _openDashboardFromWelcome,
+            ),
+          );
+        }
 
         if (routeName.startsWith('/payment-result')) {
           final uri = Uri.parse(routeName);
@@ -136,6 +160,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
           final token = uri.queryParameters['token'];
 
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => PaymentResultScreen(
               success: status == 'success',
               token: token,
@@ -149,6 +174,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
           final inviteToken = uri.queryParameters['invite'];
 
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => RegisterScreen(
               inviteToken: inviteToken,
               pressureRepository: widget.pressureRepository,
@@ -161,40 +187,34 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
           final token = uri.queryParameters['token'] ?? '';
 
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => LegalConsentScreen(token: token),
           );
         }
 
         if (routeName.startsWith('/reset-password')) {
           return MaterialPageRoute(
-            builder: (_) => const ResetPasswordScreen(),
             settings: const RouteSettings(name: '/reset-password'),
+            builder: (_) => const ResetPasswordScreen(),
           );
         }
 
         if (routeName.startsWith('/login')) {
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => LoginScreen(
               pressureRepository: widget.pressureRepository,
             ),
           );
         }
 
-        if (settings.name == '/dashboard') {
-          final args = settings.arguments as Map<String, dynamic>?;
-          final currentUserMap = args?['currentUser'] as Map<String, dynamic>?;
-
-          final currentUser = currentUserMap != null
-              ? AppUser.fromMap(currentUserMap)
-              : const AppUser(
-                  firstName: 'Bilinmeyen',
-                  lastName: 'Kullanıcı',
-                  email: 'unknown@example.com',
-                  roleCode: RoleCodes.customer,
-                  roleName: 'Müşteri',
-                );
+        if (routeName == '/dashboard' || routeName.startsWith('/dashboard')) {
+          final currentUser = _currentUserFromRouteArguments(
+            settings.arguments,
+          );
 
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => DashboardScreen(
               currentUser: currentUser,
               pressureRepository: widget.pressureRepository,
@@ -203,12 +223,56 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
         }
 
         return MaterialPageRoute(
-          builder: (_) => LoginScreen(
+          settings: settings,
+          builder: (_) => HomeScreen(
             pressureRepository: widget.pressureRepository,
           ),
         );
       },
     );
+  }
+
+  AppUser _currentUserFromRouteArguments(Object? arguments) {
+    if (arguments is AppUser) {
+      return arguments;
+    }
+
+    if (arguments is Map<String, dynamic>) {
+      final directCurrentUser = arguments['currentUser'];
+
+      if (directCurrentUser is AppUser) {
+        return directCurrentUser;
+      }
+
+      if (directCurrentUser is Map<String, dynamic>) {
+        return AppUser.fromMap(directCurrentUser);
+      }
+
+      if (arguments.containsKey('email') || arguments.containsKey('role_code')) {
+        return AppUser.fromMap(arguments);
+      }
+    }
+
+    return const AppUser(
+      firstName: 'Bilinmeyen',
+      lastName: 'Kullanıcı',
+      email: 'unknown@example.com',
+      roleCode: RoleCodes.customer,
+      roleName: 'Müşteri',
+    );
+  }
+
+  bool _isWelcomeRouteFromUrl() {
+    final directUri = Uri.base;
+
+    if (directUri.path == '/welcome') {
+      return true;
+    }
+
+    final fragmentUri = _fragmentUriFromBase();
+    if (fragmentUri == null) return false;
+
+    return fragmentUri.path == '/welcome';
   }
 
   bool _isResetPasswordRouteFromUrl() {
@@ -218,12 +282,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       return true;
     }
 
-    final fragment = Uri.base.fragment;
-    if (fragment.isEmpty) return false;
-
-    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
-    final fragmentUri = Uri.tryParse(normalized);
-
+    final fragmentUri = _fragmentUriFromBase();
     if (fragmentUri == null) return false;
 
     return fragmentUri.path == '/reset-password';
@@ -239,11 +298,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       }
     }
 
-    final fragment = Uri.base.fragment;
-    if (fragment.isEmpty) return null;
-
-    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
-    final fragmentUri = Uri.tryParse(normalized);
+    final fragmentUri = _fragmentUriFromBase();
 
     if (fragmentUri == null || fragmentUri.path != '/register') {
       return null;
@@ -265,11 +320,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       }
     }
 
-    final fragment = Uri.base.fragment;
-    if (fragment.isEmpty) return null;
-
-    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
-    final fragmentUri = Uri.tryParse(normalized);
+    final fragmentUri = _fragmentUriFromBase();
 
     if (fragmentUri == null || fragmentUri.path != '/legal-consent') {
       return null;
@@ -295,11 +346,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       );
     }
 
-    final fragment = Uri.base.fragment;
-    if (fragment.isEmpty) return null;
-
-    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
-    final fragmentUri = Uri.tryParse(normalized);
+    final fragmentUri = _fragmentUriFromBase();
 
     if (fragmentUri == null || fragmentUri.path != '/payment-result') {
       return null;
@@ -313,6 +360,16 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       success: success,
       token: token,
     );
+  }
+
+  Uri? _fragmentUriFromBase() {
+    final fragment = Uri.base.fragment;
+
+    if (fragment.isEmpty) return null;
+
+    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
+
+    return Uri.tryParse(normalized);
   }
 }
 

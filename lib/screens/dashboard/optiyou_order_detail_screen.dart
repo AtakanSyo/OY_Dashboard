@@ -1,17 +1,25 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
+import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/models/order_operation_file_model.dart';
 import 'package:oy_site/models/order_operation_state_model.dart';
+import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
 import 'package:oy_site/screens/dashboard/session_analysis_results_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:oy_site/screens/dashboard/reference_insole_analysis_screen.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class OptiYouOrderDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -35,6 +43,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   final SupabaseOrderOperationRepository _operationRepository =
       SupabaseOrderOperationRepository();
 
+  final SupabasePatientInviteRepository _inviteRepository =
+      SupabasePatientInviteRepository();
+
+  final GlobalKey _packagingQrCardKey = GlobalKey();
+
   SupabaseClient get _client => Supabase.instance.client;
 
   OrderModel get order => widget.operationItem.order;
@@ -49,6 +62,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   bool _isLoadingOperation = true;
   bool _isSavingOperation = false;
+  bool _isPreparingPackagingQr = false;
+
+  PatientInviteModel? _packagingInvite;
 
   bool _designCompleted = false;
   bool _productionStarted = false;
@@ -942,6 +958,415 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         );
 
     await _openUrl(signedUrl);
+  }
+
+  Future<void> _showPackagingQrDialog() async {
+    try {
+      setState(() => _isPreparingPackagingQr = true);
+
+      final invite = await _getOrCreatePackagingInvite();
+
+      if (!mounted) return;
+
+      setState(() {
+        _packagingInvite = invite;
+        _isPreparingPackagingQr = false;
+      });
+
+      final welcomeUrl = _buildWelcomeQrUrl(invite.token);
+
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Kutu Broşürü QR Kodu'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RepaintBoundary(
+                    key: _packagingQrCardKey,
+                    child: _buildPackagingQrExportCard(
+                      invite: invite,
+                      welcomeUrl: welcomeUrl,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SelectableText(
+                    welcomeUrl,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.teal.withOpacity(0.18)),
+                    ),
+                    child: Text(
+                      'Bu QR kod kullanıcıyı hoş geldin sayfasına götürür. Kullanıcı aynı sayfada hesap oluşturup sonuçlarına güvenli şekilde erişebilir.',
+                      style: TextStyle(
+                        color: Colors.teal.shade900,
+                        height: 1.35,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: welcomeUrl));
+
+                if (!mounted) return;
+
+                _showMessage('QR linki kopyalandı.');
+              },
+              icon: const Icon(Icons.copy_outlined),
+              label: const Text('Linki Kopyala'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _savePackagingQrPng(invite: invite),
+              icon: const Icon(Icons.download_outlined),
+              label: const Text('PNG Kaydet'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Kapat'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isPreparingPackagingQr = false);
+      _showMessage('QR hazırlanamadı: $e');
+    }
+  }
+
+  Future<PatientInviteModel> _getOrCreatePackagingInvite() async {
+    final cached = _packagingInvite;
+    if (cached != null && cached.isStillValid) return cached;
+
+    final latest = await _inviteRepository.getLatestInviteForSession(
+      sessionId: order.sessionId,
+    );
+
+    if (latest != null && latest.isStillValid) {
+      return latest;
+    }
+
+    final patientEmail = await _loadPatientEmailForInvite();
+
+    return _inviteRepository.createInvite(
+      patientId: order.patientId,
+      sessionId: order.sessionId,
+      expertUserId: order.expertUserId,
+      email: patientEmail,
+      validDays: 365,
+    );
+  }
+
+  Future<String?> _loadPatientEmailForInvite() async {
+    try {
+      final response = await _client
+          .from('patients')
+          .select('email')
+          .eq('id', order.patientId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final map = Map<String, dynamic>.from(response as Map);
+      final email = map['email']?.toString().trim();
+
+      return email == null || email.isEmpty ? null : email;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _buildWelcomeQrUrl(String inviteToken) {
+    final encodedToken = Uri.encodeQueryComponent(inviteToken);
+    return 'https://www.optiyou.fit/#/welcome?invite=$encodedToken&source=package';
+  }
+
+  Future<void> _savePackagingQrPng({
+    required PatientInviteModel invite,
+  }) async {
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final boundaryContext = _packagingQrCardKey.currentContext;
+      if (boundaryContext == null) {
+        _showMessage('QR görseli henüz hazır değil. Tekrar deneyin.');
+        return;
+      }
+
+      final boundary = boundaryContext.findRenderObject();
+      if (boundary is! RenderRepaintBoundary) {
+        _showMessage('QR görseli okunamadı.');
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        _showMessage('PNG verisi oluşturulamadı.');
+        return;
+      }
+
+      final bytes = byteData.buffer.asUint8List();
+      final fileName =
+          '${_safeFileName(order.orderNo)}_welcome_qr_${invite.inviteId ?? DateTime.now().millisecondsSinceEpoch}.png';
+
+      await _saveBytesToComputer(
+        fileName: fileName,
+        bytes: bytes,
+        extensions: const ['png'],
+      );
+
+      _showMessage('QR PNG olarak kaydedildi.');
+    } catch (e) {
+      _showMessage('QR PNG kaydedilemedi: $e');
+    }
+  }
+
+  Future<void> _saveBytesToComputer({
+    required String fileName,
+    required Uint8List bytes,
+    required List<String> extensions,
+  }) async {
+    await FilePicker.saveFile(
+      dialogTitle: 'Dosyayı kaydet',
+      fileName: fileName,
+      bytes: bytes,
+      type: FileType.custom,
+      allowedExtensions: extensions,
+    );
+  }
+
+  Widget _buildPackagingQrExportCard({
+    required PatientInviteModel invite,
+    required String welcomeUrl,
+  }) {
+    return Container(
+      width: 360,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.qr_code_2_outlined,
+                  color: Colors.teal,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Optiyou',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF07343A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Kişisel iç taban deneyiminiz başladı',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade800,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: QrImageView(
+              data: welcomeUrl,
+              version: QrVersions.auto,
+              size: 230,
+              gapless: true,
+              errorCorrectionLevel: QrErrorCorrectLevel.H,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Sonuçlarınıza güvenli erişim için okutun',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.teal.shade900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sipariş: ${order.orderNo}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            'Davet: ${invite.token.length > 14 ? '${invite.token.substring(0, 14)}...' : invite.token}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackagingQrPanel() {
+    final invite = _packagingInvite;
+    final url = invite == null ? null : _buildWelcomeQrUrl(invite.token);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.teal.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.teal.withOpacity(0.12),
+                child: const Icon(
+                  Icons.qr_code_2_outlined,
+                  color: Colors.teal,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Kutu Broşürü QR',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Kutunun içine eklenecek broşür için hoş geldin sayfası QR kodunu oluştur ve PNG olarak kaydet.',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                    if (url != null) ...[
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        url,
+                        style: TextStyle(
+                          color: Colors.teal.shade900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed:
+                  _isPreparingPackagingQr ? null : _showPackagingQrDialog,
+              icon: _isPreparingPackagingQr
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.qr_code_2_outlined),
+              label: Text(
+                _isPreparingPackagingQr
+                    ? 'QR hazırlanıyor...'
+                    : invite == null
+                        ? 'QR Oluştur / PNG Kaydet'
+                        : 'QR Görüntüle / PNG Kaydet',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _safeFileName(String value) {
+    final normalized = value.trim().isEmpty ? 'order' : value.trim();
+
+    return normalized
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'I')
+        .replaceAll('ğ', 'g')
+        .replaceAll('Ğ', 'G')
+        .replaceAll('ü', 'u')
+        .replaceAll('Ü', 'U')
+        .replaceAll('ş', 's')
+        .replaceAll('Ş', 'S')
+        .replaceAll('ö', 'o')
+        .replaceAll('Ö', 'O')
+        .replaceAll('ç', 'c')
+        .replaceAll('Ç', 'C')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_\-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
   }
 
   Future<void> _openUrl(String url) async {
@@ -1872,6 +2297,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 12),
+          _buildPackagingQrPanel(),
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
