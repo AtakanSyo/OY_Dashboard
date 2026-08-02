@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:oy_site/core/supabase_config.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/payment_result_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'site/site_routes.dart';
 import 'screens/auth/legal_consent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -19,6 +21,10 @@ class AppConfig {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Site tipografisi assets/fonts/ altında paketlenmiştir; çalışma anında
+  // Google'dan font indirilmez (yükleme gecikmesi ve dış bağımlılık olmasın).
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   await Supabase.initialize(
     url: SupabaseConfig.url,
@@ -172,7 +178,8 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
           );
         }
 
-        if (routeName.startsWith('/login')) {
+        // '/giris' public sitedeki giriş bağlantısı, '/login' mevcut adres.
+        if (routeName.startsWith('/login') || routeName.startsWith('/giris')) {
           return MaterialPageRoute(
             builder: (_) => LoginScreen(
               pressureRepository: widget.pressureRepository,
@@ -201,6 +208,10 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
             ),
           );
         }
+
+        // Public site route'ları (ana sayfa ve menü sayfaları).
+        final siteRoute = generateSiteRoute(settings);
+        if (siteRoute != null) return siteRoute;
 
         return MaterialPageRoute(
           builder: (_) => LoginScreen(

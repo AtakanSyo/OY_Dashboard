@@ -33,6 +33,7 @@ dependencies:
   url_launcher: ^6.3.1
   qr_flutter: ^4.1.0
   archive: ^4.0.9
+  video_player: ^2.11.1
 
 dev_dependencies:
   flutter_test:
@@ -42,6 +43,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    # Site tipografisi (Montserrat + Public Sans) uygulamayla birlikte gelir;
+    # google_fonts bu dosyaları bulup çalışma anında indirmeyi atlar.
+    - assets/fonts/
+    - assets/video/
+    - assets/images/hero/
     - assets/images/branding/
     - assets/images/services/
     - assets/images/products/
