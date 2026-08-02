@@ -91,6 +91,34 @@ class _ReferenceInsoleAnalysisScreenState
   List<double>? _homographyImageToMm;
   List<_LocalReferenceScale> _multiReferences = [];
   List<_InsoleMeasurement> _measurements = [];
+  _InsoleBoundary? _insoleBoundary;
+  bool _showInsoleBoundary = true;
+  bool _showCalibrationOverlay = true;
+  bool _showRoiOverlay = true;
+  bool _showInternalPointOverlay = true;
+  bool _showMeasurementOverlay = true;
+  bool _isDetectingBoundary = false;
+
+  Rect? _boundaryRoiImageRect;
+  _ImagePoint? _boundarySeedPoint;
+  _ImagePoint? _boundaryBackgroundPoint;
+
+  bool _isSelectingBoundaryRoi = false;
+  bool _isSelectingBoundarySeed = false;
+  bool _isSelectingBoundaryBackground = false;
+
+  _ImagePoint? _boundaryRoiDragStartPoint;
+  _ImagePoint? _boundaryRoiDragCurrentPoint;
+  bool _isDraggingBoundaryRoi = false;
+  bool _suppressNextCanvasTap = false;
+
+  Timer? _boundaryDetectionDebounce;
+
+  double _boundarySensitivity = 0.52;
+  double _boundaryShadowTolerance = 0.62;
+  double _boundaryBackgroundSeparation = 0.42;
+  int _boundaryClosingStrength = 2;
+  int _boundarySmoothingStrength = 2;
 
   int? get _orderId => widget.operationItem.order.orderId;
   int get _sessionId => widget.operationItem.order.sessionId;
@@ -151,6 +179,7 @@ class _ReferenceInsoleAnalysisScreenState
 
   @override
   void dispose() {
+    _boundaryDetectionDebounce?.cancel();
     _referenceLengthController.dispose();
     _noteController.dispose();
     _canvasTransformationController.dispose();
@@ -355,6 +384,51 @@ class _ReferenceInsoleAnalysisScreenState
         .map(_measurementFromDynamic)
         .whereType<_InsoleMeasurement>()
         .toList();
+
+    final boundaryFromColumn = _boundaryFromDynamic(row['insole_boundary_json']);
+    final boundaryFromCalibration =
+        _boundaryFromDynamic(calibrationJson['insoleBoundary']);
+
+    _insoleBoundary = boundaryFromColumn ?? boundaryFromCalibration;
+    _boundaryRoiImageRect = _insoleBoundary?.roiImageRect;
+    _boundarySeedPoint = _insoleBoundary?.seedPoint;
+
+    final boundarySettings = _asMap(calibrationJson['boundarySettings']);
+
+    _boundarySensitivity =
+        ((_asDouble(boundarySettings['sensitivity']) ??
+                    _insoleBoundary?.sensitivity ??
+                    0.52)
+                .clamp(0.0, 1.0))
+            .toDouble();
+
+    _boundaryShadowTolerance =
+        ((_asDouble(boundarySettings['shadowTolerance']) ??
+                    _insoleBoundary?.shadowTolerance ??
+                    0.62)
+                .clamp(0.0, 1.0))
+            .toDouble();
+
+    _boundaryBackgroundSeparation =
+        ((_asDouble(boundarySettings['backgroundSeparation']) ??
+                    _insoleBoundary?.backgroundSeparation ??
+                    0.42)
+                .clamp(0.0, 1.0))
+            .toDouble();
+
+    _boundaryClosingStrength =
+        ((_asInt(boundarySettings['closingStrength']) ??
+                    _insoleBoundary?.closingStrength ??
+                    2)
+                .clamp(0, 6))
+            .toInt();
+
+    _boundarySmoothingStrength =
+        ((_asInt(boundarySettings['smoothingStrength']) ??
+                    _insoleBoundary?.smoothingStrength ??
+                    2)
+                .clamp(0, 6))
+            .toInt();
 
     _recomputeCalibrationAndMeasurements();
   }
@@ -632,6 +706,84 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
+
+  Widget _buildOverlayVisibilityControls() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildOverlayIconToggle(
+            tooltip: 'Kalibrasyon çizgilerini göster/gizle',
+            icon: Icons.straighten_outlined,
+            value: _showCalibrationOverlay,
+            onChanged: (value) {
+              setState(() => _showCalibrationOverlay = value);
+            },
+          ),
+          _buildOverlayIconToggle(
+            tooltip: 'ROI alanını göster/gizle',
+            icon: Icons.crop_free_outlined,
+            value: _showRoiOverlay,
+            onChanged: (value) {
+              setState(() => _showRoiOverlay = value);
+            },
+          ),
+          _buildOverlayIconToggle(
+            tooltip: 'İç taban içi noktayı göster/gizle',
+            icon: Icons.my_location_outlined,
+            value: _showInternalPointOverlay,
+            onChanged: (value) {
+              setState(() => _showInternalPointOverlay = value);
+            },
+          ),
+          _buildOverlayIconToggle(
+            tooltip: 'Ölçüm çizgilerini göster/gizle',
+            icon: Icons.linear_scale_outlined,
+            value: _showMeasurementOverlay,
+            onChanged: (value) {
+              setState(() => _showMeasurementOverlay = value);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlayIconToggle({
+    required String tooltip,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => onChanged(!value),
+        child: Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          decoration: BoxDecoration(
+            color: value ? Colors.teal.withOpacity(0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: value ? Colors.teal.shade700 : Colors.grey.shade500,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleImageTap(Offset localPosition, Size canvasSize) async {
     final image = _sourceImage;
     if (image == null) return;
@@ -648,6 +800,15 @@ class _ReferenceInsoleAnalysisScreenState
       imageRect,
       image,
     );
+
+    if (_isSelectingBoundarySeed) {
+      _setBoundarySeedPoint(point);
+      return;
+    }
+
+    if (_isSelectingBoundaryRoi) {
+      return;
+    }
 
     if (_toolMode == _AnalysisToolMode.calibration) {
       await _handleCalibrationTap(point);
@@ -1053,6 +1214,8 @@ class _ReferenceInsoleAnalysisScreenState
         'calibration_points_json': _calibrationJson(),
         'measurements_json':
             _measurements.map((measurement) => measurement.toJson()).toList(),
+        'insole_boundary_json':
+            _insoleBoundary?.toJson() ?? <String, dynamic>{},
         'created_by_user_id': widget.currentUser.userId,
         'updated_at': DateTime.now().toIso8601String(),
       };
@@ -1110,32 +1273,86 @@ class _ReferenceInsoleAnalysisScreenState
       'homographyImageToMm': _homographyImageToMm,
       'multiReferences':
           _multiReferences.map((reference) => reference.toJson()).toList(),
+      'insoleBoundary': _insoleBoundary?.toJson(),
+      'boundarySettings': {
+        'sensitivity': _boundarySensitivity,
+        'shadowTolerance': _boundaryShadowTolerance,
+        'backgroundSeparation': _boundaryBackgroundSeparation,
+        'closingStrength': _boundaryClosingStrength,
+        'smoothingStrength': _boundarySmoothingStrength,
+      },
       'calibrationPixelDistance': _calibrationPixelDistance,
       'pixelsPerMm': _pixelsPerMm,
       'note': _noteController.text.trim(),
     };
   }
 
-  Future<void> _exportAnnotatedPng() async {
+
+  Future<void> _exportFullAnnotatedPng() async {
+    await _exportPngVariant(
+      transparentOverlay: false,
+      fileSuffix: 'full_annotated',
+      preparingMessage: 'Tam PNG hazırlanıyor...',
+      successMessage: 'Tam PNG dışa aktarıldı.',
+    );
+  }
+
+  Future<void> _exportTransparentOverlayPng() async {
+    await _exportPngVariant(
+      transparentOverlay: true,
+      fileSuffix: 'transparent_overlay',
+      preparingMessage: 'Şeffaf PNG overlay hazırlanıyor...',
+      successMessage: 'Şeffaf PNG overlay dışa aktarıldı.',
+    );
+  }
+
+  Future<void> _exportFullSvg() async {
+    await _exportSvgVariant(
+      transparentOverlay: false,
+      fileSuffix: 'full_annotated',
+      preparingMessage: 'Tam SVG hazırlanıyor...',
+      successMessage: 'Tam SVG dışa aktarıldı.',
+    );
+  }
+
+  Future<void> _exportTransparentOverlaySvg() async {
+    await _exportSvgVariant(
+      transparentOverlay: true,
+      fileSuffix: 'transparent_overlay',
+      preparingMessage: 'Şeffaf SVG overlay hazırlanıyor...',
+      successMessage: 'Şeffaf SVG overlay dışa aktarıldı.',
+    );
+  }
+
+  Future<void> _exportPngVariant({
+    required bool transparentOverlay,
+    required String fileSuffix,
+    required String preparingMessage,
+    required String successMessage,
+  }) async {
     if (_sourceImage == null) {
       _showMessage('Dışa aktarılacak görsel yok.');
       return;
     }
 
-    if (_measurements.isEmpty) {
-      _showMessage('PNG için en az bir ölçüm eklemelisin.');
+    if (_measurements.isEmpty && _insoleBoundary == null) {
+      _showMessage(
+        'PNG için en az bir ölçüm veya iç taban sınırı eklemelisin.',
+      );
       return;
     }
 
     setState(() {
       _isExporting = true;
-      _statusMessage = 'PNG hazırlanıyor...';
+      _statusMessage = preparingMessage;
     });
 
     try {
-      final bytes = await _buildAnnotatedPngBytes();
+      final bytes = await _buildAnnotatedPngBytes(
+        transparentOverlay: transparentOverlay,
+      );
       final fileName =
-          '${_safeFileName(widget.operationItem.order.orderNo)}_reference_insole_analysis.png';
+          '${_safeFileName(widget.operationItem.order.orderNo)}_reference_insole_$fileSuffix.png';
 
       await _saveBytesToComputer(
         fileName: fileName,
@@ -1147,10 +1364,10 @@ class _ReferenceInsoleAnalysisScreenState
 
       setState(() {
         _isExporting = false;
-        _statusMessage = 'PNG dışa aktarma tamamlandı.';
+        _statusMessage = '$successMessage tamamlandı.';
       });
 
-      _showMessage('PNG dışa aktarıldı.');
+      _showMessage(successMessage);
     } catch (e) {
       if (!mounted) return;
 
@@ -1163,26 +1380,35 @@ class _ReferenceInsoleAnalysisScreenState
     }
   }
 
-  Future<void> _exportSvg() async {
-    if (_sourceImage == null || _sourceImageBytes == null) {
+  Future<void> _exportSvgVariant({
+    required bool transparentOverlay,
+    required String fileSuffix,
+    required String preparingMessage,
+    required String successMessage,
+  }) async {
+    if (_sourceImage == null || (!transparentOverlay && _sourceImageBytes == null)) {
       _showMessage('Dışa aktarılacak görsel yok.');
       return;
     }
 
-    if (_measurements.isEmpty) {
-      _showMessage('SVG için en az bir ölçüm eklemelisin.');
+    if (_measurements.isEmpty && _insoleBoundary == null) {
+      _showMessage(
+        'SVG için en az bir ölçüm veya iç taban sınırı eklemelisin.',
+      );
       return;
     }
 
     setState(() {
       _isExporting = true;
-      _statusMessage = 'SVG hazırlanıyor...';
+      _statusMessage = preparingMessage;
     });
 
     try {
-      final svg = _buildSvgString();
+      final svg = _buildSvgString(
+        transparentOverlay: transparentOverlay,
+      );
       final fileName =
-          '${_safeFileName(widget.operationItem.order.orderNo)}_reference_insole_analysis.svg';
+          '${_safeFileName(widget.operationItem.order.orderNo)}_reference_insole_$fileSuffix.svg';
 
       await _saveBytesToComputer(
         fileName: fileName,
@@ -1194,10 +1420,10 @@ class _ReferenceInsoleAnalysisScreenState
 
       setState(() {
         _isExporting = false;
-        _statusMessage = 'SVG dışa aktarma tamamlandı.';
+        _statusMessage = '$successMessage tamamlandı.';
       });
 
-      _showMessage('SVG dışa aktarıldı.');
+      _showMessage(successMessage);
     } catch (e) {
       if (!mounted) return;
 
@@ -1224,7 +1450,9 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
-  Future<Uint8List> _buildAnnotatedPngBytes() async {
+  Future<Uint8List> _buildAnnotatedPngBytes({
+    bool transparentOverlay = false,
+  }) async {
     final image = _sourceImage!;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -1232,16 +1460,24 @@ class _ReferenceInsoleAnalysisScreenState
     final width = image.width.toDouble();
     final height = image.height.toDouble();
 
-    final backgroundPaint = Paint()..color = Colors.white;
-    canvas.drawRect(Rect.fromLTWH(0, 0, width, height), backgroundPaint);
+    if (!transparentOverlay) {
+      final backgroundPaint = Paint()..color = Colors.white;
+      canvas.drawRect(Rect.fromLTWH(0, 0, width, height), backgroundPaint);
 
-    canvas.drawImage(image, Offset.zero, Paint());
+      canvas.drawImage(image, Offset.zero, Paint());
+    }
 
     _drawAnnotationsOnCanvas(
       canvas: canvas,
       imageWidth: width,
       imageHeight: height,
       exportScale: 1,
+      includeCalibration: !transparentOverlay,
+      includeRoi: !transparentOverlay,
+      includeInternalPoint: !transparentOverlay,
+      includeBoundary: true,
+      includeMeasurements: true,
+      includeReferenceObjects: !transparentOverlay,
     );
 
     final picture = recorder.endRecording();
@@ -1266,6 +1502,12 @@ class _ReferenceInsoleAnalysisScreenState
     required double imageWidth,
     required double imageHeight,
     required double exportScale,
+    required bool includeCalibration,
+    required bool includeRoi,
+    required bool includeInternalPoint,
+    required bool includeBoundary,
+    required bool includeMeasurements,
+    required bool includeReferenceObjects,
   }) {
     final lineStroke = math.max(2, imageWidth * 0.004) * exportScale;
 
@@ -1288,83 +1530,178 @@ class _ReferenceInsoleAnalysisScreenState
       ..color = Colors.teal
       ..style = PaintingStyle.fill;
 
-    if (_simpleCalibrationPoints.length == 2) {
-      final a = _simpleCalibrationPoints[0].toOffset();
-      final b = _simpleCalibrationPoints[1].toOffset();
+    if (includeBoundary) {
+      final boundary = _insoleBoundary;
+      if (boundary != null && boundary.points.length >= 3) {
+        final boundaryPath = Path()
+          ..moveTo(boundary.points.first.x, boundary.points.first.y);
 
-      canvas.drawLine(a, b, calibrationPaint);
-      canvas.drawCircle(a, 7 * exportScale, pointPaint);
-      canvas.drawCircle(b, 7 * exportScale, pointPaint);
+        for (final point in boundary.points.skip(1)) {
+          boundaryPath.lineTo(point.x, point.y);
+        }
 
-      _drawCanvasLabel(
-        canvas: canvas,
-        text: 'Kalibrasyon: ${_referenceLengthMm.toStringAsFixed(2)} mm',
-        position: Offset(
-          (a.dx + b.dx) / 2,
-          (a.dy + b.dy) / 2,
-        ),
-        color: Colors.blue,
-        exportScale: exportScale,
-      );
+        boundaryPath.close();
+
+        canvas.drawPath(
+          boundaryPath,
+          Paint()
+            ..color = Colors.cyan.withOpacity(0.10)
+            ..style = PaintingStyle.fill,
+        );
+
+        canvas.drawPath(
+          boundaryPath,
+          Paint()
+            ..color = Colors.cyan.shade700
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = lineStroke
+            ..strokeJoin = StrokeJoin.round,
+        );
+      }
     }
 
-    if (_perspectiveCalibrationPoints.length == 4) {
-      for (int i = 0; i < 4; i++) {
-        final a = _perspectiveCalibrationPoints[i].toOffset();
-        final b = _perspectiveCalibrationPoints[(i + 1) % 4].toOffset();
+    if (includeRoi) {
+      final roi = _boundaryRoiImageRect;
+      if (roi != null && roi.width > 0 && roi.height > 0) {
+        final roiPaint = Paint()
+          ..color = Colors.orange.shade800
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = lineStroke * 0.85;
+
+        final roiFillPaint = Paint()
+          ..color = Colors.orange.withOpacity(0.08)
+          ..style = PaintingStyle.fill;
+
+        canvas.drawRect(roi, roiFillPaint);
+        canvas.drawRect(roi, roiPaint);
+
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: 'ROI',
+          position: roi.topLeft + Offset(8 * exportScale, 28 * exportScale),
+          color: Colors.orange.shade800,
+          exportScale: exportScale,
+        );
+      }
+    }
+
+    if (includeInternalPoint) {
+      final point = _boundarySeedPoint;
+      if (point != null) {
+        final center = point.toOffset();
+        final crossPaint = Paint()
+          ..color = Colors.pink.shade700
+          ..strokeWidth = lineStroke * 0.85
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawCircle(center, 10 * exportScale, crossPaint);
+        canvas.drawLine(
+          Offset(center.dx - 16 * exportScale, center.dy),
+          Offset(center.dx + 16 * exportScale, center.dy),
+          crossPaint,
+        );
+        canvas.drawLine(
+          Offset(center.dx, center.dy - 16 * exportScale),
+          Offset(center.dx, center.dy + 16 * exportScale),
+          crossPaint,
+        );
+
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: 'İç nokta',
+          position: center + Offset(10 * exportScale, -8 * exportScale),
+          color: Colors.pink.shade700,
+          exportScale: exportScale,
+        );
+      }
+    }
+
+    if (includeCalibration) {
+      if (_simpleCalibrationPoints.length == 2) {
+        final a = _simpleCalibrationPoints[0].toOffset();
+        final b = _simpleCalibrationPoints[1].toOffset();
+
         canvas.drawLine(a, b, calibrationPaint);
         canvas.drawCircle(a, 7 * exportScale, pointPaint);
+        canvas.drawCircle(b, 7 * exportScale, pointPaint);
+
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: 'Kalibrasyon: ${_referenceLengthMm.toStringAsFixed(2)} mm',
+          position: Offset(
+            (a.dx + b.dx) / 2,
+            (a.dy + b.dy) / 2,
+          ),
+          color: Colors.blue,
+          exportScale: exportScale,
+        );
       }
 
-      final center = _averageOffset(
-        _perspectiveCalibrationPoints.map((point) => point.toOffset()).toList(),
-      );
+      if (_perspectiveCalibrationPoints.length == 4) {
+        for (int i = 0; i < 4; i++) {
+          final a = _perspectiveCalibrationPoints[i].toOffset();
+          final b = _perspectiveCalibrationPoints[(i + 1) % 4].toOffset();
+          canvas.drawLine(a, b, calibrationPaint);
+          canvas.drawCircle(a, 7 * exportScale, pointPaint);
+        }
 
-      _drawCanvasLabel(
-        canvas: canvas,
-        text: 'Perspektif: ${_calibrationModeLabel(_calibrationMode)}',
-        position: center,
-        color: Colors.blue,
-        exportScale: exportScale,
-      );
+        final center = _averageOffset(
+          _perspectiveCalibrationPoints
+              .map((point) => point.toOffset())
+              .toList(),
+        );
+
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: 'Perspektif: ${_calibrationModeLabel(_calibrationMode)}',
+          position: center,
+          color: Colors.blue,
+          exportScale: exportScale,
+        );
+      }
     }
 
-    for (final reference in _multiReferences) {
-      final a = reference.start.toOffset();
-      final b = reference.end.toOffset();
-      canvas.drawLine(a, b, referencePaint);
-      canvas.drawCircle(a, 7 * exportScale, pointPaint);
-      canvas.drawCircle(b, 7 * exportScale, pointPaint);
+    if (includeReferenceObjects) {
+      for (final reference in _multiReferences) {
+        final a = reference.start.toOffset();
+        final b = reference.end.toOffset();
+        canvas.drawLine(a, b, referencePaint);
+        canvas.drawCircle(a, 7 * exportScale, pointPaint);
+        canvas.drawCircle(b, 7 * exportScale, pointPaint);
 
-      _drawCanvasLabel(
-        canvas: canvas,
-        text: '${reference.label}: ${_formatMm(reference.referenceLengthMm)}',
-        position: Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2),
-        color: Colors.deepPurple,
-        exportScale: exportScale,
-      );
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: '${reference.label}: ${_formatMm(reference.referenceLengthMm)}',
+          position: Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2),
+          color: Colors.deepPurple,
+          exportScale: exportScale,
+        );
+      }
     }
 
-    for (final measurement in _measurements) {
-      final a = measurement.startImage.toOffset();
-      final b = measurement.endImage.toOffset();
+    if (includeMeasurements) {
+      for (final measurement in _measurements) {
+        final a = measurement.startImage.toOffset();
+        final b = measurement.endImage.toOffset();
 
-      canvas.drawLine(a, b, measurementPaint);
-      canvas.drawCircle(a, 7 * exportScale, pointPaint);
-      canvas.drawCircle(b, 7 * exportScale, pointPaint);
+        canvas.drawLine(a, b, measurementPaint);
+        canvas.drawCircle(a, 7 * exportScale, pointPaint);
+        canvas.drawCircle(b, 7 * exportScale, pointPaint);
 
-      final midpoint = Offset(
-        (a.dx + b.dx) / 2,
-        (a.dy + b.dy) / 2,
-      );
+        final midpoint = Offset(
+          (a.dx + b.dx) / 2,
+          (a.dy + b.dy) / 2,
+        );
 
-      _drawCanvasLabel(
-        canvas: canvas,
-        text: '${measurement.label}: ${_formatMm(measurement.lengthMm)}',
-        position: midpoint,
-        color: Colors.teal,
-        exportScale: exportScale,
-      );
+        _drawCanvasLabel(
+          canvas: canvas,
+          text: '${measurement.label}: ${_formatMm(measurement.lengthMm)}',
+          position: midpoint,
+          color: Colors.teal,
+          exportScale: exportScale,
+        );
+      }
     }
   }
 
@@ -1430,12 +1767,10 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
-  String _buildSvgString() {
+  String _buildSvgString({
+    bool transparentOverlay = false,
+  }) {
     final image = _sourceImage!;
-    final imageBytes = _sourceImageBytes!;
-    final imageBase64 = base64Encode(imageBytes);
-    final mimeType = _selectedPhoto?.resolvedMimeType ?? 'image/png';
-
     final buffer = StringBuffer();
 
     buffer.writeln(
@@ -1444,32 +1779,64 @@ class _ReferenceInsoleAnalysisScreenState
       'viewBox="0 0 ${image.width} ${image.height}">',
     );
 
-    buffer.writeln(
-      '<image x="0" y="0" width="${image.width}" height="${image.height}" '
-      'href="data:$mimeType;base64,$imageBase64" />',
-    );
-
-    if (_simpleCalibrationPoints.length == 2) {
-      final a = _simpleCalibrationPoints[0];
-      final b = _simpleCalibrationPoints[1];
+    if (!transparentOverlay) {
+      final imageBytes = _sourceImageBytes!;
+      final imageBase64 = base64Encode(imageBytes);
+      final mimeType = _selectedPhoto?.resolvedMimeType ?? 'image/png';
 
       buffer.writeln(
-        '<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" '
-        'stroke="#1565C0" stroke-width="4" stroke-linecap="round" />',
-      );
-
-      buffer.writeln(
-        '<text x="${(a.x + b.x) / 2 + 8}" y="${(a.y + b.y) / 2 - 8}" '
-        'font-size="24" font-weight="700" fill="#1565C0">'
-        'Kalibrasyon: ${_referenceLengthMm.toStringAsFixed(2)} mm'
-        '</text>',
+        '<image x="0" y="0" width="${image.width}" height="${image.height}" '
+        'href="data:$mimeType;base64,$imageBase64" />',
       );
     }
 
-    if (_perspectiveCalibrationPoints.length == 4) {
-      for (int i = 0; i < 4; i++) {
-        final a = _perspectiveCalibrationPoints[i];
-        final b = _perspectiveCalibrationPoints[(i + 1) % 4];
+    final boundary = _insoleBoundary;
+    if (boundary != null && boundary.points.length >= 3) {
+      final polygonPoints = boundary.points
+          .map((point) => '${point.x.toStringAsFixed(2)},${point.y.toStringAsFixed(2)}')
+          .join(' ');
+
+      buffer.writeln(
+        '<polygon points="$polygonPoints" '
+        'fill="rgba(0,188,212,0.10)" stroke="#0097A7" '
+        'stroke-width="4" stroke-linejoin="round" />',
+      );
+    }
+
+    if (!transparentOverlay) {
+      final roi = _boundaryRoiImageRect;
+      if (roi != null && roi.width > 0 && roi.height > 0) {
+        buffer.writeln(
+          '<rect x="${roi.left.toStringAsFixed(2)}" '
+          'y="${roi.top.toStringAsFixed(2)}" '
+          'width="${roi.width.toStringAsFixed(2)}" '
+          'height="${roi.height.toStringAsFixed(2)}" '
+          'fill="rgba(245,124,0,0.08)" stroke="#EF6C00" '
+          'stroke-width="4" />',
+        );
+      }
+
+      final internalPoint = _boundarySeedPoint;
+      if (internalPoint != null) {
+        buffer.writeln(
+          '<circle cx="${internalPoint.x}" cy="${internalPoint.y}" '
+          'r="12" fill="none" stroke="#AD1457" stroke-width="4" />',
+        );
+        buffer.writeln(
+          '<line x1="${internalPoint.x - 18}" y1="${internalPoint.y}" '
+          'x2="${internalPoint.x + 18}" y2="${internalPoint.y}" '
+          'stroke="#AD1457" stroke-width="4" stroke-linecap="round" />',
+        );
+        buffer.writeln(
+          '<line x1="${internalPoint.x}" y1="${internalPoint.y - 18}" '
+          'x2="${internalPoint.x}" y2="${internalPoint.y + 18}" '
+          'stroke="#AD1457" stroke-width="4" stroke-linecap="round" />',
+        );
+      }
+
+      if (_simpleCalibrationPoints.length == 2) {
+        final a = _simpleCalibrationPoints[0];
+        final b = _simpleCalibrationPoints[1];
 
         buffer.writeln(
           '<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" '
@@ -1477,31 +1844,50 @@ class _ReferenceInsoleAnalysisScreenState
         );
 
         buffer.writeln(
-          '<circle cx="${a.x}" cy="${a.y}" r="7" fill="#1565C0" />',
+          '<text x="${(a.x + b.x) / 2 + 8}" y="${(a.y + b.y) / 2 - 8}" '
+          'font-size="16" font-weight="700" fill="#1565C0">'
+          'Kalibrasyon: ${_referenceLengthMm.toStringAsFixed(2)} mm'
+          '</text>',
         );
       }
-    }
 
-    for (final reference in _multiReferences) {
-      final a = reference.start;
-      final b = reference.end;
-      final midX = (a.x + b.x) / 2;
-      final midY = (a.y + b.y) / 2;
+      if (_perspectiveCalibrationPoints.length == 4) {
+        for (int i = 0; i < 4; i++) {
+          final a = _perspectiveCalibrationPoints[i];
+          final b = _perspectiveCalibrationPoints[(i + 1) % 4];
 
-      buffer.writeln(
-        '<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" '
-        'stroke="#5E35B1" stroke-width="4" stroke-linecap="round" />',
-      );
+          buffer.writeln(
+            '<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" '
+            'stroke="#1565C0" stroke-width="4" stroke-linecap="round" />',
+          );
 
-      buffer.writeln('<circle cx="${a.x}" cy="${a.y}" r="7" fill="#5E35B1" />');
-      buffer.writeln('<circle cx="${b.x}" cy="${b.y}" r="7" fill="#5E35B1" />');
+          buffer.writeln(
+            '<circle cx="${a.x}" cy="${a.y}" r="7" fill="#1565C0" />',
+          );
+        }
+      }
 
-      buffer.writeln(
-        '<text x="${midX + 8}" y="${midY - 8}" '
-        'font-size="24" font-weight="700" fill="#5E35B1">'
-        '${_escapeXml(reference.label)}: ${_formatMm(reference.referenceLengthMm)}'
-        '</text>',
-      );
+      for (final reference in _multiReferences) {
+        final a = reference.start;
+        final b = reference.end;
+        final midX = (a.x + b.x) / 2;
+        final midY = (a.y + b.y) / 2;
+
+        buffer.writeln(
+          '<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" '
+          'stroke="#5E35B1" stroke-width="4" stroke-linecap="round" />',
+        );
+
+        buffer.writeln('<circle cx="${a.x}" cy="${a.y}" r="7" fill="#5E35B1" />');
+        buffer.writeln('<circle cx="${b.x}" cy="${b.y}" r="7" fill="#5E35B1" />');
+
+        buffer.writeln(
+          '<text x="${midX + 8}" y="${midY - 8}" '
+          'font-size="16" font-weight="700" fill="#5E35B1">'
+          '${_escapeXml(reference.label)}: ${_formatMm(reference.referenceLengthMm)}'
+          '</text>',
+        );
+      }
     }
 
     for (final measurement in _measurements) {
@@ -1520,7 +1906,7 @@ class _ReferenceInsoleAnalysisScreenState
 
       buffer.writeln(
         '<text x="${midX + 8}" y="${midY - 8}" '
-        'font-size="24" font-weight="700" fill="#00897B">'
+        'font-size="16" font-weight="700" fill="#00897B">'
         '${_escapeXml(measurement.label)}: ${_formatMm(measurement.lengthMm)}'
         '</text>',
       );
@@ -1530,6 +1916,1178 @@ class _ReferenceInsoleAnalysisScreenState
 
     return buffer.toString();
   }
+
+  Future<void> _detectInsoleBoundary({bool showMessages = true}) async {
+    final image = _sourceImage;
+
+    if (image == null) {
+      if (showMessages) {
+        _showMessage('Sınır tespiti için önce referans görsel yüklenmeli.');
+      }
+      return;
+    }
+
+    final roi = _boundaryRoiImageRect;
+    if (roi == null || roi.width < 20 || roi.height < 20) {
+      if (showMessages) {
+        _showMessage(
+          'Önce iç tabanı kapsayan, markerları dışarıda bırakan bir ROI alanı seç.',
+        );
+      }
+      return;
+    }
+
+    if (_boundarySeedPoint == null) {
+      if (showMessages) {
+        _showMessage(
+          'Önce ROI içindeki iç taban gövdesine bir iç taban içi nokta seç.',
+        );
+      }
+      return;
+    }
+
+    if (!roi.contains(_boundarySeedPoint!.toOffset())) {
+      if (showMessages) {
+        _showMessage(
+          'İç taban içi nokta ROI alanının dışında. İç taban üzerinde ve ROI içinde yeni bir nokta seç.',
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isDetectingBoundary = true;
+      _statusMessage = showMessages
+          ? 'ROI + iç taban içi nokta + slider ayarları ile sınır tespit ediliyor...'
+          : 'Slider ayarlarına göre sınır güncelleniyor...';
+    });
+
+    try {
+      final boundary = await _autoDetectInsoleBoundary(
+        image,
+        roiImageRect: roi,
+        seedPoint: _boundarySeedPoint!,
+        sensitivity: _boundarySensitivity,
+        shadowTolerance: _boundaryShadowTolerance,
+        backgroundSeparation: _boundaryBackgroundSeparation,
+        closingStrength: _boundaryClosingStrength,
+        smoothingStrength: _boundarySmoothingStrength,
+      );
+
+      if (!mounted) return;
+
+      if (boundary == null || boundary.points.length < 8) {
+        setState(() {
+          _isDetectingBoundary = false;
+          _statusMessage = showMessages
+              ? null
+              : 'Bu slider ayarlarıyla sınır net bulunamadı.';
+        });
+
+        if (showMessages) {
+          _showMessage(
+            'İç taban sınırı net tespit edilemedi. ROI alanını daraltıp iç taban içi noktayı gövdeye yakın seçerek tekrar dene. Gerekirse hassasiyet, zemin ayrımı ve boşluk doldurma sliderlarını değiştir.',
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _insoleBoundary = boundary;
+        _showInsoleBoundary = true;
+        _isDetectingBoundary = false;
+        _isSelectingBoundaryRoi = false;
+        _isSelectingBoundarySeed = false;
+        _boundaryRoiDragStartPoint = null;
+        _boundaryRoiDragCurrentPoint = null;
+        _statusMessage =
+            'İç taban sınırı güncellendi: ${boundary.points.length} nokta.';
+      });
+
+      if (showMessages) {
+        _showMessage('İç taban sınırı bulundu.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isDetectingBoundary = false;
+        _statusMessage = showMessages ? null : 'Sınır güncellenemedi.';
+      });
+
+      if (showMessages) {
+        _showMessage('İç taban sınırı tespit edilemedi: $e');
+      }
+    }
+  }
+
+  void _scheduleBoundaryDetectionPreview() {
+    _boundaryDetectionDebounce?.cancel();
+
+    if (_sourceImage == null ||
+        _boundaryRoiImageRect == null ||
+        _boundarySeedPoint == null) {
+      return;
+    }
+
+    _boundaryDetectionDebounce = Timer(
+      const Duration(milliseconds: 260),
+      () {
+        if (!mounted) return;
+        _detectInsoleBoundary(showMessages: false);
+      },
+    );
+  }
+
+  Future<_InsoleBoundary?> _autoDetectInsoleBoundary(
+    ui.Image image, {
+    required Rect roiImageRect,
+    required _ImagePoint seedPoint,
+    required double sensitivity,
+    required double shadowTolerance,
+    required double backgroundSeparation,
+    required int closingStrength,
+    required int smoothingStrength,
+  }) async {
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+    if (byteData == null) {
+      throw Exception('Görsel piksel verisi okunamadı.');
+    }
+
+    final data = byteData.buffer.asUint8List();
+    final imageWidth = image.width;
+    final imageHeight = image.height;
+
+    final maxAnalysisSize = 900;
+    final sampleStep =
+        math.max(1, (math.max(imageWidth, imageHeight) / maxAnalysisSize).ceil());
+
+    final gridWidth = (imageWidth / sampleStep).floor();
+    final gridHeight = (imageHeight / sampleStep).floor();
+
+    if (gridWidth < 20 || gridHeight < 20) {
+      throw Exception('Görsel sınır analizi için çok küçük.');
+    }
+
+    final normalizedRoi = _normalizeImageRect(roiImageRect, image);
+    if (normalizedRoi.width < 20 || normalizedRoi.height < 20) {
+      throw Exception('Seçilen ROI alanı sınır analizi için çok küçük.');
+    }
+
+    final a4RestrictPolygon =
+        _calibrationMode == _CalibrationMode.perspectiveA4 &&
+                _perspectiveCalibrationPoints.length == 4
+            ? _perspectiveCalibrationPoints
+            : null;
+
+    final seedFeature = _sampleAverageFeature(
+      data: data,
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
+      center: seedPoint,
+      radiusPx: math.max(2, sampleStep * 2),
+    );
+
+    final backgroundFeature = _estimateBackgroundFeatureFromRoiBorder(
+      data: data,
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
+      roi: normalizedRoi,
+      radiusPx: math.max(2, sampleStep),
+    );
+
+    final seedThreshold = ui.lerpDouble(0.08, 0.38, sensitivity)!;
+    final separationMargin = ui.lerpDouble(0.01, 0.18, backgroundSeparation)!;
+
+    final mask = List<bool>.filled(gridWidth * gridHeight, false);
+
+    for (int gy = 0; gy < gridHeight; gy++) {
+      for (int gx = 0; gx < gridWidth; gx++) {
+        final px = math.min(imageWidth - 1, gx * sampleStep + sampleStep ~/ 2);
+        final py =
+            math.min(imageHeight - 1, gy * sampleStep + sampleStep ~/ 2);
+
+        final imagePoint = _ImagePoint(x: px.toDouble(), y: py.toDouble());
+
+        if (!normalizedRoi.contains(imagePoint.toOffset())) {
+          continue;
+        }
+
+        if (a4RestrictPolygon != null &&
+            !_isPointInsidePolygon(imagePoint, a4RestrictPolygon)) {
+          continue;
+        }
+
+        final feature = _pixelFeaturesAt(
+          data: data,
+          imageWidth: imageWidth,
+          imageHeight: imageHeight,
+          x: px,
+          y: py,
+        );
+
+        final seedDistance = _boundaryFeatureDistance(
+          feature,
+          seedFeature,
+          shadowTolerance: shadowTolerance,
+        );
+
+        final backgroundDistance = _boundaryFeatureDistance(
+          feature,
+          backgroundFeature,
+          shadowTolerance: 0.20,
+        );
+
+        final isCandidate = seedDistance <= seedThreshold &&
+            (backgroundDistance - seedDistance) >= separationMargin;
+
+        if (isCandidate) {
+          mask[gy * gridWidth + gx] = true;
+        }
+      }
+    }
+
+    final closedMask = _closeMask(
+      mask,
+      gridWidth,
+      gridHeight,
+      iterations: closingStrength.clamp(0, 6).toInt(),
+    );
+
+    final component = _componentFromSeedOrLargest(
+      mask: closedMask,
+      width: gridWidth,
+      height: gridHeight,
+      sampleStep: sampleStep,
+      roiImageRect: normalizedRoi,
+      seedPoint: seedPoint,
+    );
+
+    if (component.length < 80) return null;
+
+    final boundaryCells = _extractBoundaryCells(
+      component,
+      gridWidth,
+      gridHeight,
+    );
+
+    if (boundaryCells.length < 20) return null;
+
+    final points = _boundaryCellsToImagePolygon(
+      boundaryCells,
+      sampleStep,
+      imageWidth,
+      imageHeight,
+      smoothingStrength: smoothingStrength.clamp(0, 6).toInt(),
+    );
+
+    if (points.length < 8) return null;
+
+    final boundary = _InsoleBoundary(
+      method: 'roi_internal_point_slider_similarity',
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
+      roiImageRect: normalizedRoi,
+      seedPoint: seedPoint,
+      sensitivity: sensitivity,
+      shadowTolerance: shadowTolerance,
+      backgroundSeparation: backgroundSeparation,
+      closingStrength: closingStrength,
+      smoothingStrength: smoothingStrength,
+      points: points,
+      pointsMm: _boundaryPointsInMm(points),
+      createdAt: DateTime.now(),
+    );
+
+    return boundary;
+  }
+
+  Rect _normalizeImageRect(Rect rect, ui.Image image) {
+    final imageWidth = image.width.toDouble();
+    final imageHeight = image.height.toDouble();
+
+    final left = math.min(rect.left, rect.right).clamp(0.0, imageWidth).toDouble();
+    final right = math.max(rect.left, rect.right).clamp(0.0, imageWidth).toDouble();
+    final top = math.min(rect.top, rect.bottom).clamp(0.0, imageHeight).toDouble();
+    final bottom = math.max(rect.top, rect.bottom).clamp(0.0, imageHeight).toDouble();
+
+    return Rect.fromLTRB(left, top, right, bottom);
+  }
+
+  Set<int> _componentFromSeedOrLargest({
+    required List<bool> mask,
+    required int width,
+    required int height,
+    required int sampleStep,
+    required Rect roiImageRect,
+    required _ImagePoint? seedPoint,
+  }) {
+    if (seedPoint != null) {
+      final seedIndex = _findNearestCandidateCell(
+        mask: mask,
+        width: width,
+        height: height,
+        sampleStep: sampleStep,
+        roiImageRect: roiImageRect,
+        seedPoint: seedPoint,
+      );
+
+      if (seedIndex != null) {
+        final seedComponent = _growComponentFromIndex(
+          mask: mask,
+          width: width,
+          height: height,
+          startIndex: seedIndex,
+        );
+
+        if (seedComponent.isNotEmpty) return seedComponent;
+      }
+    }
+
+    return _largestRoiComponent(
+      mask: mask,
+      width: width,
+      height: height,
+      sampleStep: sampleStep,
+      roiImageRect: roiImageRect,
+    );
+  }
+
+  int? _findNearestCandidateCell({
+    required List<bool> mask,
+    required int width,
+    required int height,
+    required int sampleStep,
+    required Rect roiImageRect,
+    required _ImagePoint seedPoint,
+  }) {
+    final seedX = (seedPoint.x / sampleStep).round().clamp(0, width - 1).toInt();
+    final seedY = (seedPoint.y / sampleStep).round().clamp(0, height - 1).toInt();
+    final seedIndex = seedY * width + seedX;
+
+    if (mask[seedIndex]) return seedIndex;
+
+    int? bestIndex;
+    double bestDistance = double.infinity;
+    final maxRadius = math.max(8, (40 / sampleStep).ceil());
+
+    for (int radius = 1; radius <= maxRadius; radius++) {
+      for (int y = seedY - radius; y <= seedY + radius; y++) {
+        if (y < 0 || y >= height) continue;
+
+        for (int x = seedX - radius; x <= seedX + radius; x++) {
+          if (x < 0 || x >= width) continue;
+          if (x != seedX - radius &&
+              x != seedX + radius &&
+              y != seedY - radius &&
+              y != seedY + radius) {
+            continue;
+          }
+
+          final index = y * width + x;
+          if (!mask[index]) continue;
+
+          final imagePoint = _ImagePoint(
+            x: math.min((width * sampleStep) - 1, x * sampleStep + sampleStep / 2).toDouble(),
+            y: math.min((height * sampleStep) - 1, y * sampleStep + sampleStep / 2).toDouble(),
+          );
+
+          if (!roiImageRect.contains(imagePoint.toOffset())) continue;
+
+          final distance = _distancePx(seedPoint, imagePoint);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = index;
+          }
+        }
+      }
+
+      if (bestIndex != null) return bestIndex;
+    }
+
+    return null;
+  }
+
+  Set<int> _growComponentFromIndex({
+    required List<bool> mask,
+    required int width,
+    required int height,
+    required int startIndex,
+  }) {
+    if (startIndex < 0 || startIndex >= mask.length) return <int>{};
+    if (!mask[startIndex]) return <int>{};
+
+    final visited = <int>{startIndex};
+    final queue = <int>[startIndex];
+
+    const neighborOffsets = <List<int>>[
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      final cx = current % width;
+      final cy = current ~/ width;
+
+      for (final offset in neighborOffsets) {
+        final nx = cx + offset[0];
+        final ny = cy + offset[1];
+
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+        final nextIndex = ny * width + nx;
+        if (!mask[nextIndex] || visited.contains(nextIndex)) continue;
+
+        visited.add(nextIndex);
+        queue.add(nextIndex);
+      }
+    }
+
+    return visited;
+  }
+
+  Set<int> _largestRoiComponent({
+    required List<bool> mask,
+    required int width,
+    required int height,
+    required int sampleStep,
+    required Rect roiImageRect,
+  }) {
+    final visited = List<bool>.filled(mask.length, false);
+    Set<int> best = <int>{};
+
+    const neighborOffsets = <List<int>>[
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+
+    for (int y = 1; y < height - 1; y++) {
+      for (int x = 1; x < width - 1; x++) {
+        final index = y * width + x;
+        if (!mask[index] || visited[index]) continue;
+
+        final queue = <int>[index];
+        final component = <int>{};
+        visited[index] = true;
+
+        while (queue.isNotEmpty) {
+          final current = queue.removeLast();
+          component.add(current);
+
+          final cx = current % width;
+          final cy = current ~/ width;
+
+          for (final offset in neighborOffsets) {
+            final nx = cx + offset[0];
+            final ny = cy + offset[1];
+
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+            final nextIndex = ny * width + nx;
+            if (!mask[nextIndex] || visited[nextIndex]) continue;
+
+            final imagePoint = _ImagePoint(
+              x: math.min((width * sampleStep) - 1, nx * sampleStep + sampleStep / 2).toDouble(),
+              y: math.min((height * sampleStep) - 1, ny * sampleStep + sampleStep / 2).toDouble(),
+            );
+
+            if (!roiImageRect.contains(imagePoint.toOffset())) continue;
+
+            visited[nextIndex] = true;
+            queue.add(nextIndex);
+          }
+        }
+
+        if (component.length > best.length) best = component;
+      }
+    }
+
+    return best;
+  }
+
+  List<bool> _closeMask(
+    List<bool> mask,
+    int width,
+    int height, {
+    int iterations = 1,
+  }) {
+    List<bool> current = List<bool>.from(mask);
+
+    for (int i = 0; i < iterations; i++) {
+      final dilated = List<bool>.filled(current.length, false);
+
+      for (int y = 1; y < height - 1; y++) {
+        for (int x = 1; x < width - 1; x++) {
+          bool any = false;
+
+          for (int dy = -1; dy <= 1 && !any; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+              if (current[(y + dy) * width + x + dx]) {
+                any = true;
+                break;
+              }
+            }
+          }
+
+          dilated[y * width + x] = any;
+        }
+      }
+
+      current = dilated;
+    }
+
+    for (int i = 0; i < iterations; i++) {
+      final eroded = List<bool>.filled(current.length, false);
+
+      for (int y = 1; y < height - 1; y++) {
+        for (int x = 1; x < width - 1; x++) {
+          bool all = true;
+
+          for (int dy = -1; dy <= 1 && all; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+              if (!current[(y + dy) * width + x + dx]) {
+                all = false;
+                break;
+              }
+            }
+          }
+
+          eroded[y * width + x] = all;
+        }
+      }
+
+      current = eroded;
+    }
+
+    return current;
+  }
+
+  _BoundaryPixelFeatures _pixelFeaturesAt({
+    required Uint8List data,
+    required int imageWidth,
+    required int imageHeight,
+    required int x,
+    required int y,
+  }) {
+    final clampedX = x.clamp(0, imageWidth - 1).toInt();
+    final clampedY = y.clamp(0, imageHeight - 1).toInt();
+
+    final offset = (clampedY * imageWidth + clampedX) * 4;
+    final r = data[offset].toDouble();
+    final g = data[offset + 1].toDouble();
+    final b = data[offset + 2].toDouble();
+
+    final sum = math.max(1.0, r + g + b);
+    final maxChannel = math.max(r, math.max(g, b));
+    final minChannel = math.min(r, math.min(g, b));
+
+    return _BoundaryPixelFeatures(
+      nr: r / sum,
+      ng: g / sum,
+      nb: b / sum,
+      luminance: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0,
+      saturation: maxChannel <= 0
+          ? 0
+          : ((maxChannel - minChannel) / maxChannel).clamp(0.0, 1.0).toDouble(),
+    );
+  }
+
+  _BoundaryPixelFeatures _sampleAverageFeature({
+    required Uint8List data,
+    required int imageWidth,
+    required int imageHeight,
+    required _ImagePoint center,
+    required int radiusPx,
+  }) {
+    final samples = <_BoundaryPixelFeatures>[];
+
+    final cx = center.x.round();
+    final cy = center.y.round();
+
+    for (int y = cy - radiusPx; y <= cy + radiusPx; y++) {
+      for (int x = cx - radiusPx; x <= cx + radiusPx; x++) {
+        if (x < 0 || y < 0 || x >= imageWidth || y >= imageHeight) continue;
+        samples.add(
+          _pixelFeaturesAt(
+            data: data,
+            imageWidth: imageWidth,
+            imageHeight: imageHeight,
+            x: x,
+            y: y,
+          ),
+        );
+      }
+    }
+
+    return _BoundaryPixelFeatures.average(samples);
+  }
+
+  _BoundaryPixelFeatures _estimateBackgroundFeatureFromRoiBorder({
+    required Uint8List data,
+    required int imageWidth,
+    required int imageHeight,
+    required Rect roi,
+    required int radiusPx,
+  }) {
+    final samplePoints = <_ImagePoint>[];
+
+    final left = roi.left + roi.width * 0.06;
+    final right = roi.right - roi.width * 0.06;
+    final top = roi.top + roi.height * 0.06;
+    final bottom = roi.bottom - roi.height * 0.06;
+
+    for (int i = 0; i < 6; i++) {
+      final t = i / 5.0;
+
+      samplePoints.add(_ImagePoint(
+        x: ui.lerpDouble(left, right, t)!,
+        y: top,
+      ));
+      samplePoints.add(_ImagePoint(
+        x: ui.lerpDouble(left, right, t)!,
+        y: bottom,
+      ));
+      samplePoints.add(_ImagePoint(
+        x: left,
+        y: ui.lerpDouble(top, bottom, t)!,
+      ));
+      samplePoints.add(_ImagePoint(
+        x: right,
+        y: ui.lerpDouble(top, bottom, t)!,
+      ));
+    }
+
+    final features = samplePoints
+        .map(
+          (point) => _sampleAverageFeature(
+            data: data,
+            imageWidth: imageWidth,
+            imageHeight: imageHeight,
+            center: point,
+            radiusPx: radiusPx,
+          ),
+        )
+        .toList();
+
+    return _BoundaryPixelFeatures.average(features);
+  }
+
+  double _boundaryFeatureDistance(
+    _BoundaryPixelFeatures a,
+    _BoundaryPixelFeatures b, {
+    required double shadowTolerance,
+  }) {
+    final chromaDistance = math.sqrt(
+      math.pow(a.nr - b.nr, 2) +
+          math.pow(a.ng - b.ng, 2) +
+          math.pow(a.nb - b.nb, 2),
+    ) / 1.7320508075688772;
+
+    final saturationDistance = (a.saturation - b.saturation).abs();
+    final luminanceDistance = (a.luminance - b.luminance).abs();
+
+    final luminanceWeight =
+        ui.lerpDouble(0.20, 0.06, shadowTolerance.clamp(0.0, 1.0).toDouble())!;
+
+    return (chromaDistance * 0.72) +
+        (saturationDistance * 0.18) +
+        (luminanceDistance * luminanceWeight);
+  }
+
+  Set<int> _largestInteriorComponent(
+    List<bool> mask,
+    int width,
+    int height,
+    int sampleStep,
+    int imageWidth,
+    int imageHeight,
+  ) {
+    final visited = List<bool>.filled(mask.length, false);
+    Set<int> best = <int>{};
+
+    const neighborOffsets = <List<int>>[
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+
+    for (int y = 1; y < height - 1; y++) {
+      for (int x = 1; x < width - 1; x++) {
+        final index = y * width + x;
+
+        if (!mask[index] || visited[index]) continue;
+
+        final queue = <int>[index];
+        final component = <int>{};
+        visited[index] = true;
+
+        bool touchesGridEdge = false;
+
+        while (queue.isNotEmpty) {
+          final current = queue.removeLast();
+          component.add(current);
+
+          final cx = current % width;
+          final cy = current ~/ width;
+
+          if (cx <= 1 ||
+              cy <= 1 ||
+              cx >= width - 2 ||
+              cy >= height - 2) {
+            touchesGridEdge = true;
+          }
+
+          for (final offset in neighborOffsets) {
+            final nx = cx + offset[0];
+            final ny = cy + offset[1];
+
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+            final nextIndex = ny * width + nx;
+            if (!mask[nextIndex] || visited[nextIndex]) continue;
+
+            visited[nextIndex] = true;
+            queue.add(nextIndex);
+          }
+        }
+
+        if (touchesGridEdge) continue;
+        if (component.length > best.length) best = component;
+      }
+    }
+
+    return best;
+  }
+
+  List<int> _extractBoundaryCells(
+    Set<int> component,
+    int width,
+    int height,
+  ) {
+    final boundary = <int>[];
+
+    for (final index in component) {
+      final x = index % width;
+      final y = index ~/ width;
+
+      final isBoundary =
+          x == 0 ||
+          y == 0 ||
+          x == width - 1 ||
+          y == height - 1 ||
+          !component.contains(index - 1) ||
+          !component.contains(index + 1) ||
+          !component.contains(index - width) ||
+          !component.contains(index + width);
+
+      if (isBoundary) boundary.add(index);
+    }
+
+    return boundary;
+  }
+
+  List<_ImagePoint> _boundaryCellsToImagePolygon(
+    List<int> boundaryCells,
+    int sampleStep,
+    int imageWidth,
+    int imageHeight, {
+    int smoothingStrength = 1,
+  }) {
+    double centerX = 0;
+    double centerY = 0;
+
+    final rawPoints = boundaryCells.map((index) {
+      final gx = index % (imageWidth / sampleStep).floor();
+      final gy = index ~/ (imageWidth / sampleStep).floor();
+
+      final point = _ImagePoint(
+        x: math
+            .min(imageWidth - 1, gx * sampleStep + sampleStep / 2)
+            .toDouble(),
+        y: math
+            .min(imageHeight - 1, gy * sampleStep + sampleStep / 2)
+            .toDouble(),
+      );
+
+      centerX += point.x;
+      centerY += point.y;
+
+      return point;
+    }).toList();
+
+    centerX /= rawPoints.length;
+    centerY /= rawPoints.length;
+
+    const binCount = 180;
+    final radialPoints = List<_ImagePoint?>.filled(binCount, null);
+    final radialDistances = List<double>.filled(binCount, -1);
+
+    for (final point in rawPoints) {
+      final angle = math.atan2(point.y - centerY, point.x - centerX);
+      final normalizedAngle = angle < 0 ? angle + math.pi * 2 : angle;
+      final bin = ((normalizedAngle / (math.pi * 2)) * binCount)
+          .floor()
+          .clamp(0, binCount - 1)
+          .toInt();
+
+      final distance = math.sqrt(
+        math.pow(point.x - centerX, 2) + math.pow(point.y - centerY, 2),
+      );
+
+      if (distance > radialDistances[bin]) {
+        radialDistances[bin] = distance;
+        radialPoints[bin] = point;
+      }
+    }
+
+    final polygon = radialPoints.whereType<_ImagePoint>().toList();
+
+    if (polygon.length <= 40) return polygon;
+
+    final targetCount = 90;
+    final step = math.max(1, (polygon.length / targetCount).floor());
+
+    final simplified = <_ImagePoint>[];
+
+    for (int i = 0; i < polygon.length; i += step) {
+      simplified.add(polygon[i]);
+    }
+
+    return _smoothBoundaryPoints(
+      simplified,
+      iterations: smoothingStrength.clamp(0, 6).toInt(),
+    );
+  }
+
+  List<_ImagePoint> _smoothBoundaryPoints(
+    List<_ImagePoint> points, {
+    int iterations = 1,
+  }) {
+    if (points.length < 8 || iterations <= 0) return points;
+
+    List<_ImagePoint> currentPoints = List<_ImagePoint>.from(points);
+
+    for (int iteration = 0; iteration < iterations; iteration++) {
+      final smoothed = <_ImagePoint>[];
+
+      for (int i = 0; i < currentPoints.length; i++) {
+        final prev = currentPoints[(i - 1 + currentPoints.length) % currentPoints.length];
+        final current = currentPoints[i];
+        final next = currentPoints[(i + 1) % currentPoints.length];
+
+        smoothed.add(
+          _ImagePoint(
+            x: (prev.x + current.x * 2 + next.x) / 4,
+            y: (prev.y + current.y * 2 + next.y) / 4,
+          ),
+        );
+      }
+
+      currentPoints = smoothed;
+    }
+
+    return currentPoints;
+  }
+
+  List<_ImagePoint>? _boundaryPointsInMm(List<_ImagePoint> points) {
+    final homography = _homographyImageToMm;
+    if (homography == null) return null;
+
+    final mmPoints = <_ImagePoint>[];
+
+    for (final point in points) {
+      final transformed = _applyHomography(point, homography);
+      if (transformed == null) return null;
+      mmPoints.add(transformed);
+    }
+
+    return mmPoints;
+  }
+
+  bool _isPointInsidePolygon(
+    _ImagePoint point,
+    List<_ImagePoint> polygon,
+  ) {
+    if (polygon.length < 3) return false;
+
+    bool inside = false;
+
+    for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      final xi = polygon[i].x;
+      final yi = polygon[i].y;
+      final xj = polygon[j].x;
+      final yj = polygon[j].y;
+
+      final intersects = ((yi > point.y) != (yj > point.y)) &&
+          (point.x <
+              (xj - xi) * (point.y - yi) / ((yj - yi).abs() < 1e-9 ? 1e-9 : yj - yi) +
+                  xi);
+
+      if (intersects) inside = !inside;
+    }
+
+    return inside;
+  }
+
+  _ImagePoint? _scenePointToImagePoint(Offset scenePoint, Size canvasSize) {
+    final image = _sourceImage;
+    if (image == null) return null;
+
+    final imageRect = _imageDrawRect(
+      canvasSize,
+      image.width / image.height,
+    );
+
+    if (!imageRect.contains(scenePoint)) return null;
+
+    return _canvasPointToImagePoint(scenePoint, imageRect, image);
+  }
+
+  void _startBoundaryRoiSelection() {
+    if (_sourceImage == null) {
+      _showMessage('ROI seçmek için önce referans görsel yüklenmeli.');
+      return;
+    }
+
+    setState(() {
+      _isSelectingBoundaryRoi = true;
+      _isSelectingBoundarySeed = false;
+      _isSelectingBoundaryBackground = false;
+      _boundaryRoiDragStartPoint = null;
+      _boundaryRoiDragCurrentPoint = null;
+      _isDraggingBoundaryRoi = false;
+      _suppressNextCanvasTap = false;
+      _statusMessage =
+          'ROI seçimi aktif: iç tabanı kapsayan ve markerları dışarıda bırakan dikdörtgeni sürükleyerek çiz.';
+    });
+  }
+
+  void _startBoundarySeedSelection() {
+    if (_boundaryRoiImageRect == null) {
+      _showMessage('İç taban içi nokta seçmeden önce ROI alanı seç.');
+      return;
+    }
+
+    setState(() {
+      _isSelectingBoundarySeed = true;
+      _isSelectingBoundaryRoi = false;
+      _isSelectingBoundaryBackground = false;
+      _boundaryRoiDragStartPoint = null;
+      _boundaryRoiDragCurrentPoint = null;
+      _isDraggingBoundaryRoi = false;
+      _suppressNextCanvasTap = false;
+      _statusMessage =
+          'İç taban içi nokta seçimi aktif: ROI içinde iç tabanın gövdesine bir kez tıkla.';
+    });
+  }
+
+  void _handleBoundaryRoiPointerDown(PointerDownEvent event, Size canvasSize) {
+    if (!_isSelectingBoundaryRoi) return;
+
+    final scenePoint = _canvasTransformationController.toScene(
+      event.localPosition,
+    );
+    final imagePoint = _scenePointToImagePoint(scenePoint, canvasSize);
+
+    if (imagePoint == null) return;
+
+    setState(() {
+      _isDraggingBoundaryRoi = true;
+      _suppressNextCanvasTap = true;
+      _boundaryRoiDragStartPoint = imagePoint;
+      _boundaryRoiDragCurrentPoint = imagePoint;
+      _boundaryRoiImageRect = Rect.fromPoints(
+        imagePoint.toOffset(),
+        imagePoint.toOffset(),
+      );
+      _insoleBoundary = null;
+    });
+  }
+
+  void _handleBoundaryRoiPointerMove(PointerMoveEvent event, Size canvasSize) {
+    if (!_isSelectingBoundaryRoi || !_isDraggingBoundaryRoi) return;
+
+    final start = _boundaryRoiDragStartPoint;
+    if (start == null) return;
+
+    final scenePoint = _canvasTransformationController.toScene(
+      event.localPosition,
+    );
+    final imagePoint = _scenePointToImagePoint(scenePoint, canvasSize);
+
+    if (imagePoint == null) return;
+
+    final image = _sourceImage;
+    if (image == null) return;
+
+    final nextRect = _normalizeImageRect(
+      Rect.fromPoints(start.toOffset(), imagePoint.toOffset()),
+      image,
+    );
+
+    setState(() {
+      _suppressNextCanvasTap = true;
+      _boundaryRoiDragCurrentPoint = imagePoint;
+      _boundaryRoiImageRect = nextRect;
+    });
+  }
+
+  void _handleBoundaryRoiPointerUp(PointerUpEvent event) {
+    if (!_isSelectingBoundaryRoi || !_isDraggingBoundaryRoi) return;
+
+    setState(() {
+      _isDraggingBoundaryRoi = false;
+      _suppressNextCanvasTap = true;
+    });
+
+    _finishBoundaryRoiSelection();
+  }
+
+  void _handleBoundaryRoiPointerCancel(PointerCancelEvent event) {
+    if (!_isSelectingBoundaryRoi) return;
+
+    setState(() {
+      _isDraggingBoundaryRoi = false;
+      _suppressNextCanvasTap = true;
+    });
+
+    _finishBoundaryRoiSelection();
+  }
+
+  void _handleBoundaryRoiPanStart(DragStartDetails details, Size canvasSize) {
+    if (!_isSelectingBoundaryRoi) return;
+
+    final scenePoint = _canvasTransformationController.toScene(
+      details.localPosition,
+    );
+    final imagePoint = _scenePointToImagePoint(scenePoint, canvasSize);
+
+    if (imagePoint == null) return;
+
+    setState(() {
+      _boundaryRoiDragStartPoint = imagePoint;
+      _boundaryRoiDragCurrentPoint = imagePoint;
+      _boundaryRoiImageRect = Rect.fromPoints(
+        imagePoint.toOffset(),
+        imagePoint.toOffset(),
+      );
+      _insoleBoundary = null;
+    });
+  }
+
+  void _handleBoundaryRoiPanUpdate(DragUpdateDetails details, Size canvasSize) {
+    if (!_isSelectingBoundaryRoi) return;
+
+    final start = _boundaryRoiDragStartPoint;
+    if (start == null) return;
+
+    final scenePoint = _canvasTransformationController.toScene(
+      details.localPosition,
+    );
+    final imagePoint = _scenePointToImagePoint(scenePoint, canvasSize);
+
+    if (imagePoint == null) return;
+
+    final image = _sourceImage;
+    if (image == null) return;
+
+    final nextRect = _normalizeImageRect(
+      Rect.fromPoints(start.toOffset(), imagePoint.toOffset()),
+      image,
+    );
+
+    setState(() {
+      _boundaryRoiDragCurrentPoint = imagePoint;
+      _boundaryRoiImageRect = nextRect;
+    });
+  }
+
+  void _handleBoundaryRoiPanEnd(DragEndDetails details) {
+    if (!_isSelectingBoundaryRoi) return;
+    _finishBoundaryRoiSelection();
+  }
+
+  void _finishBoundaryRoiSelection() {
+    if (!_isSelectingBoundaryRoi) return;
+
+    final roi = _boundaryRoiImageRect;
+
+    setState(() {
+      _isSelectingBoundaryRoi = false;
+      _isDraggingBoundaryRoi = false;
+      _boundaryRoiDragStartPoint = null;
+      _boundaryRoiDragCurrentPoint = null;
+
+      if (roi == null || roi.width < 20 || roi.height < 20) {
+        _boundaryRoiImageRect = null;
+        _statusMessage = 'ROI alanı çok küçük olduğu için iptal edildi.';
+      } else {
+        _boundarySeedPoint = null;
+        _boundaryBackgroundPoint = null;
+        _insoleBoundary = null;
+        _statusMessage =
+            'ROI seçildi. Şimdi ROI içinde iç tabanın gövdesine iç taban içi nokta seç.';
+      }
+    });
+  }
+
+  void _setBoundarySeedPoint(_ImagePoint point) {
+    final roi = _boundaryRoiImageRect;
+
+    if (roi == null) {
+      _showMessage('İç taban içi nokta seçmeden önce ROI alanı seç.');
+      return;
+    }
+
+    if (!roi.contains(point.toOffset())) {
+      _showMessage('İç taban içi nokta ROI alanının içinde olmalı.');
+      return;
+    }
+
+    setState(() {
+      _boundarySeedPoint = point;
+      _isSelectingBoundarySeed = false;
+      _insoleBoundary = null;
+      _statusMessage =
+          'İç taban içi nokta seçildi. İlk sınır tahmini hazırlanıyor; sliderları değiştirince çizgi otomatik güncellenir.';
+    });
+
+    _scheduleBoundaryDetectionPreview();
+  }
+
+  void _clearBoundaryRoiAndSeed() {
+    setState(() {
+      _boundaryRoiImageRect = null;
+      _boundarySeedPoint = null;
+      _boundaryBackgroundPoint = null;
+      _boundaryRoiDragStartPoint = null;
+      _boundaryRoiDragCurrentPoint = null;
+      _isDraggingBoundaryRoi = false;
+      _suppressNextCanvasTap = false;
+      _isSelectingBoundaryRoi = false;
+      _isSelectingBoundarySeed = false;
+      _isSelectingBoundaryBackground = false;
+      _insoleBoundary = null;
+      _statusMessage = 'ROI, iç taban içi nokta ve sınır temizlendi.';
+    });
+  }
+
+  void _clearInsoleBoundary() {
+    setState(() {
+      _insoleBoundary = null;
+      _statusMessage = 'İç taban sınırı temizlendi. ROI ve iç taban içi nokta korunuyor.';
+    });
+  }
+
 
   void _clearCalibration() {
     setState(() {
@@ -1542,8 +3100,18 @@ class _ReferenceInsoleAnalysisScreenState
       _calibrationPixelDistance = null;
       _pixelsPerMm = null;
       _measurements = [];
+      _insoleBoundary = null;
+      _showInsoleBoundary = true;
+      _boundaryRoiImageRect = null;
+      _boundarySeedPoint = null;
+      _boundaryBackgroundPoint = null;
+      _isSelectingBoundaryRoi = false;
+      _isSelectingBoundarySeed = false;
+      _isSelectingBoundaryBackground = false;
+      _boundaryRoiDragStartPoint = null;
+      _boundaryRoiDragCurrentPoint = null;
       _toolMode = _AnalysisToolMode.calibration;
-      _statusMessage = 'Kalibrasyon ve ölçümler temizlendi.';
+      _statusMessage = 'Kalibrasyon, sınır ve ölçümler temizlendi.';
     });
   }
 
@@ -2126,6 +3694,205 @@ class _ReferenceInsoleAnalysisScreenState
             ),
             const SizedBox(height: 12),
             _buildSectionCard(
+              title: 'İç Taban Sınırı',
+              icon: Icons.gesture_outlined,
+              child: Column(
+                children: [
+                  _buildNotice(
+                    icon: Icons.select_all_outlined,
+                    text:
+                        'Önce markerları dışarıda bırakan bir ROI seç. Ardından ROI içinde iç tabanın gövdesine bir iç taban içi nokta koy. Sliderları değiştirdikçe sınır otomatik güncellenir.',
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isDetectingBoundary
+                              ? null
+                              : _startBoundaryRoiSelection,
+                          icon: const Icon(Icons.crop_free_outlined),
+                          label: Text(
+                            _boundaryRoiImageRect == null
+                                ? 'ROI Seç'
+                                : 'ROI Yenile',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isDetectingBoundary ||
+                                  _boundaryRoiImageRect == null
+                              ? null
+                              : _startBoundarySeedSelection,
+                          icon: const Icon(Icons.my_location_outlined),
+                          label: Text(
+                            _boundarySeedPoint == null
+                                ? 'İç Nokta Seç'
+                                : 'İç Nokta Yenile',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildKeyValueRow(
+                    'ROI',
+                    _boundaryRoiImageRect == null
+                        ? '—'
+                        : '${_boundaryRoiImageRect!.width.toStringAsFixed(0)} × ${_boundaryRoiImageRect!.height.toStringAsFixed(0)} px',
+                  ),
+                  _buildKeyValueRow(
+                    'İç taban içi nokta',
+                    _boundarySeedPoint == null
+                        ? '—'
+                        : 'x:${_boundarySeedPoint!.x.toStringAsFixed(0)}, y:${_boundarySeedPoint!.y.toStringAsFixed(0)}',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildBoundarySlider(
+                    title: 'Sınır hassasiyeti',
+                    subtitle:
+                        'Yüksek değer iç tabana benzer daha fazla pikseli dahil eder. Çok yüksek değer gölgeyi de içeri alabilir.',
+                    value: _boundarySensitivity,
+                    valueText: _levelText(_boundarySensitivity),
+                    onChanged: (value) {
+                      setState(() {
+                        _boundarySensitivity = value;
+                      });
+                      _scheduleBoundaryDetectionPreview();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBoundarySlider(
+                    title: 'Gölge toleransı',
+                    subtitle:
+                        'Yüksek değer parlaklık farklarını daha fazla yok sayar. Gölgeli fotoğraflarda yükseltmek işe yarar.',
+                    value: _boundaryShadowTolerance,
+                    valueText: _levelText(_boundaryShadowTolerance),
+                    onChanged: (value) {
+                      setState(() {
+                        _boundaryShadowTolerance = value;
+                      });
+                      _scheduleBoundaryDetectionPreview();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBoundarySlider(
+                    title: 'Zemin ayrımı',
+                    subtitle:
+                        'Yüksek değer A4/arka planı daha agresif dışarıda bırakır. Gölge sınıra dahil oluyorsa yükselt.',
+                    value: _boundaryBackgroundSeparation,
+                    valueText: _levelText(_boundaryBackgroundSeparation),
+                    onChanged: (value) {
+                      setState(() {
+                        _boundaryBackgroundSeparation = value;
+                      });
+                      _scheduleBoundaryDetectionPreview();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBoundarySlider(
+                    title: 'Boşluk doldurma',
+                    subtitle:
+                        'Kopuk sınırları birleştirir. Çok yüksek değer yakın gölgeleri veya lekeleri de birleştirebilir.',
+                    value: _boundaryClosingStrength.toDouble(),
+                    min: 0,
+                    max: 6,
+                    divisions: 6,
+                    valueText: _strengthText(_boundaryClosingStrength),
+                    onChanged: (value) {
+                      setState(() {
+                        _boundaryClosingStrength = value.round();
+                      });
+                      _scheduleBoundaryDetectionPreview();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBoundarySlider(
+                    title: 'Kontur yumuşatma',
+                    subtitle:
+                        'Çizgiyi daha akıcı yapar. Çok yüksek değer küçük gerçek detayları sadeleştirebilir.',
+                    value: _boundarySmoothingStrength.toDouble(),
+                    min: 0,
+                    max: 6,
+                    divisions: 6,
+                    valueText: _strengthText(_boundarySmoothingStrength),
+                    onChanged: (value) {
+                      setState(() {
+                        _boundarySmoothingStrength = value.round();
+                      });
+                      _scheduleBoundaryDetectionPreview();
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isDetectingBoundary
+                          ? null
+                          : () => _detectInsoleBoundary(),
+                      icon: _isDetectingBoundary
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.auto_fix_high_outlined),
+                      label: const Text('Sınırı Bul / Güncelle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.cyan.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    value: _showInsoleBoundary,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Sınırı göster'),
+                    subtitle: Text(
+                      _insoleBoundary == null
+                          ? 'Henüz sınır bulunmadı.'
+                          : '${_insoleBoundary!.points.length} nokta ile çiziliyor.',
+                    ),
+                    onChanged: _insoleBoundary == null
+                        ? null
+                        : (value) {
+                            setState(() => _showInsoleBoundary = value);
+                          },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _insoleBoundary == null
+                              ? null
+                              : _clearInsoleBoundary,
+                          icon: const Icon(Icons.layers_clear_outlined),
+                          label: const Text('Sınırı Temizle'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _boundaryRoiImageRect == null &&
+                                  _boundarySeedPoint == null
+                              ? null
+                              : _clearBoundaryRoiAndSeed,
+                          icon: const Icon(Icons.delete_sweep_outlined),
+                          label: const Text('ROI/Nokta Temizle'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildSectionCard(
               title: 'Kaydet / Dışa Aktar',
               icon: Icons.save_alt_outlined,
               child: Column(
@@ -2160,23 +3927,72 @@ class _ReferenceInsoleAnalysisScreenState
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isExporting ? null : _exportAnnotatedPng,
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text('PNG Dışa Aktar'),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Tam görsel',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isExporting ? null : _exportSvg,
-                      icon: const Icon(Icons.code_outlined),
-                      label: const Text('SVG Dışa Aktar'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              _isExporting ? null : _exportFullAnnotatedPng,
+                          icon: const Icon(Icons.image_outlined),
+                          label: const Text('PNG'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isExporting ? null : _exportFullSvg,
+                          icon: const Icon(Icons.code_outlined),
+                          label: const Text('SVG'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Şeffaf overlay',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isExporting
+                              ? null
+                              : _exportTransparentOverlayPng,
+                          icon: const Icon(Icons.layers_outlined),
+                          label: const Text('PNG'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isExporting
+                              ? null
+                              : _exportTransparentOverlaySvg,
+                          icon: const Icon(Icons.polyline_outlined),
+                          label: const Text('SVG'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2213,6 +4029,8 @@ class _ReferenceInsoleAnalysisScreenState
                 ),
               ),
             const SizedBox(width: 10),
+            _buildOverlayVisibilityControls(),
+            const SizedBox(width: 8),
             _buildZoomIndicator(),
           ],
         ),
@@ -2256,9 +4074,34 @@ class _ReferenceInsoleAnalysisScreenState
 
                             return Listener(
                               onPointerSignal: _handleCanvasPointerSignal,
+                              onPointerDown: _isSelectingBoundaryRoi
+                                  ? (event) => _handleBoundaryRoiPointerDown(
+                                        event,
+                                        canvasSize,
+                                      )
+                                  : null,
+                              onPointerMove: _isSelectingBoundaryRoi
+                                  ? (event) => _handleBoundaryRoiPointerMove(
+                                        event,
+                                        canvasSize,
+                                      )
+                                  : null,
+                              onPointerUp: _isSelectingBoundaryRoi
+                                  ? _handleBoundaryRoiPointerUp
+                                  : null,
+                              onPointerCancel: _isSelectingBoundaryRoi
+                                  ? _handleBoundaryRoiPointerCancel
+                                  : null,
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTapUp: (details) {
+                                  if (_suppressNextCanvasTap) {
+                                    _suppressNextCanvasTap = false;
+                                    return;
+                                  }
+
+                                  if (_isSelectingBoundaryRoi) return;
+
                                   final scenePoint =
                                       _canvasTransformationController.toScene(
                                     details.localPosition,
@@ -2276,8 +4119,8 @@ class _ReferenceInsoleAnalysisScreenState
                                     minScale: _minCanvasScale,
                                     maxScale: _maxCanvasScale,
                                     boundaryMargin: const EdgeInsets.all(5000),
-                                    panEnabled: true,
-                                    scaleEnabled: true,
+                                    panEnabled: !_isSelectingBoundaryRoi,
+                                    scaleEnabled: !_isSelectingBoundaryRoi,
                                     child: SizedBox(
                                       width: canvasSize.width,
                                       height: canvasSize.height,
@@ -2296,7 +4139,32 @@ class _ReferenceInsoleAnalysisScreenState
                                           measurements: _measurements,
                                           pendingMeasurementPoints:
                                               _pendingMeasurementPoints,
+                                          insoleBoundary: _showInsoleBoundary
+                                              ? _insoleBoundary
+                                              : null,
+                                          boundaryRoiImageRect:
+                                              _boundaryRoiImageRect,
+                                          boundarySeedPoint:
+                                              _boundarySeedPoint,
+                                          boundaryBackgroundPoint: null,
+                                          isSelectingBoundaryRoi:
+                                              _isSelectingBoundaryRoi,
+                                          isSelectingBoundarySeed:
+                                              _isSelectingBoundarySeed,
+                                          isSelectingBoundaryBackground: false,
+                                          boundaryRoiDragStartPoint:
+                                              _boundaryRoiDragStartPoint,
+                                          boundaryRoiDragCurrentPoint:
+                                              _boundaryRoiDragCurrentPoint,
                                           referenceLengthMm: _referenceLengthMm,
+                                          showCalibrationOverlay:
+                                              _showCalibrationOverlay,
+                                          showBoundaryRoiOverlay:
+                                              _showRoiOverlay,
+                                          showInternalPointOverlay:
+                                              _showInternalPointOverlay,
+                                          showMeasurementOverlay:
+                                              _showMeasurementOverlay,
                                         ),
                                         size: canvasSize,
                                       ),
@@ -2368,6 +4236,35 @@ class _ReferenceInsoleAnalysisScreenState
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            _buildSectionCard(
+              title: 'İç Taban Sınırı',
+              icon: Icons.polyline_outlined,
+              child: _insoleBoundary == null
+                  ? _buildNotice(
+                      icon: Icons.gesture_outlined,
+                      text:
+                          'Sol panelden otomatik sınır tespiti yapıldığında sınır bilgisi burada özetlenir.',
+                    )
+                  : Column(
+                      children: [
+                        _buildKeyValueRow(
+                          'Yöntem',
+                          _insoleBoundary!.method,
+                        ),
+                        _buildKeyValueRow(
+                          'Nokta sayısı',
+                          _insoleBoundary!.points.length.toString(),
+                        ),
+                        _buildKeyValueRow(
+                          'MM koordinat',
+                          _insoleBoundary!.pointsMm == null
+                              ? 'Yok'
+                              : 'Hazır',
+                        ),
+                      ],
+                    ),
+            ),
             const SizedBox(height: 12),
             _buildSectionCard(
               title: 'Perspektif / Ölçüm Mantığı',
@@ -2619,6 +4516,93 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
+  Widget _buildBoundarySlider({
+    required String title,
+    required String subtitle,
+    required double value,
+    required String valueText,
+    required ValueChanged<double> onChanged,
+    double min = 0,
+    double max = 1,
+    int? divisions = 100,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                valueText,
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          Slider(
+            value: value.clamp(min, max).toDouble(),
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _levelText(double value) {
+    if (value < 0.17) return 'Çok düşük';
+    if (value < 0.34) return 'Düşük';
+    if (value < 0.50) return 'Orta düşük';
+    if (value < 0.67) return 'Orta';
+    if (value < 0.84) return 'Yüksek';
+    return 'Çok yüksek';
+  }
+
+  String _strengthText(int value) {
+    switch (value) {
+      case 0:
+        return 'Kapalı';
+      case 1:
+        return 'Çok düşük';
+      case 2:
+        return 'Düşük';
+      case 3:
+        return 'Orta';
+      case 4:
+        return 'Yüksek';
+      case 5:
+        return 'Çok yüksek';
+      case 6:
+        return 'Maksimum';
+      default:
+        return value.toString();
+    }
+  }
+
   static int? _asInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
@@ -2719,6 +4703,71 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
+
+  static Rect? _rectFromDynamic(dynamic value) {
+    final map = _asMap(value);
+    if (map.isEmpty) return null;
+
+    final x = _asDouble(map['x'] ?? map['left']);
+    final y = _asDouble(map['y'] ?? map['top']);
+    final width = _asDouble(map['width']);
+    final height = _asDouble(map['height']);
+
+    if (x != null && y != null && width != null && height != null) {
+      return Rect.fromLTWH(x, y, width, height);
+    }
+
+    final left = _asDouble(map['left']);
+    final top = _asDouble(map['top']);
+    final right = _asDouble(map['right']);
+    final bottom = _asDouble(map['bottom']);
+
+    if (left != null && top != null && right != null && bottom != null) {
+      return Rect.fromLTRB(left, top, right, bottom);
+    }
+
+    return null;
+  }
+
+  static _InsoleBoundary? _boundaryFromDynamic(dynamic value) {
+    final map = _asMap(value);
+
+    if (map.isEmpty) return null;
+
+    final points = _asList(map['points'] ?? map['pointsImage'])
+        .map(_pointFromDynamic)
+        .whereType<_ImagePoint>()
+        .toList();
+
+    if (points.length < 3) return null;
+
+    final pointsMm = _asList(map['pointsMm'])
+        .map(_pointFromDynamic)
+        .whereType<_ImagePoint>()
+        .toList();
+
+    final roiMap = _asMap(map['roi'] ?? map['roiImageRect']);
+    final roi = _rectFromDynamic(roiMap);
+    final seed = _pointFromDynamic(map['seedPoint']);
+
+    return _InsoleBoundary(
+      method: (map['method'] ?? 'saved_boundary').toString(),
+      imageWidth: _asInt(map['imageWidth']) ?? 0,
+      imageHeight: _asInt(map['imageHeight']) ?? 0,
+      roiImageRect: roi,
+      seedPoint: seed,
+      sensitivity: _asDouble(map['sensitivity']),
+      shadowTolerance: _asDouble(map['shadowTolerance']),
+      backgroundSeparation: _asDouble(map['backgroundSeparation']),
+      closingStrength: _asInt(map['closingStrength']),
+      smoothingStrength: _asInt(map['smoothingStrength']),
+      points: points,
+      pointsMm: pointsMm.isEmpty ? null : pointsMm,
+      createdAt: _asDateTime(map['createdAt']) ?? DateTime.now(),
+    );
+  }
+
+
   static _InsoleMeasurement? _measurementFromDynamic(dynamic value) {
     final map = _asMap(value);
 
@@ -2769,7 +4818,20 @@ class _ReferenceInsolePainter extends CustomPainter {
   final List<_ImagePoint> pendingMultiReferencePoints;
   final List<_InsoleMeasurement> measurements;
   final List<_ImagePoint> pendingMeasurementPoints;
+  final _InsoleBoundary? insoleBoundary;
+  final Rect? boundaryRoiImageRect;
+  final _ImagePoint? boundarySeedPoint;
+  final _ImagePoint? boundaryBackgroundPoint;
+  final bool isSelectingBoundaryRoi;
+  final bool isSelectingBoundarySeed;
+  final bool isSelectingBoundaryBackground;
+  final _ImagePoint? boundaryRoiDragStartPoint;
+  final _ImagePoint? boundaryRoiDragCurrentPoint;
   final double referenceLengthMm;
+  final bool showCalibrationOverlay;
+  final bool showBoundaryRoiOverlay;
+  final bool showInternalPointOverlay;
+  final bool showMeasurementOverlay;
 
   const _ReferenceInsolePainter({
     required this.image,
@@ -2781,7 +4843,20 @@ class _ReferenceInsolePainter extends CustomPainter {
     required this.pendingMultiReferencePoints,
     required this.measurements,
     required this.pendingMeasurementPoints,
+    required this.insoleBoundary,
+    required this.boundaryRoiImageRect,
+    required this.boundarySeedPoint,
+    required this.boundaryBackgroundPoint,
+    required this.isSelectingBoundaryRoi,
+    required this.isSelectingBoundarySeed,
+    required this.isSelectingBoundaryBackground,
+    required this.boundaryRoiDragStartPoint,
+    required this.boundaryRoiDragCurrentPoint,
     required this.referenceLengthMm,
+    required this.showCalibrationOverlay,
+    required this.showBoundaryRoiOverlay,
+    required this.showInternalPointOverlay,
+    required this.showMeasurementOverlay,
   });
 
   @override
@@ -2821,17 +4896,162 @@ class _ReferenceInsolePainter extends CustomPainter {
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
 
-    _drawSimpleCalibration(canvas, imageRect, calibrationPaint);
-    _drawPerspectiveCalibration(canvas, imageRect, calibrationPaint);
-    _drawMultiReferences(canvas, imageRect, referencePaint);
-    _drawPendingReferences(canvas, imageRect, pendingPaint);
-    _drawMeasurements(canvas, imageRect, measurementPaint);
-    _drawPendingMeasurements(canvas, imageRect, pendingPaint);
+    _drawInsoleBoundary(canvas, imageRect);
+
+    if (showBoundaryRoiOverlay || showInternalPointOverlay) {
+      _drawBoundaryRoiAndSeed(canvas, imageRect);
+    }
+
+    if (showCalibrationOverlay) {
+      _drawSimpleCalibration(canvas, imageRect, calibrationPaint);
+      _drawPerspectiveCalibration(canvas, imageRect, calibrationPaint);
+      _drawMultiReferences(canvas, imageRect, referencePaint);
+      _drawPendingReferences(canvas, imageRect, pendingPaint);
+    }
+
+    if (showMeasurementOverlay) {
+      _drawMeasurements(canvas, imageRect, measurementPaint);
+      _drawPendingMeasurements(canvas, imageRect, pendingPaint);
+    }
 
     _drawTopBadge(
       canvas: canvas,
       text: _modeInstructionText,
       rect: imageRect,
+    );
+  }
+
+  void _drawBoundaryRoiAndSeed(Canvas canvas, Rect imageRect) {
+    final activeRoi = _activeBoundaryRoiRect();
+
+    if (showBoundaryRoiOverlay &&
+        activeRoi != null &&
+        activeRoi.width > 0 &&
+        activeRoi.height > 0) {
+      final rect = _imageRectToCanvasRect(activeRoi, imageRect);
+      final fillPaint = Paint()
+        ..color = Colors.orange.withOpacity(isSelectingBoundaryRoi ? 0.14 : 0.08)
+        ..style = PaintingStyle.fill;
+      final strokePaint = Paint()
+        ..color = Colors.orange.shade800
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isSelectingBoundaryRoi ? 3 : 2;
+
+      canvas.drawRect(rect, fillPaint);
+      canvas.drawRect(rect, strokePaint);
+
+      _drawLabel(
+        canvas: canvas,
+        text: isSelectingBoundaryRoi ? 'ROI seçiliyor' : 'ROI',
+        position: rect.topLeft + const Offset(8, 24),
+        color: Colors.orange.shade800,
+      );
+    }
+
+    final seed = boundarySeedPoint;
+    if (showInternalPointOverlay && seed != null) {
+      final point = _imagePointToCanvasPoint(seed, imageRect);
+      _drawCrosshair(canvas, point, Colors.pink.shade700);
+      _drawLabel(
+        canvas: canvas,
+        text: isSelectingBoundarySeed ? 'İç nokta seçiliyor' : 'İç nokta',
+        position: point + const Offset(10, -10),
+        color: Colors.pink.shade700,
+      );
+    }
+
+    final background = boundaryBackgroundPoint;
+    if (background != null) {
+      final point = _imagePointToCanvasPoint(background, imageRect);
+      _drawCrosshair(canvas, point, Colors.amber.shade800);
+      _drawLabel(
+        canvas: canvas,
+        text: isSelectingBoundaryBackground
+            ? 'Zemin seçiliyor'
+            : 'Zemin/Gölge',
+        position: point + const Offset(10, 18),
+        color: Colors.amber.shade800,
+      );
+    }
+  }
+
+
+  Rect? _activeBoundaryRoiRect() {
+    if (isSelectingBoundaryRoi &&
+        boundaryRoiDragStartPoint != null &&
+        boundaryRoiDragCurrentPoint != null) {
+      return Rect.fromPoints(
+        boundaryRoiDragStartPoint!.toOffset(),
+        boundaryRoiDragCurrentPoint!.toOffset(),
+      );
+    }
+
+    return boundaryRoiImageRect;
+  }
+
+  Rect _imageRectToCanvasRect(Rect rect, Rect imageRect) {
+    final topLeft = _imagePointToCanvasPoint(
+      _ImagePoint(x: rect.left, y: rect.top),
+      imageRect,
+    );
+    final bottomRight = _imagePointToCanvasPoint(
+      _ImagePoint(x: rect.right, y: rect.bottom),
+      imageRect,
+    );
+
+    return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  void _drawCrosshair(Canvas canvas, Offset point, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(point, 8, paint..style = PaintingStyle.stroke);
+    canvas.drawLine(
+      Offset(point.dx - 13, point.dy),
+      Offset(point.dx + 13, point.dy),
+      paint..style = PaintingStyle.stroke,
+    );
+    canvas.drawLine(
+      Offset(point.dx, point.dy - 13),
+      Offset(point.dx, point.dy + 13),
+      paint..style = PaintingStyle.stroke,
+    );
+  }
+
+  void _drawInsoleBoundary(Canvas canvas, Rect imageRect) {
+    final boundary = insoleBoundary;
+
+    if (boundary == null || boundary.points.length < 3) return;
+
+    final points = boundary.points
+        .map((point) => _imagePointToCanvasPoint(point, imageRect))
+        .toList();
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+
+    path.close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.cyan.withOpacity(0.10)
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.cyan.shade700
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeJoin = StrokeJoin.round,
     );
   }
 
@@ -2987,6 +5207,14 @@ class _ReferenceInsolePainter extends CustomPainter {
   }
 
   String get _modeInstructionText {
+    if (isSelectingBoundaryRoi) {
+      return 'ROI seçimi: iç tabanı kapsayan alanı sürükle';
+    }
+
+    if (isSelectingBoundarySeed) {
+      return 'İç taban içi nokta seçimi: gövdeye tıkla';
+    }
+
     if (toolMode == _AnalysisToolMode.measurement) {
       return 'Ölçüm modu: ölçülecek iki noktayı seç';
     }
@@ -3190,7 +5418,21 @@ class _ReferenceInsolePainter extends CustomPainter {
           oldDelegate.pendingMeasurementPoints,
           pendingMeasurementPoints,
         ) ||
-        oldDelegate.referenceLengthMm != referenceLengthMm;
+        oldDelegate.insoleBoundary != insoleBoundary ||
+        oldDelegate.boundaryRoiImageRect != boundaryRoiImageRect ||
+        oldDelegate.boundarySeedPoint != boundarySeedPoint ||
+        oldDelegate.boundaryBackgroundPoint != boundaryBackgroundPoint ||
+        oldDelegate.isSelectingBoundaryRoi != isSelectingBoundaryRoi ||
+        oldDelegate.isSelectingBoundarySeed != isSelectingBoundarySeed ||
+        oldDelegate.isSelectingBoundaryBackground !=
+            isSelectingBoundaryBackground ||
+        oldDelegate.boundaryRoiDragStartPoint != boundaryRoiDragStartPoint ||
+        oldDelegate.boundaryRoiDragCurrentPoint != boundaryRoiDragCurrentPoint ||
+        oldDelegate.referenceLengthMm != referenceLengthMm ||
+        oldDelegate.showCalibrationOverlay != showCalibrationOverlay ||
+        oldDelegate.showBoundaryRoiOverlay != showBoundaryRoiOverlay ||
+        oldDelegate.showInternalPointOverlay != showInternalPointOverlay ||
+        oldDelegate.showMeasurementOverlay != showMeasurementOverlay;
   }
 }
 
@@ -3332,6 +5574,102 @@ class _LocalReferenceScale {
       );
 }
 
+
+class _InsoleBoundary {
+  final String method;
+  final int imageWidth;
+  final int imageHeight;
+  final Rect? roiImageRect;
+  final _ImagePoint? seedPoint;
+  final double? sensitivity;
+  final double? shadowTolerance;
+  final double? backgroundSeparation;
+  final int? closingStrength;
+  final int? smoothingStrength;
+  final List<_ImagePoint> points;
+  final List<_ImagePoint>? pointsMm;
+  final DateTime createdAt;
+
+  const _InsoleBoundary({
+    required this.method,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.roiImageRect,
+    required this.seedPoint,
+    required this.sensitivity,
+    required this.shadowTolerance,
+    required this.backgroundSeparation,
+    required this.closingStrength,
+    required this.smoothingStrength,
+    required this.points,
+    required this.pointsMm,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'method': method,
+      'imageWidth': imageWidth,
+      'imageHeight': imageHeight,
+      'roi': roiImageRect == null
+          ? null
+          : {
+              'x': roiImageRect!.left,
+              'y': roiImageRect!.top,
+              'width': roiImageRect!.width,
+              'height': roiImageRect!.height,
+              'left': roiImageRect!.left,
+              'top': roiImageRect!.top,
+              'right': roiImageRect!.right,
+              'bottom': roiImageRect!.bottom,
+            },
+      'seedPoint': seedPoint?.toJson(),
+      'sensitivity': sensitivity,
+      'shadowTolerance': shadowTolerance,
+      'backgroundSeparation': backgroundSeparation,
+      'closingStrength': closingStrength,
+      'smoothingStrength': smoothingStrength,
+      'points': points.map((point) => point.toJson()).toList(),
+      'pointsMm': pointsMm?.map((point) => point.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is _InsoleBoundary &&
+        other.method == method &&
+        other.imageWidth == imageWidth &&
+        other.imageHeight == imageHeight &&
+        other.roiImageRect == roiImageRect &&
+        other.seedPoint == seedPoint &&
+        other.sensitivity == sensitivity &&
+        other.shadowTolerance == shadowTolerance &&
+        other.backgroundSeparation == backgroundSeparation &&
+        other.closingStrength == closingStrength &&
+        other.smoothingStrength == smoothingStrength &&
+        listEquals(other.points, points) &&
+        listEquals(other.pointsMm, pointsMm);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        method,
+        imageWidth,
+        imageHeight,
+        roiImageRect,
+        seedPoint,
+        sensitivity,
+        shadowTolerance,
+        backgroundSeparation,
+        closingStrength,
+        smoothingStrength,
+        Object.hashAll(points),
+        pointsMm == null ? null : Object.hashAll(pointsMm!),
+      );
+}
+
+
 class _InsoleMeasurement {
   final String id;
   final String label;
@@ -3413,4 +5751,59 @@ class _ReferenceScaleDialogResult {
     required this.label,
     required this.lengthMm,
   });
+}
+
+
+class _BoundaryPixelFeatures {
+  final double nr;
+  final double ng;
+  final double nb;
+  final double luminance;
+  final double saturation;
+
+  const _BoundaryPixelFeatures({
+    required this.nr,
+    required this.ng,
+    required this.nb,
+    required this.luminance,
+    required this.saturation,
+  });
+
+  factory _BoundaryPixelFeatures.average(
+    List<_BoundaryPixelFeatures> items,
+  ) {
+    if (items.isEmpty) {
+      return const _BoundaryPixelFeatures(
+        nr: 0,
+        ng: 0,
+        nb: 0,
+        luminance: 0,
+        saturation: 0,
+      );
+    }
+
+    double nr = 0;
+    double ng = 0;
+    double nb = 0;
+    double luminance = 0;
+    double saturation = 0;
+
+    for (final item in items) {
+      nr += item.nr;
+      ng += item.ng;
+      nb += item.nb;
+      luminance += item.luminance;
+      saturation += item.saturation;
+    }
+
+    final count = items.length.toDouble();
+
+    return _BoundaryPixelFeatures(
+      nr: nr / count,
+      ng: ng / count,
+      nb: nb / count,
+      luminance: luminance / count,
+      saturation: saturation / count,
+    );
+  }
 }
