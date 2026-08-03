@@ -35,6 +35,10 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
   SupabaseClient get _client => Supabase.instance.client;
 
   DateTime? _birthDate;
+  int? _selectedBirthDay;
+  int? _selectedBirthMonth;
+  int? _selectedBirthYear;
+
   String? _selectedGender;
   bool _isSaving = false;
 
@@ -69,17 +73,120 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
     return regex.hasMatch(email);
   }
 
+  List<int> _birthYearOptions() {
+    final currentYear = DateTime.now().year;
+
+    return List<int>.generate(
+      currentYear - 1930 + 1,
+      (index) => currentYear - index,
+    );
+  }
+
+  List<int> _birthMonthOptions() {
+    return List<int>.generate(12, (index) => index + 1);
+  }
+
+  List<int> _birthDayOptions() {
+    final year = _selectedBirthYear ?? 2000;
+    final month = _selectedBirthMonth ?? 1;
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+
+    return List<int>.generate(daysInMonth, (index) => index + 1);
+  }
+
+  String _monthLabel(int month) {
+    switch (month) {
+      case 1:
+        return 'Ocak';
+      case 2:
+        return 'Şubat';
+      case 3:
+        return 'Mart';
+      case 4:
+        return 'Nisan';
+      case 5:
+        return 'Mayıs';
+      case 6:
+        return 'Haziran';
+      case 7:
+        return 'Temmuz';
+      case 8:
+        return 'Ağustos';
+      case 9:
+        return 'Eylül';
+      case 10:
+        return 'Ekim';
+      case 11:
+        return 'Kasım';
+      case 12:
+        return 'Aralık';
+      default:
+        return month.toString();
+    }
+  }
+
+  void _updateBirthDateFromParts() {
+    final day = _selectedBirthDay;
+    final month = _selectedBirthMonth;
+    final year = _selectedBirthYear;
+
+    if (day == null || month == null || year == null) {
+      setState(() {
+        _birthDate = null;
+      });
+      return;
+    }
+
+    final now = DateTime.now();
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final safeDay = day > daysInMonth ? daysInMonth : day;
+    final selectedDate = DateTime(year, month, safeDay);
+
+    if (selectedDate.isAfter(now)) {
+      setState(() {
+        _selectedBirthDay = now.day;
+        _selectedBirthMonth = now.month;
+        _selectedBirthYear = now.year;
+        _birthDate = DateTime(now.year, now.month, now.day);
+      });
+      return;
+    }
+
+    setState(() {
+      _selectedBirthDay = safeDay;
+      _birthDate = selectedDate;
+    });
+  }
+
+  void _clearBirthDate() {
+    setState(() {
+      _birthDate = null;
+      _selectedBirthDay = null;
+      _selectedBirthMonth = null;
+      _selectedBirthYear = null;
+    });
+  }
+
   Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(1995, 1, 1),
+      initialDate: _birthDate ?? DateTime(1995, 1, 1),
       firstDate: DateTime(1930),
-      lastDate: DateTime.now(),
+      lastDate: now,
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Doğum tarihi seçin',
+      cancelText: 'Vazgeç',
+      confirmText: 'Seç',
     );
 
     if (picked != null) {
       setState(() {
         _birthDate = picked;
+        _selectedBirthDay = picked.day;
+        _selectedBirthMonth = picked.month;
+        _selectedBirthYear = picked.year;
       });
     }
   }
@@ -416,16 +523,7 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        InkWell(
-                          onTap: _pickBirthDate,
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Doğum Tarihi',
-                              border: OutlineInputBorder(),
-                            ),
-                            child: Text(_formatDate(_birthDate)),
-                          ),
-                        ),
+                        _buildBirthDateSelector(),
                       ],
                     ),
                   ),
@@ -575,6 +673,161 @@ class _PatientCreateScreenState extends State<PatientCreateScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBirthDateSelector() {
+    final days = _birthDayOptions();
+    final months = _birthMonthOptions();
+    final years = _birthYearOptions();
+
+    final dayValue = _selectedBirthDay != null && days.contains(_selectedBirthDay)
+        ? _selectedBirthDay
+        : null;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 560;
+
+        final dayField = DropdownButtonFormField<int>(
+          initialValue: dayValue,
+          decoration: const InputDecoration(
+            labelText: 'Gün',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: days
+              .map(
+                (day) => DropdownMenuItem<int>(
+                  value: day,
+                  child: Text(day.toString().padLeft(2, '0')),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            _selectedBirthDay = value;
+            _updateBirthDateFromParts();
+          },
+        );
+
+        final monthField = DropdownButtonFormField<int>(
+          initialValue: _selectedBirthMonth,
+          decoration: const InputDecoration(
+            labelText: 'Ay',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: months
+              .map(
+                (month) => DropdownMenuItem<int>(
+                  value: month,
+                  child: Text(_monthLabel(month)),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            _selectedBirthMonth = value;
+            _updateBirthDateFromParts();
+          },
+        );
+
+        final yearField = DropdownButtonFormField<int>(
+          initialValue: _selectedBirthYear,
+          decoration: const InputDecoration(
+            labelText: 'Yıl',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: years
+              .map(
+                (year) => DropdownMenuItem<int>(
+                  value: year,
+                  child: Text(year.toString()),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            _selectedBirthYear = value;
+            _updateBirthDateFromParts();
+          },
+        );
+
+        final calendarButton = OutlinedButton.icon(
+          onPressed: _pickBirthDate,
+          icon: const Icon(Icons.calendar_month_outlined),
+          label: const Text('Takvim'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.teal,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 16,
+            ),
+          ),
+        );
+
+        final clearButton = IconButton(
+          tooltip: 'Doğum tarihini temizle',
+          onPressed: _birthDate == null ? null : _clearBirthDate,
+          icon: const Icon(Icons.close),
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Doğum Tarihi',
+              style: TextStyle(
+                color: Colors.grey.shade800,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (isNarrow)
+              Column(
+                children: [
+                  dayField,
+                  const SizedBox(height: 10),
+                  monthField,
+                  const SizedBox(height: 10),
+                  yearField,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: calendarButton),
+                      const SizedBox(width: 8),
+                      clearButton,
+                    ],
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(child: dayField),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 2, child: monthField),
+                  const SizedBox(width: 10),
+                  Expanded(child: yearField),
+                  const SizedBox(width: 10),
+                  calendarButton,
+                  const SizedBox(width: 4),
+                  clearButton,
+                ],
+              ),
+            const SizedBox(height: 8),
+            Text(
+              _birthDate == null
+                  ? 'Doğum tarihi isteğe bağlıdır.'
+                  : 'Seçilen tarih: ${_formatDate(_birthDate)}',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

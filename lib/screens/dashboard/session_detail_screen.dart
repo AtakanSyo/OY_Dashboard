@@ -65,6 +65,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     super.initState();
     _currentSession = widget.session;
     _loadDisplayInfo();
+    _loadLatestInvite();
   }
 
   bool get _hasUploadedScanFolder =>
@@ -94,6 +95,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     });
   }
 
+  Future<void> _loadLatestInvite() async {
+    final sessionId = _currentSession.sessionId;
+
+    if (sessionId == null) return;
+
+    try {
+      final invite = await _inviteRepository.getLatestInviteForSession(
+        sessionId: sessionId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _latestInvite = invite;
+      });
+    } catch (_) {
+      // Davet yüklenemese bile oturum ekranı çalışmaya devam eder.
+    }
+  }
+
   Future<void> _loadPatientDisplayInfo() async {
     try {
       final response = await _client
@@ -113,8 +134,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       if (!mounted) return;
 
       setState(() {
-        _patientDisplayName =
-            fullName.isNotEmpty ? fullName : 'Hasta #${_currentSession.patientId}';
+        _patientDisplayName = fullName.isNotEmpty
+            ? fullName
+            : 'Hasta #${_currentSession.patientId}';
         _patientCode = patientCode.isEmpty ? null : patientCode;
       });
     } catch (_) {
@@ -329,6 +351,24 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   String _safeValue(String? value) {
     final text = (value ?? '').trim();
     return text.isEmpty ? '—' : text;
+  }
+
+  String _publicAppOrigin() {
+    final uri = Uri.base;
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.trim().isNotEmpty) {
+      return uri.origin;
+    }
+
+    return 'https://www.optiyou.fit';
+  }
+
+  String _buildWelcomeQrUrl(PatientInviteModel invite) {
+    final token = invite.token.trim();
+    final encodedToken = Uri.encodeComponent(token);
+
+    return '${_publicAppOrigin()}/#/welcome?invite=$encodedToken&source=session';
   }
 
   void _openExpertProfile() {
@@ -574,7 +614,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     Text(
                       isEnabled
                           ? 'Ölçüm sonuçlarını görüntülemek için tıklayın'
-                          : 'Bu kartın aktif olması için ilk 3 ölçüm adımı tamamlanmalıdır',
+                          : 'Bu alanın aktif olması için ilk 3 ölçüm adımı tamamlanmalıdır',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         height: 1.4,
@@ -621,14 +661,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   Widget _buildInviteQrCard() {
     return _buildSectionCard(
-      title: 'Kullanıcı Kayıt Daveti',
+      title: 'Sonuç Erişim QR',
       child: Row(
         children: [
           Expanded(
             child: Text(
               _latestInvite == null
-                  ? 'Davet henüz oluşturulmadı. Ölçümü onayladıktan sonra QR ve kayıt linki oluşturulur.'
-                  : 'Davet oluşturuldu. QR kodu tekrar görüntüleyebilir veya linki kopyalayabilirsiniz.',
+                  ? 'Ölçüm onaylandıktan sonra kullanıcıyı Optiyou karşılama sayfasına yönlendiren QR bağlantısı oluşturulur.'
+                  : 'Sonuç erişim bağlantısı oluşturuldu. QR kodu tekrar görüntüleyebilir veya linki kopyalayabilirsiniz.',
               style: TextStyle(
                 color: Colors.grey[700],
                 height: 1.4,
@@ -639,7 +679,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           OutlinedButton.icon(
             onPressed: _latestInvite == null ? null : _showLatestInviteQr,
             icon: const Icon(Icons.qr_code),
-            label: const Text('QR'),
+            label: const Text('QR Görüntüle'),
           ),
         ],
       ),
@@ -675,7 +715,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       ),
       _SessionStepItem(
         icon: Icons.photo_camera_back,
-        title: 'Referans Fotoğraf',
+        title: 'Referans İç Tabanlık',
         subtitle: 'İç tabanlık / ayak referans görselleri',
         isCompleted: _currentSession.hasInsolePhoto,
         onTap: _openInsolePhotoUploadDialog,
@@ -691,10 +731,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         icon: Icons.verified_user_outlined,
         title: 'Ölçümü Onayla',
         subtitle: _currentSession.orderCreated
-            ? 'Ölçüm onaylandı ve kayıt daveti oluşturuldu'
-            : 'Ölçümü tamamla, kullanıcı kayıt linki ve QR oluştur',
+            ? 'Ölçüm onaylandı ve sonuç erişim QR bağlantısı oluşturuldu'
+            : 'Ölçümü tamamla, kullanıcıyı karşılama sayfasına yönlendiren QR oluştur',
         isCompleted: _currentSession.orderCreated,
-        onTap: _confirmMeasurementAndCreateInvite,
+        onTap: _currentSession.orderCreated && _latestInvite != null
+            ? _showLatestInviteQr
+            : _confirmMeasurementAndCreateInvite,
       ),
     ];
   }
@@ -955,6 +997,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         sessionId: sessionId,
         expertUserId: expertUserId,
         email: patient?.email,
+        validDays: 365,
       );
 
       if (!mounted) return;
@@ -982,8 +1025,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         SnackBar(
           content: Text(
             (patient?.email ?? '').trim().isEmpty
-                ? 'Ölçüm onaylandı ve kayıt daveti oluşturuldu. E-posta bulunamadı.'
-                : 'Ölçüm onaylandı ve kayıt daveti oluşturuldu. E-posta davete eklendi.',
+                ? 'Ölçüm onaylandı ve sonuç erişim QR bağlantısı oluşturuldu. E-posta bulunamadı.'
+                : 'Ölçüm onaylandı ve sonuç erişim QR bağlantısı oluşturuldu. E-posta davete eklendi.',
           ),
           backgroundColor: Colors.green,
         ),
@@ -999,7 +1042,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Davet oluşturulamadı: $e'),
+          content: Text('Sonuç erişim QR bağlantısı oluşturulamadı: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1007,27 +1050,40 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   void _showInviteDialog(PatientInviteModel invite) {
+    final welcomeUrl = _buildWelcomeQrUrl(invite);
+
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Kullanıcı Kayıt Daveti'),
+        title: const Text('Sonuç Erişim QR'),
         content: SizedBox(
-          width: 420,
+          width: 440,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Taraması yapılan kişi bu link veya QR ile kayıt olup ölçüm sonuçlarını kendi hesabında görüntüleyebilir.',
+                'Taraması yapılan kişi bu QR kodu okutarak Optiyou karşılama sayfasına gider. Kayıt veya giriş işlemini aynı sayfadan tamamlayıp ölçüm sonuçlarına erişebilir.',
+                textAlign: TextAlign.center,
+                style: TextStyle(height: 1.4),
               ),
               const SizedBox(height: 18),
-              QrImageView(
-                data: invite.registrationUrl,
-                version: QrVersions.auto,
-                size: 220,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.teal.withOpacity(0.20)),
+                ),
+                child: QrImageView(
+                  data: welcomeUrl,
+                  version: QrVersions.auto,
+                  size: 220,
+                  backgroundColor: Colors.white,
+                ),
               ),
               const SizedBox(height: 14),
               SelectableText(
-                invite.registrationUrl,
+                welcomeUrl,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13),
               ),
@@ -1038,14 +1094,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           TextButton(
             onPressed: () async {
               await Clipboard.setData(
-                ClipboardData(text: invite.registrationUrl),
+                ClipboardData(text: welcomeUrl),
               );
 
               if (!mounted) return;
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Davet linki kopyalandı.'),
+                  content: Text('Welcome QR bağlantısı kopyalandı.'),
                 ),
               );
             },
@@ -1157,23 +1213,30 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          _statusLabel(_currentSession.effectiveStatus),
-                          style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.w700,
+                      if (_isCreatingInvite)
+                        const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            _statusLabel(_currentSession.effectiveStatus),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -1350,7 +1413,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: InkWell(
-              onTap: step.onTap,
+              onTap: _isCreatingInvite ? null : step.onTap,
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 width: double.infinity,
@@ -1409,8 +1472,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(
-                      Icons.arrow_forward_ios,
+                    Icon(
+                      _isCreatingInvite
+                          ? Icons.hourglass_top_outlined
+                          : Icons.arrow_forward_ios,
                       size: 16,
                       color: Colors.black38,
                     ),

@@ -31,6 +31,11 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       SupabaseSessionReferencePhotoRepository();
 
   final SupabaseStorageService _storageService = SupabaseStorageService();
+
+  final TextEditingController _shoeBrandController = TextEditingController();
+  final TextEditingController _shoeModelController = TextEditingController();
+  final TextEditingController _shoeSizeController = TextEditingController();
+
   Uint8List? _fileBytes;
   String? _fileName;
   String? _localFilePath;
@@ -41,6 +46,21 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
   String? _statusMessage;
 
   bool get _hasFile => _fileBytes != null;
+
+  bool get _hasShoeInfo =>
+      _shoeBrandController.text.trim().isNotEmpty &&
+      _shoeModelController.text.trim().isNotEmpty &&
+      _shoeSizeController.text.trim().isNotEmpty;
+
+  bool get _canUpload => _hasFile && _hasShoeInfo && !_isUploading;
+
+  @override
+  void dispose() {
+    _shoeBrandController.dispose();
+    _shoeModelController.dispose();
+    _shoeSizeController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(
@@ -72,6 +92,14 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
 
   Future<void> _upload() async {
     if (_fileBytes == null) return;
+
+    if (!_hasShoeInfo) {
+      setState(() {
+        _statusMessage =
+            'Lütfen ayakkabı markası, modeli ve ayakkabı numarasını girin.';
+      });
+      return;
+    }
 
     setState(() {
       _isUploading = true;
@@ -108,7 +136,8 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       return;
     }
 
-    final fileName = _fileName ?? 'insole_photo_${DateTime.now().millisecondsSinceEpoch}.png';
+    final fileName =
+        _fileName ?? 'insole_photo_${DateTime.now().millisecondsSinceEpoch}.png';
 
     StorageUploadResult? uploadResult;
 
@@ -136,6 +165,17 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       );
     }
 
+    final shoeBrand = _shoeBrandController.text.trim();
+    final shoeModel = _shoeModelController.text.trim();
+    final shoeSize = _shoeSizeController.text.trim();
+
+    final note = [
+      'Referans iç taban fotoğrafı',
+      'Ayakkabı markası: $shoeBrand',
+      'Ayakkabı modeli: $shoeModel',
+      'Ayakkabı numarası: $shoeSize',
+    ].join('\n');
+
     final photo = SessionReferencePhotoModel(
       sessionId: sessionId,
       patientId: patientId,
@@ -151,7 +191,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       uploadStatus: uploadResult == null
           ? ReferencePhotoUploadStatuses.local
           : ReferencePhotoUploadStatuses.uploaded,
-      note: 'Referans iç taban fotoğrafı',
+      note: note,
     );
 
     await _repository.createPhoto(photo: photo);
@@ -216,8 +256,8 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
-          maxWidth: 700,
-          maxHeight: 720,
+          maxWidth: 760,
+          maxHeight: 820,
         ),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -248,14 +288,22 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• İç tabanı ölçekli / antetli A4 kağıt üzerine yerleştirin.'),
+                    Text(
+                      '• İç tabanı ölçekli / antetli A4 kağıt üzerine yerleştirin.',
+                    ),
                     SizedBox(height: 4),
-                    Text('• Alternatif olarak A4 üzerine ortalayın, üst köşeye yakın ve alt köşeye yakın 1 TL ile fotoğraflayın.'),
+                    Text(
+                      '• Alternatif olarak A4 üzerine ortalayın, üst köşeye yakın ve alt köşeye yakın 1 TL ile fotoğraflayın.',
+                    ),
                     SizedBox(height: 4),
-                    Text('• Fotoğraf net, üstten çekilmiş ve kenarlar görünür olmalı.'),
+                    Text(
+                      '• Fotoğraf net, üstten çekilmiş ve kenarlar görünür olmalı.',
+                    ),
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
+              _buildShoeInfoFields(),
               const SizedBox(height: 18),
               Expanded(
                 child: Row(
@@ -264,9 +312,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                       flex: 4,
                       child: _buildTemplatePreview(),
                     ),
-
                     const SizedBox(width: 16),
-
                     Expanded(
                       flex: 6,
                       child: kIsWeb
@@ -308,7 +354,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: (!_hasFile || _isUploading) ? null : _upload,
+                    onPressed: _canUpload ? _upload : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                     ),
@@ -335,6 +381,124 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
     );
   }
 
+  Widget _buildShoeInfoFields() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 620;
+
+          final brandField = TextField(
+            controller: _shoeBrandController,
+            enabled: !_isUploading,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (mounted) setState(() {});
+            },
+            decoration: const InputDecoration(
+              labelText: 'Ayakkabı Markası',
+              hintText: 'Örn. Nike',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          );
+
+          final modelField = TextField(
+            controller: _shoeModelController,
+            enabled: !_isUploading,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (mounted) setState(() {});
+            },
+            decoration: const InputDecoration(
+              labelText: 'Ayakkabı Modeli',
+              hintText: 'Örn. Air Zoom Pegasus',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          );
+
+          final sizeField = TextField(
+            controller: _shoeSizeController,
+            enabled: !_isUploading,
+            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.text,
+            onChanged: (_) {
+              if (mounted) setState(() {});
+            },
+            decoration: const InputDecoration(
+              labelText: 'Ayakkabı Numarası',
+              hintText: 'Örn. 42 / 42.5',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.directions_run_outlined,
+                    color: Colors.teal,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Ayakkabı Bilgisi',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (isNarrow)
+                Column(
+                  children: [
+                    brandField,
+                    const SizedBox(height: 10),
+                    modelField,
+                    const SizedBox(height: 10),
+                    sizeField,
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(child: brandField),
+                    const SizedBox(width: 10),
+                    Expanded(child: modelField),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 150,
+                      child: sizeField,
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 8),
+              Text(
+                'Bu bilgi referans iç taban fotoğrafıyla birlikte kaydedilir.',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildTemplatePreview() {
     return Container(
       decoration: BoxDecoration(
@@ -355,9 +519,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
               fontSize: 16,
             ),
           ),
-
           const SizedBox(height: 8),
-
           Text(
             'İç tabanı aşağıdaki örneğe benzer şekilde fotoğraflayın.',
             style: TextStyle(
@@ -365,9 +527,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
               fontSize: 12,
             ),
           ),
-
           const SizedBox(height: 12),
-
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -423,7 +583,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                     ),
                     const SizedBox(height: 18),
                     ElevatedButton.icon(
-                      onPressed: _pickFile,
+                      onPressed: _isUploading ? null : _pickFile,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
                       ),
@@ -458,7 +618,7 @@ class _InsolePhotoUploadDialogState extends State<InsolePhotoUploadDialog> {
                         ),
                       ),
                       TextButton(
-                        onPressed: _clearFile,
+                        onPressed: _isUploading ? null : _clearFile,
                         child: const Text('Temizle'),
                       ),
                     ],
