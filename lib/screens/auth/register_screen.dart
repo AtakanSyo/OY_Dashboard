@@ -55,17 +55,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _acceptedTermsOfUse = false;
   bool _acceptedCommercialMessages = false;
 
-  String? _selectedRoleCode;
+  String? _selectedRoleCode = RoleCodes.customer;
 
   bool get _hasInvite =>
       _activeInviteToken != null && _activeInviteToken!.trim().isNotEmpty;
-      
 
   static const List<Map<String, String>> _roles = [
-    {'code': RoleCodes.expert, 'label': 'Uzman'},
     {'code': RoleCodes.customer, 'label': 'Müşteri'},
+    {'code': RoleCodes.expert, 'label': 'Uzman'},
     {'code': RoleCodes.corporate, 'label': 'Kurumsal'},
-    {'code': RoleCodes.optiYouTeam, 'label': 'OptiYou Ekibi'},
+    {'code': RoleCodes.optiYouTeam, 'label': 'Optiyou Ekibi'},
   ];
 
   @override
@@ -399,6 +398,111 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return roleCode == RoleCodes.expert || roleCode == RoleCodes.optiYouTeam;
   }
 
+  String _roleLabel(String? roleCode) {
+    final matched = _roles.where((role) => role['code'] == roleCode);
+
+    if (matched.isEmpty) {
+      return 'Müşteri';
+    }
+
+    return matched.first['label'] ?? 'Müşteri';
+  }
+
+  String _roleTooltipText() {
+    if (_hasInvite) {
+      return 'Davet bağlantısı ile kayıt müşteri hesabı olarak oluşturulur.';
+    }
+
+    final otherRoles = _roles
+        .where((role) => role['code'] != _selectedRoleCode)
+        .map((role) => role['label'] ?? '')
+        .where((label) => label.trim().isNotEmpty)
+        .join(', ');
+
+    return 'Diğer kullanıcı tipleri: $otherRoles';
+  }
+
+  Widget _buildUserTypeSelector() {
+    final isLocked = _isLoading || _hasInvite;
+    final selectedLabel = _roleLabel(_selectedRoleCode);
+
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Kullanıcı Tipi',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.person_outline,
+            size: 20,
+            color: isLocked ? Colors.grey : Colors.teal,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              selectedLabel,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isLocked ? Colors.grey.shade600 : Colors.black87,
+              ),
+            ),
+          ),
+          Tooltip(
+            message: _roleTooltipText(),
+            waitDuration: const Duration(milliseconds: 300),
+            child: PopupMenuButton<String>(
+              enabled: !isLocked,
+              tooltip: _roleTooltipText(),
+              icon: Icon(
+                Icons.info_outline,
+                size: 20,
+                color: isLocked ? Colors.grey : Colors.teal,
+              ),
+              onSelected: (value) {
+                setState(() {
+                  _selectedRoleCode = value;
+                  _errorMessage = null;
+                });
+              },
+              itemBuilder: (context) {
+                return _roles.map((role) {
+                  final code = role['code']!;
+                  final label = role['label']!;
+                  final isSelected = code == _selectedRoleCode;
+
+                  return PopupMenuItem<String>(
+                    value: code,
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: 18,
+                          color: isSelected ? Colors.teal : Colors.grey,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(label),
+                      ],
+                    ),
+                  );
+                }).toList();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _goToLogin() {
     if (widget.pressureRepository != null) {
       Navigator.pushReplacement(
@@ -608,6 +712,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _inviteInvalid = false;
                       _inviteError = null;
                       _activeInviteToken = null;
+                      _selectedRoleCode = RoleCodes.customer;
                     });
                   },
                   child: const Text('Farklı Davet Bağlantısı Gir'),
@@ -776,29 +881,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedRoleCode,
-          decoration: InputDecoration(
-            labelText: 'Kullanıcı Tipi',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          items: _roles.map((role) {
-            return DropdownMenuItem<String>(
-              value: role['code'],
-              child: Text(role['label']!),
-            );
-          }).toList(),
-          onChanged: _isLoading || _hasInvite
-              ? null
-              : (value) {
-                  setState(() {
-                    _selectedRoleCode = value;
-                    _errorMessage = null;
-                  });
-                },
-        ),
+        _buildUserTypeSelector(),
         const SizedBox(height: 16),
         TextField(
           controller: _emailController,
@@ -831,8 +914,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
               ),
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
             ),
           ),
           onChanged: (_) {
@@ -856,8 +942,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               icon: Icon(
                 _obscureConfirm ? Icons.visibility_off : Icons.visibility,
               ),
-              onPressed: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
+              onPressed: () {
+                setState(() {
+                  _obscureConfirm = !_obscureConfirm;
+                });
+              },
             ),
           ),
           onChanged: (_) {
