@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/legal/legal_document_registry.dart';
@@ -9,6 +10,20 @@ import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+const String _logoAssetPath = 'assets/images/branding/logo.png';
+const String _heroVideoAssetPath = 'assets/images/branding/welcome_flow.mp4';
+
+EdgeInsets _sectionPadding(
+  BuildContext context, {
+  required double top,
+  required double bottom,
+}) {
+  final isNarrow = MediaQuery.of(context).size.width < 720;
+
+  return EdgeInsets.fromLTRB(isNarrow ? 18 : 72, top, 18, bottom);
+}
+
 
 class WelcomeQrScreen extends StatefulWidget {
   final dynamic pressureRepository;
@@ -36,7 +51,7 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
   String? _inviteError;
 
   bool _isLoadingInvite = false;
-  bool _accessPanelOpen = false;
+  bool _accessPanelOpen = true;
   AppUser? _readyUser;
   double _scrollOffset = 0;
 
@@ -105,7 +120,7 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
       if (invite == null) {
         setState(() {
           _inviteError =
-              'Bu QR kod ile ilişkili ölçüm daveti bulunamadı. Kodu manuel girebilirsiniz.';
+              'Bu QR kod ile ilişkili ölçüm daveti bulunamadı. Yine de hesap oluşturup uygulamaya geçebilirsiniz.';
           _isLoadingInvite = false;
         });
         return;
@@ -150,10 +165,8 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
   }
 
   void _openUsageGuide() {
-    final target = math.min(
-      _scrollController.position.maxScrollExtent,
-      1850.0,
-    );
+    final maxExtent = _maxScrollExtent;
+    final target = maxExtent <= 0 ? 0.0 : maxExtent * .34;
 
     _scrollController.animateTo(
       target,
@@ -193,96 +206,598 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
     );
   }
 
+  double get _maxScrollExtent {
+    if (!_scrollController.hasClients) return 0;
+    return _scrollController.position.maxScrollExtent;
+  }
+
+  double get _scrollProgress {
+    final maxExtent = _maxScrollExtent;
+    if (maxExtent <= 0) return 0;
+    return (_scrollOffset / maxExtent).clamp(0.0, 1.0).toDouble();
+  }
+
+  double _focusFromProgress({
+    required int index,
+    required List<double> anchors,
+    required double width,
+    double minimum = .08,
+  }) {
+    final safeIndex = index.clamp(0, anchors.length - 1).toInt();
+    final distance = (_scrollProgress - anchors[safeIndex]).abs();
+    final focus = 1 - distance / width;
+    return math.max(minimum, focus.clamp(0.0, 1.0).toDouble());
+  }
+
   double _focusForStep(int index) {
-    final start = 420.0 + index * 330.0;
-    final distance = (_scrollOffset - start).abs();
-    return (1 - distance / 420).clamp(0.0, 1.0).toDouble();
+    return _focusFromProgress(
+      index: index,
+      anchors: const [.28, .40, .52, .64],
+      width: .16,
+      minimum: .20,
+    );
+  }
+
+  double _mainSectionFocus(BuildContext context, int index) {
+    return _focusFromProgress(
+      index: index,
+      anchors: const [0, .50, 1],
+      width: .34,
+      minimum: .04,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final readyUser = _readyUser;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5FAFA),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _WelcomeBackgroundPainter(progress: _scrollOffset),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _WelcomeBackgroundPainter(progress: _scrollOffset),
+                ),
               ),
             ),
-          ),
-          CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              SliverToBoxAdapter(
-                child: _HeroWelcomeSection(
-                  hasToken: (_inviteToken ?? '').trim().isNotEmpty,
-                  source: _source ?? 'qr',
-                  isLoadingInvite: _isLoadingInvite,
-                  inviteError: _inviteError,
-                  onOpenResults: _openAccessPanel,
-                  onOpenGuide: _openUsageGuide,
-                ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _MeasurementFlowRail(progress: _scrollProgress),
               ),
-              SliverToBoxAdapter(
-                child: _TechnologyStorySection(
-                  focusForStep: _focusForStep,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _PressurePreviewSection(
-                  progress: (_scrollOffset / 1600).clamp(0.0, 1.0).toDouble(),
-                ),
-              ),
-              SliverToBoxAdapter(
-                key: _accessPanelKey,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 42, 18, 28),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1120),
-                      child: InlineCustomerAccessPanel(
-                        isOpen: _accessPanelOpen,
-                        initialInviteToken: _inviteToken,
-                        initialInvite: _invite,
-                        initialInviteError: _inviteError,
-                        onOpenRequested: _openAccessPanel,
-                        onInviteLoaded: _handleInviteLoaded,
-                        onAuthenticated: _handleAuthenticated,
-                        onOpenApp: _openApp,
+            ),
+            Positioned.fill(
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _FocusStage(
+                      focus: _mainSectionFocus(context, 0),
+                      child: _HeroWelcomeSection(
+                        hasToken: (_inviteToken ?? '').trim().isNotEmpty,
+                        source: _source ?? 'qr',
+                        isLoadingInvite: _isLoadingInvite,
+                        inviteError: _inviteError,
+                        onOpenResults: _openAccessPanel,
+                        onOpenGuide: _openAccessPanel,
                       ),
                     ),
                   ),
-                ),
+                  SliverToBoxAdapter(
+                    key: _accessPanelKey,
+                    child: _FocusStage(
+                      focus: _mainSectionFocus(context, 1),
+                      child: _RegistrationSection(
+                        child: InlineCustomerAccessPanel(
+                          isOpen: _accessPanelOpen,
+                          initialInviteToken: _inviteToken,
+                          initialInvite: _invite,
+                          initialInviteError: _inviteError,
+                          onOpenRequested: _openAccessPanel,
+                          onInviteLoaded: _handleInviteLoaded,
+                          onAuthenticated: _handleAuthenticated,
+                          onOpenApp: _openApp,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _FocusStage(
+                      focus: _mainSectionFocus(context, 2),
+                      child: _ResultsSection(
+                        isReady: _readyUser != null,
+                        onOpenResults: _readyUser == null
+                            ? _openAccessPanel
+                            : () => _openApp(_readyUser!),
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                ],
               ),
-              SliverToBoxAdapter(
-                child: _UsageGuideSection(onOpenResults: _openAccessPanel),
+            ),
+            Positioned(
+              left: MediaQuery.of(context).size.width < 720 ? 18 : 24,
+              top: 18,
+              child: const IgnorePointer(child: _FloatingLogo()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+class _FloatingLogo extends StatelessWidget {
+  const _FloatingLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.of(context).size.width < 720;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 10 : 14,
+        vertical: isNarrow ? 8 : 10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.88),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.teal.withOpacity(.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey.withOpacity(.10),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Image.asset(
+        _logoAssetPath,
+        height: isNarrow ? 28 : 34,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Text(
+          'Optiyou',
+          style: TextStyle(
+            color: Color(0xFF072B36),
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegistrationSection extends StatelessWidget {
+  final Widget child;
+
+  const _RegistrationSection({
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 720),
+      padding: _sectionPadding(context, top: 48, bottom: 56),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader(
+                eyebrow: 'Kullanıcı kaydı',
+                title: 'Sonuçlarınızı size ait güvenli hesaba bağlayın.',
+                subtitle:
+                    'QR bağlantısı ölçüm kaydınızı tanır. Hesap oluşturduğunuzda veya giriş yaptığınızda analiz raporu ve ürün önerisi uygulama hesabınızla ilişkilendirilir.',
               ),
-              SliverToBoxAdapter(
-                child: _SupportSection(onOpenResults: _openAccessPanel),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              const SizedBox(height: 24),
+              child,
             ],
           ),
-          Positioned(
-            left: 14,
-            right: 14,
-            bottom: 14,
-            child: SafeArea(
-              top: false,
-              child: _StickyActionBar(
-                isReady: readyUser != null,
-                onOpenResults: readyUser == null
-                    ? _openAccessPanel
-                    : () => _openApp(readyUser),
-                onOpenGuide: _openUsageGuide,
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultsSection extends StatelessWidget {
+  final bool isReady;
+  final VoidCallback onOpenResults;
+
+  const _ResultsSection({
+    required this.isReady,
+    required this.onOpenResults,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final narrow = MediaQuery.of(context).size.width < 820;
+
+    final content = Column(
+      crossAxisAlignment: narrow ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sonuçlar'.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withOpacity(.76),
+            fontWeight: FontWeight.w800,
+            letterSpacing: .9,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Analiz raporu, ürün önerisi ve takip bilgileri tek yerde.',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            height: 1.08,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Kayıt tamamlandığında ölçüm geçmişinizi, uzman değerlendirmesini ve size önerilen ürünü Optiyou hesabınızdan görüntüleyebilirsiniz.',
+          textAlign: narrow ? TextAlign.center : TextAlign.left,
+          style: TextStyle(
+            color: Colors.white.withOpacity(.80),
+            height: 1.5,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 22),
+        const _ResultBenefit(
+          icon: Icons.analytics_outlined,
+          title: 'Analiz özeti',
+          text: 'Basınç, denge ve destek ihtiyacı sade başlıklarla sunulur.',
+        ),
+        const _ResultBenefit(
+          icon: Icons.recommend_outlined,
+          title: 'Size uygun ürün önerisi',
+          text: 'Değerlendirme sonucuna göre ürün listemizden uygun çözüm seçilir.',
+        ),
+        const _ResultBenefit(
+          icon: Icons.timeline_outlined,
+          title: 'Takip geçmişi',
+          text: 'Sonraki ölçümlerde değişim ve kullanım notları karşılaştırılabilir.',
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          onPressed: onOpenResults,
+          icon: Icon(isReady ? Icons.dashboard_customize_outlined : Icons.person_add_alt_1_outlined),
+          label: Text(isReady ? 'Sonuçları Aç' : 'Kullanıcı Kaydına Geç'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.teal.shade800,
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final preview = const _ResultsPreviewPanel();
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 700),
+      padding: _sectionPadding(context, top: 52, bottom: 72),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
+          child: Container(
+            padding: EdgeInsets.all(narrow ? 22 : 30),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade700,
+              borderRadius: BorderRadius.circular(34),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.teal.withOpacity(.22),
+                  blurRadius: 30,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: narrow
+                ? Column(
+                    children: [
+                      preview,
+                      const SizedBox(height: 24),
+                      content,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: content),
+                      const SizedBox(width: 32),
+                      Expanded(child: preview),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultBenefit extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _ResultBenefit({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(.14)),
+            ),
+            child: Icon(icon, color: Colors.white, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$title\n',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(
+                    text: text,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(.74),
+                      height: 1.34,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ResultsPreviewPanel extends StatelessWidget {
+  const _ResultsPreviewPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 1.04,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.96),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: Colors.white.withOpacity(.40)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(.10),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.insights_outlined, color: Colors.teal.shade700),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Kişisel sonuç görünümü',
+                    style: TextStyle(
+                      color: Color(0xFF10323B),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const _ResultPreviewRow(label: 'Analiz skoru', value: '82 / 100'),
+            const _ResultPreviewRow(label: 'Destek ihtiyacı', value: 'Orta'),
+            const _ResultPreviewRow(label: 'Önerilen ürün', value: 'Kişisel iç taban'),
+            const SizedBox(height: 18),
+            Expanded(
+              child: CustomPaint(
+                painter: _ResultsPreviewPainter(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultPreviewRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ResultPreviewRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.blueGrey.shade600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF10323B),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultsPreviewPainter extends CustomPainter {
+  const _ResultsPreviewPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final basePaint = Paint()
+      ..color = Colors.teal.withOpacity(.08)
+      ..style = PaintingStyle.fill;
+
+    final linePaint = Paint()
+      ..color = Colors.teal.withOpacity(.20)
+      ..strokeWidth = 1.2;
+
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (i / 4);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    final points = <Offset>[
+      Offset(size.width * .08, size.height * .72),
+      Offset(size.width * .24, size.height * .54),
+      Offset(size.width * .40, size.height * .60),
+      Offset(size.width * .58, size.height * .36),
+      Offset(size.width * .78, size.height * .42),
+      Offset(size.width * .92, size.height * .24),
+    ];
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final p in points.skip(1)) {
+      path.lineTo(p.dx, p.dy);
+    }
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.teal.shade700
+        ..strokeWidth = 4
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    for (final p in points) {
+      canvas.drawCircle(p, 8, basePaint);
+      canvas.drawCircle(p, 4.5, Paint()..color = Colors.teal.shade700);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ResultsPreviewPainter oldDelegate) => false;
+}
+
+class _FocusStage extends StatelessWidget {
+  final double focus;
+  final Widget child;
+
+  const _FocusStage({
+    required this.focus,
+    required this.child,
+  });
+
+  List<double> _saturationMatrix(double saturation) {
+    final s = saturation.clamp(0.0, 1.0);
+    final inv = 1 - s;
+    const r = .2126;
+    const g = .7152;
+    const b = .0722;
+
+    return <double>[
+      r * inv + s,
+      g * inv,
+      b * inv,
+      0,
+      0,
+      r * inv,
+      g * inv + s,
+      b * inv,
+      0,
+      0,
+      r * inv,
+      g * inv,
+      b * inv + s,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = focus.clamp(0.0, 1.0).toDouble();
+    final inactive = 1 - normalized;
+    final scale = .84 + normalized * .16;
+    final opacity = .30 + normalized * .70;
+    final saturation = .03 + normalized * .97;
+    final yOffset = inactive * 22;
+
+    return AnimatedOpacity(
+      opacity: opacity,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      child: AnimatedScale(
+        scale: scale,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.center,
+        child: AnimatedSlide(
+          offset: Offset(0, yOffset / 100),
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          child: ColorFiltered(
+            colorFilter: ColorFilter.matrix(_saturationMatrix(saturation)),
+            child: child,
+          ),
+        ),
       ),
     );
   }
@@ -325,7 +840,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
   final SupabasePatientRepository _patientRepository =
       SupabasePatientRepository();
 
-  final TextEditingController _codeController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _registerEmailController =
@@ -346,7 +860,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
   _AccessMode _mode = _AccessMode.register;
 
   bool _isLoading = false;
-  bool _isLoadingCode = false;
   bool _obscureRegisterPassword = true;
   bool _obscureRegisterConfirm = true;
   bool _obscureLoginPassword = true;
@@ -379,10 +892,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     _inviteToken = widget.initialInviteToken?.trim();
     _invite = widget.initialInvite;
 
-    if ((_inviteToken ?? '').trim().isNotEmpty) {
-      _codeController.text = _inviteToken!;
-    }
-
     final email = (_invite?.email ?? '').trim();
     if (email.isNotEmpty) {
       _registerEmailController.text = email;
@@ -392,7 +901,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
 
   @override
   void dispose() {
-    _codeController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _registerEmailController.dispose();
@@ -410,99 +918,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     if (invite.isCancelled) return 'Bu QR/davet bağlantısı iptal edilmiş.';
     if (!invite.isStillValid) return 'Bu QR/davet bağlantısının süresi dolmuş.';
     return null;
-  }
-
-  String? _extractInviteTokenFromText(String value) {
-    final text = value.trim();
-
-    if (text.isEmpty) return null;
-    if (text.startsWith('inv_')) return text;
-
-    final uri = Uri.tryParse(text);
-    if (uri == null) return null;
-
-    for (final key in ['invite', 't', 'token', 'result']) {
-      final direct = uri.queryParameters[key];
-      if ((direct ?? '').trim().isNotEmpty) return direct!.trim();
-    }
-
-    final fragment = uri.fragment.trim();
-    if (fragment.isEmpty) return null;
-
-    final normalized = fragment.startsWith('/') ? fragment : '/$fragment';
-    final fragmentUri = Uri.tryParse(normalized);
-
-    for (final key in ['invite', 't', 'token', 'result']) {
-      final fromFragment = fragmentUri?.queryParameters[key];
-      if ((fromFragment ?? '').trim().isNotEmpty) return fromFragment!.trim();
-    }
-
-    return null;
-  }
-
-  Future<void> _loadInviteFromCode() async {
-    final token = _extractInviteTokenFromText(_codeController.text);
-
-    if (token == null || token.isEmpty) {
-      setState(() {
-        _errorMessage =
-            'Geçerli bir QR bağlantısı veya inv_ ile başlayan davet kodu girin.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoadingCode = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
-      final invite = await _inviteRepository.getInviteByToken(token: token);
-
-      if (!mounted) return;
-
-      if (invite == null) {
-        setState(() {
-          _isLoadingCode = false;
-          _errorMessage = 'Bu davet kodu bulunamadı.';
-        });
-        return;
-      }
-
-      final validationError = _validateInvite(invite);
-
-      if (validationError != null) {
-        setState(() {
-          _isLoadingCode = false;
-          _errorMessage = validationError;
-        });
-        return;
-      }
-
-      final email = (invite.email ?? '').trim();
-
-      setState(() {
-        _inviteToken = token;
-        _invite = invite;
-        _isLoadingCode = false;
-        _successMessage =
-            'Davet doğrulandı. Şimdi hesap oluşturabilir veya giriş yapabilirsiniz.';
-      });
-
-      if (email.isNotEmpty) {
-        _registerEmailController.text = email;
-        _loginEmailController.text = email;
-      }
-
-      widget.onInviteLoaded(token: token, invite: invite);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoadingCode = false;
-        _errorMessage = 'Davet kontrol edilirken hata oluştu: $e';
-      });
-    }
   }
 
   Future<void> _registerAndClaim() async {
@@ -532,25 +947,12 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       return;
     }
 
-    if (!_acceptedMembershipAgreement) {
+    if (!(_acceptedMembershipAgreement &&
+        _acceptedPrivacyPolicy &&
+        _acceptedTermsOfUse)) {
       setState(() {
         _errorMessage =
-            'Devam etmek için Üyelik Sözleşmesi kabul edilmelidir.';
-      });
-      return;
-    }
-
-    if (!_acceptedPrivacyPolicy) {
-      setState(() {
-        _errorMessage = 'Devam etmek için Aydınlatma Metni okunmalıdır.';
-      });
-      return;
-    }
-
-    if (!_acceptedTermsOfUse) {
-      setState(() {
-        _errorMessage =
-            'Devam etmek için Kullanım Koşulları kabul edilmelidir.';
+            'Devam etmek için sözleşme ve bilgilendirme metinlerini kabul etmelisiniz.';
       });
       return;
     }
@@ -776,12 +1178,12 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
+        color: Colors.teal.shade700,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.teal.withOpacity(0.16)),
+        border: Border.all(color: Colors.teal.shade600),
         boxShadow: [
           BoxShadow(
-            color: Colors.teal.withOpacity(0.12),
+            color: Colors.teal.withOpacity(0.18),
             blurRadius: 30,
             offset: const Offset(0, 18),
           ),
@@ -794,11 +1196,28 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
             hasInvite: _hasInvite,
             email: _invite?.email,
             emailConfirmationRequired: _emailConfirmationRequired,
+            onGreenBackground: true,
           );
 
-          final auth = readyUser == null
+          final authContent = readyUser == null
               ? _buildAuthContent()
               : _buildSuccessView(readyUser);
+
+          final auth = Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: authContent,
+          );
 
           if (narrow) {
             return Column(
@@ -827,8 +1246,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildCodeBox(),
-        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
@@ -892,104 +1309,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
           ),
         ],
       ],
-    );
-  }
-
-  Widget _buildCodeBox() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _hasInvite
-            ? Colors.teal.withOpacity(0.08)
-            : Colors.orange.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _hasInvite
-              ? Colors.teal.withOpacity(0.22)
-              : Colors.orange.withOpacity(0.22),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                _hasInvite
-                    ? Icons.verified_user_outlined
-                    : Icons.qr_code_scanner_outlined,
-                color:
-                    _hasInvite ? Colors.teal.shade700 : Colors.orange.shade800,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _hasInvite
-                      ? 'Sonuç erişim kodu doğrulandı'
-                      : 'Sonuçlar için davet kodu',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _hasInvite
-                ? 'Bu kayıt müşteri hesabına bağlanacak.'
-                : 'Broşürde veya QR bağlantısında verilen inv_ kodunu girerek sonuçlarınızı hesaba bağlayabilirsiniz.',
-            style: TextStyle(
-              color: Colors.blueGrey.shade700,
-              height: 1.35,
-            ),
-          ),
-          if (!_hasInvite) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _codeController,
-                    enabled: !_isLoadingCode && !_isLoading,
-                    decoration: InputDecoration(
-                      labelText: 'Davet kodu veya QR bağlantısı',
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed:
-                      _isLoadingCode || _isLoading ? null : _loadInviteFromCode,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: _isLoadingCode
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Doğrula'),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -1231,57 +1550,74 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
   }
 
   Widget _buildLegalCheckboxes() {
-    return Column(
-      children: [
-        _buildLegalCheckbox(
-          value: _acceptedMembershipAgreement,
-          onChanged: (value) {
-            setState(() {
-              _acceptedMembershipAgreement = value ?? false;
-              _errorMessage = null;
-            });
-          },
-          documentCode: LegalDocumentCodes.uyelikSozlesmesi,
-          documentTitle: 'Üyelik Sözleşmesi',
-          trailingText: '’ni kabul ediyorum.',
-        ),
-        _buildLegalCheckbox(
-          value: _acceptedPrivacyPolicy,
-          onChanged: (value) {
-            setState(() {
-              _acceptedPrivacyPolicy = value ?? false;
-              _errorMessage = null;
-            });
-          },
-          documentCode: LegalDocumentCodes.aydinlatmaMetni,
-          documentTitle: 'Aydınlatma Metni',
-          trailingText: '’ni okudum.',
-        ),
-        _buildLegalCheckbox(
-          value: _acceptedTermsOfUse,
-          onChanged: (value) {
-            setState(() {
-              _acceptedTermsOfUse = value ?? false;
-              _errorMessage = null;
-            });
-          },
-          documentCode: LegalDocumentCodes.kullanimKosullari,
-          documentTitle: 'Kullanım Koşulları',
-          trailingText: '’nı kabul ediyorum.',
-        ),
-        _buildLegalCheckbox(
-          value: _acceptedCommercialMessages,
-          onChanged: (value) {
-            setState(() {
-              _acceptedCommercialMessages = value ?? false;
-              _errorMessage = null;
-            });
-          },
-          documentCode: LegalDocumentCodes.ticariElektronikIleti,
-          documentTitle: 'Ticari Elektronik İleti',
-          trailingText: ' onayını veriyorum. (Opsiyonel)',
-        ),
-      ],
+    final acceptedRequiredDocuments = _acceptedMembershipAgreement &&
+        _acceptedPrivacyPolicy &&
+        _acceptedTermsOfUse;
+
+    return CheckboxListTile(
+      value: acceptedRequiredDocuments,
+      onChanged: _isLoading
+          ? null
+          : (value) {
+              final checked = value ?? false;
+              setState(() {
+                _acceptedMembershipAgreement = checked;
+                _acceptedPrivacyPolicy = checked;
+                _acceptedTermsOfUse = checked;
+                _errorMessage = null;
+              });
+            },
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('Devam ederek '),
+          InkWell(
+            onTap: () => _showLegalDocument(
+              LegalDocumentCodes.uyelikSozlesmesi,
+            ),
+            child: const Text(
+              'Üyelik Sözleşmesi',
+              style: TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          const Text(', '),
+          InkWell(
+            onTap: () => _showLegalDocument(
+              LegalDocumentCodes.aydinlatmaMetni,
+            ),
+            child: const Text(
+              'Aydınlatma Metni',
+              style: TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          const Text(' ve '),
+          InkWell(
+            onTap: () => _showLegalDocument(
+              LegalDocumentCodes.kullanimKosullari,
+            ),
+            child: const Text(
+              'Kullanım Koşulları',
+              style: TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          const Text('’nı okuduğumu ve kabul ettiğimi onaylıyorum.'),
+        ],
+      ),
     );
   }
 
@@ -1339,7 +1675,7 @@ class _HeroWelcomeSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(minHeight: 760),
-      padding: const EdgeInsets.fromLTRB(18, 44, 18, 42),
+      padding: _sectionPadding(context, top: 86, bottom: 42),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1180),
@@ -1357,37 +1693,35 @@ class _HeroWelcomeSection extends StatelessWidget {
                         narrow ? WrapAlignment.center : WrapAlignment.start,
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
+                    children: const [
                       _Pill(
-                        icon: Icons.qr_code_2_outlined,
-                        text: 'QR deneyimi',
+                        icon: Icons.health_and_safety_outlined,
+                        text: 'Ayak Sağlığı Ekosistemi',
                       ),
                       _Pill(
-                        icon: Icons.verified_user_outlined,
-                        text: hasToken
-                            ? 'Güvenli erişim algılandı'
-                            : 'Genel bilgilendirme',
+                        icon: Icons.precision_manufacturing_outlined,
+                        text: 'Dijital Üretim',
                       ),
                       _Pill(
-                        icon: Icons.analytics_outlined,
-                        text: 'Kaynak: $source',
+                        icon: Icons.speed_outlined,
+                        text: 'Performans Desteği',
                       ),
                     ],
                   ),
                   const SizedBox(height: 26),
-                  const Text(
-                    'Kişiselleştirilmiş iç taban deneyiminiz başladı.',
-                    textAlign: TextAlign.left,
+                  Text(
+                    'Optiyou ekosistemine hoş geldiniz.',
+                    textAlign: narrow ? TextAlign.center : TextAlign.left,
                     style: TextStyle(
-                      fontSize: 42,
+                      fontSize: narrow ? 34 : 42,
                       fontWeight: FontWeight.w900,
                       height: 1.05,
-                      color: Color(0xFF072B36),
+                      color: const Color(0xFF072B36),
                     ),
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Optiyou iç tabanınız; dijital ölçüm, basınç analizi ve uzman değerlendirmesiyle size özel bir destek çözümüne dönüştürülür.',
+                    'Ölçüm, uzman değerlendirmesi ve sonuç erişimini tek bir kullanıcı yolculuğunda birleştiriyoruz. QR bağlantısı üzerinden hesabınızı oluşturup kişisel sonuçlarınıza güvenli şekilde ulaşabilirsiniz.',
                     textAlign: narrow ? TextAlign.center : TextAlign.left,
                     style: TextStyle(
                       color: Colors.blueGrey.shade700,
@@ -1399,7 +1733,7 @@ class _HeroWelcomeSection extends StatelessWidget {
                   if (isLoadingInvite)
                     const _InfoBanner(
                       icon: Icons.hourglass_top_outlined,
-                      text: 'QR bağlantısı kontrol ediliyor...',
+                      text: 'Sonuç erişim bağlantısı kontrol ediliyor...',
                       color: Colors.teal,
                     )
                   else if (inviteError != null)
@@ -1412,7 +1746,7 @@ class _HeroWelcomeSection extends StatelessWidget {
                     const _InfoBanner(
                       icon: Icons.lock_open_outlined,
                       text:
-                          'Sonuçlarınıza güvenli erişim için aynı sayfada hesap oluşturabilir veya giriş yapabilirsiniz.',
+                          'Bu bağlantı kişisel sonuç erişimi için hazır. Hesap oluşturma veya giriş işlemini aynı sayfa içinde tamamlayabilirsiniz.',
                       color: Colors.teal,
                     ),
                   const SizedBox(height: 28),
@@ -1425,28 +1759,12 @@ class _HeroWelcomeSection extends StatelessWidget {
                       ElevatedButton.icon(
                         onPressed: onOpenResults,
                         icon: const Icon(Icons.insights_outlined),
-                        label: const Text('Sonuçlarımı Güvenli Şekilde Gör'),
+                        label: const Text('Kullanıcı Kaydına Geç'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal.shade700,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 22,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: onOpenGuide,
-                        icon: const Icon(Icons.menu_book_outlined),
-                        label: const Text('Kullanım Rehberi'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.teal.shade800,
-                          side: BorderSide(color: Colors.teal.shade200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
                             vertical: 16,
                           ),
                           shape: RoundedRectangleBorder(
@@ -1491,7 +1809,97 @@ class _HeroVisual extends StatefulWidget {
   State<_HeroVisual> createState() => _HeroVisualState();
 }
 
-class _HeroVisualState extends State<_HeroVisual>
+class _HeroVisualState extends State<_HeroVisual> {
+  late final VideoPlayerController _controller;
+  bool _isVideoReady = false;
+  bool _hasVideoError = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = VideoPlayerController.asset(_heroVideoAssetPath)
+      ..setLooping(true)
+      ..setVolume(0);
+
+    _controller.initialize().then((_) {
+      if (!mounted) return;
+      setState(() => _isVideoReady = true);
+      _controller.play();
+    }).catchError((_) {
+      if (!mounted) return;
+      setState(() => _hasVideoError = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(34),
+          color: const Color(0xFF072B36),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.teal.withOpacity(.22),
+              blurRadius: 28,
+              offset: const Offset(0, 18),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: _isVideoReady && !_hasVideoError
+                    ? FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _controller.value.size.width,
+                          height: _controller.value.size.height,
+                          child: VideoPlayer(_controller),
+                        ),
+                      )
+                    : const _HeroVideoFallback(),
+              ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(.06),
+                        Colors.black.withOpacity(.32),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroVideoFallback extends StatefulWidget {
+  const _HeroVideoFallback();
+
+  @override
+  State<_HeroVideoFallback> createState() => _HeroVideoFallbackState();
+}
+
+class _HeroVideoFallbackState extends State<_HeroVideoFallback>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -1506,78 +1914,26 @@ class _HeroVisualState extends State<_HeroVisual>
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: .95,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(34),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.teal.shade900,
-                  const Color(0xFF072B36),
-                  Colors.blueGrey.shade900,
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.teal.withOpacity(.22),
-                  blurRadius: 28,
-                  offset: const Offset(0, 18),
-                ),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.teal.shade900,
+                const Color(0xFF072B36),
+                Colors.blueGrey.shade900,
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(34),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _DataFootPainter(progress: _controller.value),
-                    ),
-                  ),
-                  Positioned(
-                    left: 24,
-                    right: 24,
-                    bottom: 24,
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.10),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(.16),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.auto_graph_outlined,
-                              color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              '3D ölçümden kişisel desteğe uzanan dijital üretim akışı',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(.92),
-                                height: 1.35,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+          ),
+          child: CustomPaint(
+            painter: _DataFootPainter(progress: _controller.value),
+          ),
+        );
+      },
     );
   }
 }
@@ -1593,37 +1949,37 @@ class _TechnologyStorySection extends StatelessWidget {
     _TechStep(
       icon: Icons.view_in_ar_outlined,
       badge: '01',
-      title: 'Dijital Ölçüm',
+      title: 'Dijital Tarama',
       subtitle:
-          '3D tarama, referans görseller ve ölçüm kayıtları aynı kullanıcı yolculuğunda birleşir.',
+          'Ayak yapısı, referans görseller ve ölçüm kayıtları dijital bir kullanıcı profili altında toplanır.',
     ),
     _TechStep(
-      icon: Icons.blur_on_outlined,
+      icon: Icons.manage_search_outlined,
       badge: '02',
-      title: 'Basınç Haritası',
-      subtitle:
-          'Yük dağılımı, temas alanı ve denge bilgisi görsel olarak anlamlandırılır.',
-    ),
-    _TechStep(
-      icon: Icons.psychology_alt_outlined,
-      badge: '03',
       title: 'Uzman Değerlendirmesi',
       subtitle:
-          'Uzman; ölçüm verisini, klinik bilgiyi ve kullanım ihtiyacını birlikte yorumlar.',
+          'Uzman; ölçüm verisini, kullanım ihtiyacını ve klinik notları birlikte değerlendirir.',
+    ),
+    _TechStep(
+      icon: Icons.recommend_outlined,
+      badge: '03',
+      title: 'Size Uygun Ürün Önerisi',
+      subtitle:
+          'Değerlendirme sonuçlarına göre ürün listemiz içinden kullanıcının ihtiyacına en uygun çözüm önerilir.',
     ),
     _TechStep(
       icon: Icons.precision_manufacturing_outlined,
       badge: '04',
-      title: 'Kişisel Üretim',
+      title: 'Dijital Üretim',
       subtitle:
-          'Tasarım veriye dayalı hazırlanır ve ürün kullanım amacına göre kişiselleştirilir.',
+          'Onaylanan ürün seçimi ve tasarım girdileri dijital üretim sürecine aktarılır.',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 44, 18, 42),
+      padding: _sectionPadding(context, top: 44, bottom: 42),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1120),
@@ -1632,9 +1988,9 @@ class _TechnologyStorySection extends StatelessWidget {
             children: [
               const _SectionHeader(
                 eyebrow: 'Teknoloji akışı',
-                title: 'Veri, uzmanlık ve üretim tek bir çizgide birleşir.',
+                title: 'Ölçümden ürüne uzanan akış tek ekranda anlaşılır.',
                 subtitle:
-                    'Aşağı indikçe aktif adım öne çıkar; tamamlanan adımlar arka plana çekilir.',
+                    'Dijital tarama, uzman yorumu, ürün önerisi ve üretim adımları sade bir yolculuk olarak sunulur.',
               ),
               const SizedBox(height: 24),
               LayoutBuilder(
@@ -1809,11 +2165,14 @@ class _TechnologyOutcomeCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.hub_outlined,
-                  color: Colors.tealAccent.shade100, size: 34),
+              Icon(
+                Icons.hub_outlined,
+                color: Colors.tealAccent.shade100,
+                size: 34,
+              ),
               const SizedBox(height: 16),
               const Text(
-                'Dijital ayak sağlığı kaydı',
+                'Optiyou ekosisteminin kullanıcıya katkısı',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 25,
@@ -1823,21 +2182,30 @@ class _TechnologyOutcomeCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Kullanıcı; analiz, ürün, kullanım önerisi ve destek geçmişine tek hesaptan ulaşır.',
+                'Tek bir ölçüm deneyimi, takip edilebilir sonuçlara ve farklı ürün seçeneklerine bağlanır.',
                 style: TextStyle(
                   color: Colors.white.withOpacity(.78),
                   height: 1.45,
                 ),
               ),
-              const Spacer(),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: const [
-                  _DarkMetric(label: 'Ölçüm', value: '3D + Basınç'),
-                  _DarkMetric(label: 'Değerlendirme', value: 'Uzman'),
-                  _DarkMetric(label: 'Çıktı', value: 'Kişisel Ürün'),
-                ],
+              const SizedBox(height: 24),
+              const _OutcomeBenefit(
+                icon: Icons.timeline_outlined,
+                title: 'Periyodik takip',
+                text:
+                    'Ölçüm ve ürün geçmişi zaman içinde karşılaştırılabilir hale gelir.',
+              ),
+              const _OutcomeBenefit(
+                icon: Icons.category_outlined,
+                title: 'Tek tarama ile çoklu ürün erişimi',
+                text:
+                    'Aynı dijital kayıt, iç taban ve farklı ürün aileleri için temel veri sağlar.',
+              ),
+              const _OutcomeBenefit(
+                icon: Icons.psychology_alt_outlined,
+                title: 'Yapay zeka destekli değerlendirme',
+                text:
+                    'Ölçüm çıktıları daha hızlı yorumlanır ve uzman karar süreci desteklenir.',
               ),
             ],
           ),
@@ -1847,17 +2215,74 @@ class _TechnologyOutcomeCard extends StatelessWidget {
   }
 }
 
-class _PressurePreviewSection extends StatelessWidget {
+class _OutcomeBenefit extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _OutcomeBenefit({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.10),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: Colors.white.withOpacity(.12)),
+            ),
+            child: Icon(icon, color: Colors.tealAccent.shade100, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(.72),
+                    height: 1.32,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiEvaluationSection extends StatelessWidget {
   final double progress;
 
-  const _PressurePreviewSection({
+  const _AiEvaluationSection({
     required this.progress,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 42, 18, 42),
+      padding: _sectionPadding(context, top: 42, bottom: 42),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1120),
@@ -1865,15 +2290,22 @@ class _PressurePreviewSection extends StatelessWidget {
             builder: (context, constraints) {
               final narrow = constraints.maxWidth < 820;
               final visual = AspectRatio(
-                aspectRatio: 1.15,
+                aspectRatio: narrow ? 1.10 : 1.18,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.84),
+                    color: Colors.white.withOpacity(.88),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: Colors.teal.withOpacity(.12)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.teal.withOpacity(.09),
+                        blurRadius: 22,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
                   ),
                   child: CustomPaint(
-                    painter: _PressureMapPreviewPainter(progress: progress),
+                    painter: _AiEvaluationPreviewPainter(progress: progress),
                   ),
                 ),
               );
@@ -1881,31 +2313,31 @@ class _PressurePreviewSection extends StatelessWidget {
               final text = Column(
                 crossAxisAlignment:
                     narrow ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-                children: [
-                  const _SectionHeader(
-                    eyebrow: 'Raporu anlamak kolay',
-                    title: 'Basınç haritası sade kartlara dönüşür.',
+                children: const [
+                  _SectionHeader(
+                    eyebrow: 'Yapay zeka destekli değerlendirme',
+                    title: 'Ölçüm verisi uzman kararını destekleyen içgörüye dönüşür.',
                     subtitle:
-                        'Kullanıcı gerçek raporuna geçtiğinde neye bakacağını önceden öğrenir.',
+                        'Dijital tarama, basınç verisi ve kullanım ihtiyacı birlikte yorumlanır. Yapay zeka destekli analiz; risk sinyallerini, destek ihtiyacını ve ürün uyumunu uzman değerlendirmesine hazır hale getirir.',
                   ),
-                  const SizedBox(height: 18),
-                  const _ReportPreviewTile(
-                    icon: Icons.thermostat_auto_outlined,
-                    title: 'Yük dağılımı',
+                  SizedBox(height: 18),
+                  _ReportPreviewTile(
+                    icon: Icons.hub_outlined,
+                    title: 'Veri bütünleştirme',
                     text:
-                        'Ayağın hangi bölgelerine daha fazla yük bindiğini gösterir.',
+                        'Tarama, basınç dağılımı, uzman notu ve ürün tercihleri aynı değerlendirme akışında bir araya gelir.',
                   ),
-                  const _ReportPreviewTile(
-                    icon: Icons.balance_outlined,
-                    title: 'Denge ve stabilite',
+                  _ReportPreviewTile(
+                    icon: Icons.psychology_alt_outlined,
+                    title: 'Destek ihtiyacı sinyalleri',
                     text:
-                        'Yük merkezinizin ayak üzerinde nasıl dağıldığını açıklar.',
+                        'Sistem; yüklenme bölgeleri, denge ve kullanım senaryosuna göre dikkat edilmesi gereken noktaları öne çıkarır.',
                   ),
-                  const _ReportPreviewTile(
-                    icon: Icons.architecture_outlined,
-                    title: 'Ark desteği',
+                  _ReportPreviewTile(
+                    icon: Icons.recommend_outlined,
+                    title: 'Ürün önerisine hazırlık',
                     text:
-                        'Ayak kavisi ve destek ihtiyacını anlaşılır hale getirir.',
+                        'Değerlendirme sonuçları, ürün listemiz içinden kişiye uygun çözümün seçilmesini kolaylaştırır.',
                   ),
                 ],
               );
@@ -1935,188 +2367,11 @@ class _PressurePreviewSection extends StatelessWidget {
   }
 }
 
-class _UsageGuideSection extends StatelessWidget {
-  final VoidCallback onOpenResults;
 
-  const _UsageGuideSection({
-    required this.onOpenResults,
-  });
 
-  static const items = [
-    _GuideItem(
-      icon: Icons.timer_outlined,
-      title: 'İlk gün kısa süreli kullanın',
-      text:
-          'İlk gün 1–2 saat ile başlayıp alışma süresine göre kullanımı artırın.',
-    ),
-    _GuideItem(
-      icon: Icons.checkroom_outlined,
-      title: 'Ayakkabı içinde doğru konumlandırın',
-      text:
-          'İç tabanın topuk kısmının ayakkabı içinde tam oturduğundan emin olun.',
-    ),
-    _GuideItem(
-      icon: Icons.sync_alt_outlined,
-      title: 'Alışma süresi normaldir',
-      text:
-          'Yeni destek yapısı vücudunuz tarafından birkaç gün içinde daha doğal algılanır.',
-    ),
-    _GuideItem(
-      icon: Icons.report_gmailerrorred_outlined,
-      title: 'Baskı veya sürtünme olursa bildirin',
-      text:
-          'Rahatsızlık, sürtünme veya yoğun baskı hissederseniz uzmanınıza ulaşın.',
-    ),
-  ];
 
-  @override
-  Widget build(BuildContext context) {
-    final isNarrow = MediaQuery.of(context).size.width < 760;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 46, 18, 42),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(
-                eyebrow: 'Kullanım rehberi',
-                title: 'Üründen maksimum fayda almak için sade adımlar.',
-                subtitle:
-                    'Bu rehber herkes tarafından görülebilir; kişisel rapor için güvenli hesap gerekir.',
-              ),
-              const SizedBox(height: 22),
-              GridView.builder(
-                itemCount: items.length,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isNarrow ? 1 : 2,
-                  mainAxisExtent: 156,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemBuilder: (context, index) => _GuideCard(item: items[index]),
-              ),
-              const SizedBox(height: 22),
-              Center(
-                child: OutlinedButton.icon(
-                  onPressed: onOpenResults,
-                  icon: const Icon(Icons.insights_outlined),
-                  label: const Text('Kişisel Sonuçlarıma Geç'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.teal.shade800,
-                    side: BorderSide(color: Colors.teal.shade200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 15,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-class _SupportSection extends StatelessWidget {
-  final VoidCallback onOpenResults;
-
-  const _SupportSection({
-    required this.onOpenResults,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 32, 18, 42),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1120),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF072B36),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final narrow = constraints.maxWidth < 700;
-                final content = Column(
-                  crossAxisAlignment:
-                      narrow ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Desteğe ihtiyacınız olursa buradayız.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Hesabınızı oluşturduktan sonra destek taleplerini, kullanım notlarını ve takip ölçümlerini uygulama içinden yönetebilirsiniz.',
-                      textAlign: narrow ? TextAlign.center : TextAlign.left,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(.72),
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                );
-
-                final action = ElevatedButton.icon(
-                  onPressed: onOpenResults,
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Ekosisteme Katıl'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.teal.shade900,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 15,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                );
-
-                if (narrow) {
-                  return Column(
-                    children: [
-                      content,
-                      const SizedBox(height: 18),
-                      action,
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: content),
-                    const SizedBox(width: 24),
-                    action,
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _ClosedAccessCard extends StatelessWidget {
   final bool hasInvite;
@@ -2134,12 +2389,12 @@ class _ClosedAccessCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.94),
+        color: Colors.teal.shade700,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.teal.withOpacity(.14)),
+        border: Border.all(color: Colors.teal.shade600),
         boxShadow: [
           BoxShadow(
-            color: Colors.teal.withOpacity(.10),
+            color: Colors.teal.withOpacity(.20),
             blurRadius: 24,
             offset: const Offset(0, 14),
           ),
@@ -2156,7 +2411,7 @@ class _ClosedAccessCard extends StatelessWidget {
                 hasInvite ? 'Sonuçlarınıza erişim hazır.' : 'Sonuçlarınıza erişin.',
                 textAlign: narrow ? TextAlign.center : TextAlign.left,
                 style: const TextStyle(
-                  color: Color(0xFF10323B),
+                  color: Colors.white,
                   fontSize: 25,
                   fontWeight: FontWeight.w800,
                 ),
@@ -2167,7 +2422,7 @@ class _ClosedAccessCard extends StatelessWidget {
                     'Kayıt veya giriş işlemini bu sayfadan tamamlayıp uygulamaya geçebilirsiniz.',
                 textAlign: narrow ? TextAlign.center : TextAlign.left,
                 style: TextStyle(
-                  color: Colors.blueGrey.shade700,
+                  color: Colors.white.withOpacity(.82),
                   height: 1.45,
                 ),
               ),
@@ -2179,8 +2434,8 @@ class _ClosedAccessCard extends StatelessWidget {
             icon: const Icon(Icons.lock_open_outlined),
             label: const Text('Güvenli Erişimi Başlat'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal.shade700,
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.teal.shade800,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -2211,45 +2466,81 @@ class _ClosedAccessCard extends StatelessWidget {
   }
 }
 
+
+
 class _AccessIntro extends StatelessWidget {
   final bool hasInvite;
   final String? email;
   final bool emailConfirmationRequired;
+  final bool onGreenBackground;
 
   const _AccessIntro({
     required this.hasInvite,
     required this.email,
     required this.emailConfirmationRequired,
+    this.onGreenBackground = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final emailText = (email ?? '').trim();
 
+    final titleColor = onGreenBackground ? Colors.white : const Color(0xFF10323B);
+    final mutedColor = onGreenBackground
+        ? Colors.white.withOpacity(.80)
+        : Colors.blueGrey.shade700;
+    final eyebrowColor = onGreenBackground
+        ? Colors.white.withOpacity(.76)
+        : Colors.teal.shade700;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(
-          eyebrow: 'Güvenli erişim',
-          title: 'Tüm işlemi bu sayfada tamamlayın.',
-          subtitle:
-              'Sonuçlar kişisel veri içerebilir. Bu yüzden raporlarınızı size ait güvenli bir hesapla ilişkilendiriyoruz.',
+        Text(
+          'Kullanıcı kaydı'.toUpperCase(),
+          style: TextStyle(
+            color: eyebrowColor,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .9,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Hesabınızı oluşturun ve sonuçlarınıza bağlanın.',
+          style: TextStyle(
+            color: titleColor,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            height: 1.12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Kişisel sonuçlarınızı güvenli şekilde görüntüleyebilmeniz için ölçüm kaydınızı size ait kullanıcı hesabıyla ilişkilendiriyoruz.',
+          style: TextStyle(
+            color: mutedColor,
+            height: 1.45,
+          ),
         ),
         const SizedBox(height: 18),
-        const _AccessBenefit(
+        _AccessBenefit(
           icon: Icons.analytics_outlined,
           title: 'Analiz raporunuz',
           text: 'Basınç, denge ve destek bilgilerini uygulamada görüntüleyin.',
+          onGreenBackground: onGreenBackground,
         ),
-        const _AccessBenefit(
-          icon: Icons.menu_book_outlined,
-          title: 'Kullanım önerileri',
-          text: 'İlk kullanım, alışma süreci ve bakım adımlarına ulaşın.',
+        _AccessBenefit(
+          icon: Icons.recommend_outlined,
+          title: 'Ürün öneriniz',
+          text: 'Değerlendirme sonucuna göre size uygun ürün seçimine ulaşın.',
+          onGreenBackground: onGreenBackground,
         ),
-        const _AccessBenefit(
-          icon: Icons.support_agent_outlined,
-          title: 'Destek ve takip',
-          text: 'Ürünle ilgili destek ve sonraki ölçümler için hesabınızı kullanın.',
+        _AccessBenefit(
+          icon: Icons.timeline_outlined,
+          title: 'Takip geçmişiniz',
+          text: 'Sonraki ölçümlerde gelişimi ve kullanım notlarını takip edin.',
+          onGreenBackground: onGreenBackground,
         ),
         const SizedBox(height: 12),
         if (hasInvite)
@@ -2259,13 +2550,6 @@ class _AccessIntro extends StatelessWidget {
                 ? 'Davet doğrulandı. Hesap oluşturunca sonuçlarınız bu hesaba bağlanacak.'
                 : 'Davet doğrulandı. E-posta: $emailText',
             color: Colors.teal,
-          )
-        else
-          const _InfoBanner(
-            icon: Icons.info_outline,
-            text:
-                'Kişisel sonuçlar için broşürdeki QR bağlantısı veya davet kodu gerekir. Kod yoksa yine hesap oluşturup uygulamaya geçebilirsiniz.',
-            color: Colors.orange,
           ),
         if (emailConfirmationRequired) ...[
           const SizedBox(height: 10),
@@ -2281,73 +2565,9 @@ class _AccessIntro extends StatelessWidget {
   }
 }
 
-class _StickyActionBar extends StatelessWidget {
-  final bool isReady;
-  final VoidCallback onOpenResults;
-  final VoidCallback onOpenGuide;
 
-  const _StickyActionBar({
-    required this.isReady,
-    required this.onOpenResults,
-    required this.onOpenGuide,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.92),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.teal.withOpacity(.16)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blueGrey.withOpacity(.16),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onOpenResults,
-                  icon: Icon(
-                    isReady
-                        ? Icons.dashboard_customize_outlined
-                        : Icons.lock_open_outlined,
-                  ),
-                  label: Text(isReady ? 'Uygulamaya Geç' : 'Sonuçlarımı Gör'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Kullanım rehberi',
-                onPressed: onOpenGuide,
-                icon: Icon(
-                  Icons.menu_book_outlined,
-                  color: Colors.teal.shade800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+
 
 class _SectionHeader extends StatelessWidget {
   final String eyebrow;
@@ -2525,21 +2745,29 @@ class _AccessBenefit extends StatelessWidget {
   final IconData icon;
   final String title;
   final String text;
+  final bool onGreenBackground;
 
   const _AccessBenefit({
     required this.icon,
     required this.title,
     required this.text,
+    this.onGreenBackground = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = onGreenBackground ? Colors.white : Colors.teal.shade700;
+    final titleColor = onGreenBackground ? Colors.white : Colors.black87;
+    final textColor = onGreenBackground
+        ? Colors.white.withOpacity(.78)
+        : Colors.blueGrey.shade700;
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.teal.shade700),
+          Icon(icon, color: iconColor),
           const SizedBox(width: 10),
           Expanded(
             child: Text.rich(
@@ -2547,12 +2775,15 @@ class _AccessBenefit extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '$title\n',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: titleColor,
+                    ),
                   ),
                   TextSpan(
                     text: text,
                     style: TextStyle(
-                      color: Colors.blueGrey.shade700,
+                      color: textColor,
                       height: 1.35,
                     ),
                   ),
@@ -2565,6 +2796,8 @@ class _AccessBenefit extends StatelessWidget {
     );
   }
 }
+
+
 
 class _ReportPreviewTile extends StatelessWidget {
   final IconData icon;
@@ -2619,55 +2852,7 @@ class _ReportPreviewTile extends StatelessWidget {
   }
 }
 
-class _GuideCard extends StatelessWidget {
-  final _GuideItem item;
 
-  const _GuideCard({
-    required this.item,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.90),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.teal.withOpacity(.10)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(item.icon, color: Colors.teal.shade700, size: 30),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '${item.title}\n',
-                    style: const TextStyle(
-                      color: Color(0xFF10323B),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
-                  ),
-                  TextSpan(
-                    text: item.text,
-                    style: TextStyle(
-                      color: Colors.blueGrey.shade700,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _DarkMetric extends StatelessWidget {
   final String label;
@@ -2703,6 +2888,273 @@ class _DarkMetric extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _MeasurementFlowRail extends StatelessWidget {
+  final double progress;
+
+  const _MeasurementFlowRail({
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final showLabels = screenWidth >= 980;
+    final railWidth = showLabels ? 230.0 : 46.0;
+    final left = screenWidth < 720 ? 8.0 : 18.0;
+    final top = screenWidth < 720 ? 92.0 : 112.0;
+    final bottom = screenWidth < 720 ? 104.0 : 112.0;
+    final safeProgress = progress.clamp(0.0, 1.0).toDouble();
+
+    return Stack(
+      children: [
+        Positioned(
+          left: left,
+          top: top,
+          bottom: bottom,
+          child: SizedBox(
+            width: railWidth,
+            child: CustomPaint(
+              painter: _MeasurementFlowRailPainter(
+                progress: safeProgress,
+                showLabels: showLabels,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MeasurementFlowRailPainter extends CustomPainter {
+  final double progress;
+  final bool showLabels;
+
+  const _MeasurementFlowRailPainter({
+    required this.progress,
+    required this.showLabels,
+  });
+
+  static const _labels = [
+    'Optiyou ekosistemi',
+    'Kullanıcı kaydı',
+    'Sonuçlar',
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lineX = 21.0;
+    final top = 18.0;
+    final bottom = size.height - 18.0;
+    final lineHeight = bottom - top;
+    final activeEnd = top + lineHeight * progress;
+
+    final basePaint = Paint()
+      ..color = Colors.teal.withOpacity(.13)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final activePaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF0F766E), Color(0xFF7DD3FC)],
+      ).createShader(Rect.fromLTWH(0, top, 1, lineHeight))
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(Offset(lineX, top), Offset(lineX, bottom), basePaint);
+    canvas.drawLine(Offset(lineX, top), Offset(lineX, activeEnd), activePaint);
+
+    for (var i = 0; i < _labels.length; i++) {
+      final itemAnchor = i / (_labels.length - 1);
+      final y = top + lineHeight * itemAnchor;
+      final distance = (progress - itemAnchor).abs();
+      final pulse = (1 - distance * (_labels.length - 1)).clamp(0.0, 1.0);
+      final isCompleted = progress + .012 >= itemAnchor;
+      final isCurrent = distance <= .17;
+
+      final outerPaint = Paint()
+        ..color = isCompleted
+            ? Colors.teal.withOpacity(.18 + pulse * .18)
+            : Colors.white.withOpacity(.72)
+        ..style = PaintingStyle.fill;
+
+      final borderPaint = Paint()
+        ..color = isCompleted
+            ? Colors.teal.withOpacity(.72)
+            : Colors.blueGrey.withOpacity(.20)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isCurrent ? 2.8 : 2;
+
+      canvas.drawCircle(Offset(lineX, y), 9.5 + pulse * 3.5, outerPaint);
+      canvas.drawCircle(Offset(lineX, y), 9.5, borderPaint);
+
+      if (isCompleted) {
+        canvas.drawCircle(
+          Offset(lineX, y),
+          4.2,
+          Paint()..color = Colors.teal.shade700,
+        );
+      }
+
+      if (showLabels) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: _labels[i],
+            style: TextStyle(
+              color: isCurrent || isCompleted
+                  ? const Color(0xFF0F3A42)
+                  : Colors.blueGrey.shade400,
+              fontSize: isCurrent ? 12.2 : 11.5,
+              fontWeight: isCurrent || isCompleted
+                  ? FontWeight.w800
+                  : FontWeight.w600,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 2,
+          ellipsis: '…',
+        )..layout(maxWidth: size.width - 42);
+
+        tp.paint(canvas, Offset(38, y - tp.height / 2));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MeasurementFlowRailPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.showLabels != showLabels;
+  }
+}
+
+
+class _AiEvaluationPreviewPainter extends CustomPainter {
+  final double progress;
+
+  const _AiEvaluationPreviewPainter({
+    required this.progress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width * .43, size.height * .48);
+    final cardPaint = Paint()..color = Colors.teal.withOpacity(.055);
+    final strokePaint = Paint()
+      ..color = Colors.teal.withOpacity(.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    final profile = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: center,
+        width: size.width * .36,
+        height: size.height * .66,
+      ),
+      Radius.circular(size.width * .18),
+    );
+
+    canvas.drawRRect(profile, cardPaint);
+    canvas.drawRRect(profile, strokePaint);
+
+    final nodes = <Offset>[
+      Offset(size.width * .26, size.height * .28),
+      Offset(size.width * .40, size.height * .22),
+      Offset(size.width * .55, size.height * .34),
+      Offset(size.width * .32, size.height * .54),
+      Offset(size.width * .51, size.height * .64),
+      Offset(size.width * .42, size.height * .78),
+    ];
+
+    final linePaint = Paint()
+      ..color = Colors.teal.withOpacity(.22)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    for (var i = 0; i < nodes.length - 1; i++) {
+      canvas.drawLine(nodes[i], nodes[i + 1], linePaint);
+    }
+
+    for (var i = 0; i < nodes.length; i++) {
+      final pulse = (math.sin(progress * math.pi * 2 + i * .8) + 1) / 2;
+      final radius = 7.0 + pulse * 3;
+      canvas.drawCircle(
+        nodes[i],
+        radius,
+        Paint()..color = Colors.teal.withOpacity(.24 + pulse * .25),
+      );
+      canvas.drawCircle(
+        nodes[i],
+        3.6,
+        Paint()..color = Colors.teal.shade700,
+      );
+    }
+
+    final panelRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * .60,
+        size.height * .20,
+        size.width * .30,
+        size.height * .58,
+      ),
+      const Radius.circular(22),
+    );
+
+    canvas.drawRRect(
+      panelRect,
+      Paint()..color = const Color(0xFF072B36).withOpacity(.92),
+    );
+
+    final accentPaint = Paint()
+      ..color = Colors.tealAccent.withOpacity(.72)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+
+    final mutedPaint = Paint()
+      ..color = Colors.white.withOpacity(.20)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+
+    final bars = <double>[.78, .58, .70, .46];
+    for (var i = 0; i < bars.length; i++) {
+      final y = size.height * (.32 + i * .10);
+      final x1 = size.width * .66;
+      final x2 = size.width * .84;
+      canvas.drawLine(Offset(x1, y), Offset(x2, y), mutedPaint);
+      canvas.drawLine(
+        Offset(x1, y),
+        Offset(x1 + (x2 - x1) * bars[i] * (.55 + progress * .45), y),
+        accentPaint,
+      );
+    }
+
+    final titlePainter = TextPainter(
+      text: TextSpan(
+        text: 'AI\nEvaluation',
+        style: TextStyle(
+          color: Colors.white.withOpacity(.88),
+          fontSize: size.width < 520 ? 15 : 18,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 2,
+    )..layout(maxWidth: size.width * .22);
+
+    titlePainter.paint(
+      canvas,
+      Offset(size.width * .66, size.height * .22),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _AiEvaluationPreviewPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 
@@ -3019,17 +3471,7 @@ class _TechStep {
   });
 }
 
-class _GuideItem {
-  final IconData icon;
-  final String title;
-  final String text;
 
-  const _GuideItem({
-    required this.icon,
-    required this.title,
-    required this.text,
-  });
-}
 
 enum _AccessMode {
   register,
