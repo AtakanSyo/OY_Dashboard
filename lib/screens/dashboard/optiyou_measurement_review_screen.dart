@@ -39,11 +39,14 @@ class _OptiYouMeasurementReviewScreenState
   List<Map<String, dynamic>> _pressureRecordings = [];
   List<Map<String, dynamic>> _referencePhotos = [];
 
+  late int _currentClinicId;
+
   MeasurementSession get session => widget.session;
 
   @override
   void initState() {
     super.initState();
+    _currentClinicId = widget.session.clinicId;
     _loadReviewData();
   }
 
@@ -60,6 +63,21 @@ class _OptiYouMeasurementReviewScreenState
         throw Exception('Oturum ID bulunamadı.');
       }
 
+      final freshSessionResponse = await _client
+          .from('measurement_sessions')
+          .select('id, clinic_id')
+          .eq('id', sessionId)
+          .maybeSingle();
+
+      final freshSessionRow = freshSessionResponse == null
+          ? null
+          : Map<String, dynamic>.from(freshSessionResponse as Map);
+
+      final freshClinicId =
+          _asInt(freshSessionRow?['clinic_id']) ?? _currentClinicId;
+
+      _currentClinicId = freshClinicId;
+
       final results = await Future.wait<dynamic>([
         _fetchSingleById(
           table: 'patients',
@@ -69,7 +87,7 @@ class _OptiYouMeasurementReviewScreenState
         _fetchSingleById(
           table: 'clinics',
           idColumn: 'id',
-          id: session.clinicId,
+          id: _currentClinicId,
         ),
         _fetchSingleById(
           table: 'user_profiles_full',
@@ -205,6 +223,445 @@ class _OptiYouMeasurementReviewScreenState
     );
   }
 
+  Future<List<Map<String, dynamic>>> _fetchClinics() async {
+    try {
+      final response = await _client
+          .from('clinics')
+          .select('id, clinic_code, clinic_name, clinic_type')
+          .order('clinic_name', ascending: true);
+
+      return (response as List<dynamic>)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (e) {
+      debugPrint('Clinic list fetch error: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  String _generateClinicCode(String clinicName) {
+    final suffix = DateTime.now().millisecondsSinceEpoch.toString();
+
+    final cleaned = clinicName
+        .trim()
+        .toUpperCase()
+        .replaceAll('Ğ', 'G')
+        .replaceAll('Ü', 'U')
+        .replaceAll('Ş', 'S')
+        .replaceAll('İ', 'I')
+        .replaceAll('Ö', 'O')
+        .replaceAll('Ç', 'C')
+        .replaceAll(RegExp(r'[^A-Z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+
+    if (cleaned.isEmpty) {
+      return 'CLN-$suffix';
+    }
+
+    final prefix = cleaned.length > 24 ? cleaned.substring(0, 24) : cleaned;
+    return '$prefix-$suffix';
+  }
+
+  int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+
+    return int.tryParse(value.toString());
+  }
+
+  String _clinicRowLabel(Map<String, dynamic> clinic) {
+    final name = (clinic['clinic_name'] ?? '').toString().trim();
+    final code = (clinic['clinic_code'] ?? '').toString().trim();
+
+    if (name.isNotEmpty && code.isNotEmpty) return '$name ($code)';
+    if (name.isNotEmpty) return name;
+    if (code.isNotEmpty) return code;
+
+    return 'Klinik #${clinic['id']}';
+  }
+
+  Future<Map<String, dynamic>> _createClinic({
+    required String clinicName,
+    required String clinicCode,
+    required String clinicType,
+  }) async {
+    final normalizedName = clinicName.trim();
+    final normalizedType = clinicType.trim();
+    final normalizedCode = clinicCode.trim().isEmpty
+        ? _generateClinicCode(normalizedName)
+        : clinicCode.trim();
+
+    if (normalizedName.isEmpty) {
+      throw Exception('Klinik adı boş olamaz.');
+    }
+
+    if (normalizedType.isEmpty) {
+      throw Exception('Klinik tipi seçilmelidir.');
+    }
+
+    final response = await _client
+        .from('clinics')
+        .insert({
+          'clinic_code': normalizedCode,
+          'clinic_name': normalizedName,
+          'clinic_type': normalizedType,
+        })
+        .select('id, clinic_code, clinic_name, clinic_type')
+        .single();
+
+    return Map<String, dynamic>.from(response as Map);
+  }
+
+  Future<void> _updateSessionClinic({
+    required int clinicId,
+    required Map<String, dynamic> clinicRow,
+  }) async {
+    final sessionId = session.sessionId;
+
+    if (sessionId == null) {
+      _showMessage('Oturum ID bulunamadı.');
+      return;
+    }
+
+    await _client
+        .from('measurement_sessions')
+        .update({
+          'clinic_id': clinicId,
+        })
+        .eq('id', sessionId);
+
+    Map<String, dynamic>? freshSessionRow;
+
+    try {
+      final freshSessionResponse = await _client
+          .from('measurement_sessions')
+          .select('id, clinic_id')
+          .eq('id', sessionId)
+          .limit(1);
+
+      final rows = freshSessionResponse as List<dynamic>;
+
+      if (rows.isNotEmpty) {
+        freshSessionRow = Map<String, dynamic>.from(rows.first as Map);
+      }
+    } catch (e) {
+      debugPrint('Session clinic verify skipped: $e');
+    }
+
+    if (freshSessionRow == null) {
+      throw Exception(
+        'Klinik güncellemesi doğrulanamadı. measurement_sessions için SELECT/UPDATE RLS policy kontrol edilmeli.',
+      );
+    }
+
+    final updatedClinicId = _asInt(freshSessionRow['clinic_id']);
+
+    if (updatedClinicId != clinicId) {
+      throw Exception(
+        'Klinik güncellenmedi. Beklenen clinic_id: $clinicId, mevcut clinic_id: $updatedClinicId. RLS UPDATE policy kontrol edilmeli.',
+      );
+    }
+
+    try {
+      await _client
+          .from('orders')
+          .update({
+            'clinic_id': clinicId,
+          })
+          .eq('session_id', sessionId);
+    } catch (e) {
+      debugPrint('Related order clinic update skipped: $e');
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentClinicId = clinicId;
+      _clinic = clinicRow;
+    });
+
+    _showMessage('Klinik bilgisi güncellendi.');
+  }
+
+  Future<void> _openClinicEditDialog() async {
+    bool isLoadingClinics = true;
+    bool isSaving = false;
+    bool createNewClinic = false;
+    bool didStartLoading = false;
+
+    List<Map<String, dynamic>> clinics = [];
+    int? selectedClinicId = _currentClinicId > 0 ? _currentClinicId : null;
+
+    final clinicNameController = TextEditingController();
+    final clinicCodeController = TextEditingController();
+
+    final allowedTypes = _ClinicTypeOption.values.map((e) => e.value).toSet();
+    String selectedClinicType = allowedTypes.contains(
+      (_clinic?['clinic_type'] ?? '').toString().trim(),
+    )
+        ? (_clinic?['clinic_type'] ?? '').toString().trim()
+        : 'clinic';
+
+    Future<void> loadClinics(StateSetter dialogSetState) async {
+      final rows = await _fetchClinics();
+
+      if (!mounted) return;
+
+      dialogSetState(() {
+        clinics = rows;
+        isLoadingClinics = false;
+
+        final hasCurrentClinic = clinics.any((clinic) {
+          return _asInt(clinic['id']) == selectedClinicId;
+        });
+
+        if (!hasCurrentClinic && clinics.isNotEmpty) {
+          selectedClinicId = _asInt(clinics.first['id']);
+        }
+      });
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            if (!didStartLoading) {
+              didStartLoading = true;
+              Future.microtask(() => loadClinics(dialogSetState));
+            }
+
+            return AlertDialog(
+              title: const Text('Klinik Bilgisini Düzenle'),
+              content: SizedBox(
+                width: 560,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.teal.withOpacity(0.18),
+                          ),
+                        ),
+                        child: Text(
+                          'Mevcut klinik: ${_clinicDisplayName()}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment<bool>(
+                            value: false,
+                            icon: Icon(Icons.local_hospital_outlined),
+                            label: Text('Mevcut Klinik'),
+                          ),
+                          ButtonSegment<bool>(
+                            value: true,
+                            icon: Icon(Icons.add_business_outlined),
+                            label: Text('Yeni Klinik'),
+                          ),
+                        ],
+                        selected: {createNewClinic},
+                        onSelectionChanged: isSaving
+                            ? null
+                            : (value) {
+                                dialogSetState(() {
+                                  createNewClinic = value.first;
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                      if (!createNewClinic)
+                        isLoadingClinics
+                            ? const Padding(
+                                padding: EdgeInsets.all(20),
+                                child: CircularProgressIndicator(),
+                              )
+                            : clinics.isEmpty
+                                ? _buildEmptyState(
+                                    'Kayıtlı klinik bulunamadı. Yeni klinik oluşturabilirsiniz.',
+                                  )
+                                : DropdownButtonFormField<int>(
+                                    initialValue: selectedClinicId,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Klinik Seç',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    items: clinics.map((clinic) {
+                                      final id = _asInt(clinic['id']) ?? 0;
+
+                                      return DropdownMenuItem<int>(
+                                        value: id,
+                                        child: Text(_clinicRowLabel(clinic)),
+                                      );
+                                    }).toList(),
+                                    onChanged: isSaving
+                                        ? null
+                                        : (value) {
+                                            dialogSetState(() {
+                                              selectedClinicId = value;
+                                            });
+                                          },
+                                  )
+                      else ...[
+                        TextField(
+                          controller: clinicNameController,
+                          enabled: !isSaving,
+                          decoration: const InputDecoration(
+                            labelText: 'Klinik adı',
+                            hintText: 'Örn. Galen Hastanesi',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedClinicType,
+                          decoration: const InputDecoration(
+                            labelText: 'Klinik tipi',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _ClinicTypeOption.values.map((option) {
+                            return DropdownMenuItem<String>(
+                              value: option.value,
+                              child: Text(option.label),
+                            );
+                          }).toList(),
+                          onChanged: isSaving
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+
+                                  dialogSetState(() {
+                                    selectedClinicType = value;
+                                  });
+                                },
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: clinicCodeController,
+                          enabled: !isSaving,
+                          decoration: const InputDecoration(
+                            labelText: 'Klinik kodu',
+                            hintText: 'Boş bırakılırsa otomatik oluşturulur',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text(
+                        'Kaydedildiğinde bu ölçüm oturumunun clinic_id değeri güncellenir. Aynı oturuma bağlı sipariş kaydı varsa order.clinic_id de eşitlenmeye çalışılır.',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          height: 1.35,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isSaving ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('Vazgeç'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          dialogSetState(() {
+                            isSaving = true;
+                          });
+
+                          try {
+                            Map<String, dynamic> selectedClinicRow;
+
+                            if (createNewClinic) {
+                              selectedClinicRow = await _createClinic(
+                                clinicName: clinicNameController.text,
+                                clinicCode: clinicCodeController.text,
+                                clinicType: selectedClinicType,
+                              );
+                            } else {
+                              final id = selectedClinicId;
+
+                              if (id == null || id <= 0) {
+                                throw Exception('Lütfen bir klinik seçin.');
+                              }
+
+                              selectedClinicRow = clinics.firstWhere(
+                                (clinic) => _asInt(clinic['id']) == id,
+                                orElse: () => <String, dynamic>{},
+                              );
+
+                              if (selectedClinicRow.isEmpty) {
+                                throw Exception('Seçilen klinik bulunamadı.');
+                              }
+                            }
+
+                            final clinicId = _asInt(selectedClinicRow['id']);
+
+                            if (clinicId == null || clinicId <= 0) {
+                              throw Exception('Klinik ID alınamadı.');
+                            }
+
+                            await _updateSessionClinic(
+                              clinicId: clinicId,
+                              clinicRow: selectedClinicRow,
+                            );
+
+                            if (!dialogContext.mounted) return;
+
+                            Navigator.pop(dialogContext);
+                          } catch (e) {
+                            if (!mounted) return;
+
+                            _showMessage('Klinik güncellenemedi: $e');
+
+                            if (!dialogContext.mounted) return;
+
+                            dialogSetState(() {
+                              isSaving = false;
+                            });
+                          }
+                        },
+                  icon: isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(isSaving ? 'Kaydediliyor' : 'Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    clinicNameController.dispose();
+    clinicCodeController.dispose();
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
 
@@ -279,8 +736,8 @@ class _OptiYouMeasurementReviewScreenState
     if (name.isNotEmpty) return name;
     if (code.isNotEmpty) return code;
 
-    return session.clinicId > 0
-        ? 'Klinik #${session.clinicId}'
+    return _currentClinicId > 0
+        ? 'Klinik #$_currentClinicId'
         : 'Klinik bilgisi yok';
   }
 
@@ -841,6 +1298,15 @@ class _OptiYouMeasurementReviewScreenState
               onPressed: _openAnalysisResults,
               icon: const Icon(Icons.analytics_outlined),
               label: const Text('Analiz Sonuçlarını Görüntüle'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _openClinicEditDialog,
+              icon: const Icon(Icons.local_hospital_outlined),
+              label: const Text('Klinik Bilgisini Düzenle'),
             ),
           ),
         ],
@@ -1601,4 +2067,26 @@ class _SideValue {
   final String value;
 
   const _SideValue(this.label, this.value);
+}
+
+class _ClinicTypeOption {
+  final String value;
+  final String label;
+
+  const _ClinicTypeOption({
+    required this.value,
+    required this.label,
+  });
+
+  static const List<_ClinicTypeOption> values = [
+    _ClinicTypeOption(value: 'clinic', label: 'Klinik'),
+    _ClinicTypeOption(value: 'hospital', label: 'Hastane'),
+    _ClinicTypeOption(
+      value: 'orthotics_center',
+      label: 'Ortez / Protez Merkezi',
+    ),
+    _ClinicTypeOption(value: 'store', label: 'Mağaza'),
+    _ClinicTypeOption(value: 'corporate', label: 'Kurumsal Lokasyon'),
+    _ClinicTypeOption(value: 'other', label: 'Diğer'),
+  ];
 }

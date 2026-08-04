@@ -174,4 +174,73 @@ class SupabaseOrderOperationRepository {
 
     return null;
   }
+
+  Future<Set<int>> getArchivedOrderIds() async {
+    final response = await _client
+        .from('order_operation_states')
+        .select('order_id')
+        .eq('is_archived', true);
+
+    return (response as List<dynamic>)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .map((row) {
+          final value = row['order_id'];
+
+          if (value is int) return value;
+          if (value is num) return value.toInt();
+
+          return int.tryParse(value.toString());
+        })
+        .whereType<int>()
+        .toSet();
+  }
+
+  Future<void> archiveOrder({
+    required int orderId,
+    required int? sessionId,
+    required int? patientId,
+    required int? archivedByUserId,
+  }) async {
+    final existing = await getStateByOrderId(orderId: orderId);
+
+    if (existing == null) {
+      await _client.from('order_operation_states').insert({
+        'order_id': orderId,
+        'session_id': sessionId,
+        'patient_id': patientId,
+        'assigned_user_id': archivedByUserId,
+        'board_column_code': 'completed',
+        'is_archived': true,
+        'archived_at': DateTime.now().toIso8601String(),
+        'archived_by_user_id': archivedByUserId,
+      });
+
+      return;
+    }
+
+    await _client
+        .from('order_operation_states')
+        .update({
+          'board_column_code': 'completed',
+          'is_archived': true,
+          'archived_at': DateTime.now().toIso8601String(),
+          'archived_by_user_id': archivedByUserId,
+        })
+        .eq('order_id', orderId);
+  }
+
+  Future<void> restoreArchivedOrder({
+    required int orderId,
+  }) async {
+    await _client
+        .from('order_operation_states')
+        .update({
+          'board_column_code': 'completed',
+          'is_archived': false,
+          'archived_at': null,
+          'archived_by_user_id': null,
+        })
+        .eq('order_id', orderId);
+  }
+
 }

@@ -201,6 +201,9 @@ class MeasurementSession {
 
   Map<String, dynamic> toUpdateMap() {
     return {
+      'clinic_id': clinicId,
+      'assigned_optityou_user_id': assignedOptityouUserId,
+
       'status': status,
       'has_3d_scan': has3dScan,
       'has_plantar_csv': hasPlantarCsv,
@@ -208,7 +211,9 @@ class MeasurementSession {
       'order_created': orderCreated,
       'clinical_info_completed': clinicalInfoCompleted,
       'design_form_completed': designFormCompleted,
+
       'completed_at': completedAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 

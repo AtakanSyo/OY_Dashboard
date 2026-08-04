@@ -35,8 +35,10 @@ class _OptiYouOperationsBoardScreenState
 
   List<OptiYouOrderOperationItem> _allItems = [];
   List<OptiYouOrderOperationItem> _filteredItems = [];
+  List<OptiYouOrderOperationItem> _archivedItems = [];
 
   bool _isLoading = true;
+  bool _isArchiving = false;
   String? _errorMessage;
 
   @override
@@ -53,20 +55,36 @@ class _OptiYouOperationsBoardScreenState
   }
 
   Future<void> _loadItems() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final orders = await _orderRepository.getAllOrders();
-      final relatedLabels = await _loadRelatedLabels(orders);
 
-      final List<OptiYouOrderOperationItem> items = [];
+      final results = await Future.wait<dynamic>([
+        _loadRelatedLabels(orders),
+        _operationRepository.getArchivedOrderIds(),
+      ]);
+
+      final relatedLabels = results[0] as _OrderRelatedLabels;
+      final archivedOrderIds = results[1] as Set<int>;
+
+      final activeItems = <OptiYouOrderOperationItem>[];
+      final archivedItems = <OptiYouOrderOperationItem>[];
 
       for (final order in orders) {
+        final orderId = order.orderId;
+
+        if (orderId == null) {
+          continue;
+        }
+
         final state = await _operationRepository.getStateByOrderId(
-          orderId: order.orderId ?? 0,
+          orderId: orderId,
         );
 
         final patientName = relatedLabels.patientNames[order.patientId] ??
@@ -91,14 +109,32 @@ class _OptiYouOperationsBoardScreenState
           missingDataSummary: '',
         );
 
-        items.add(item);
+        if (archivedOrderIds.contains(orderId)) {
+          archivedItems.add(item);
+        } else {
+          activeItems.add(item);
+        }
       }
+
+      archivedItems.sort((a, b) {
+        final aDate =
+            a.order.orderedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        final bDate =
+            b.order.orderedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        return bDate.compareTo(aDate);
+      });
 
       if (!mounted) return;
 
       setState(() {
-        _allItems = items;
-        _filteredItems = items;
+        _allItems = activeItems;
+        _archivedItems = archivedItems;
+        _filteredItems = _filterActiveItems(
+          activeItems,
+          _searchController.text,
+        );
         _isLoading = false;
       });
     } catch (e) {
@@ -145,7 +181,9 @@ class _OptiYouOperationsBoardScreenState
             .inFilter('id', patientIds);
 
         final rows = (response as List<dynamic>)
-            .map((item) => Map<String, dynamic>.from(item as Map))
+            .map(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
             .toList();
 
         for (final row in rows) {
@@ -164,8 +202,8 @@ class _OptiYouOperationsBoardScreenState
                   ? patientCode
                   : 'Kullanıcı #$id';
         }
-      } catch (_) {
-        // Kullanıcı bilgisi okunamazsa fallback kullanılacak.
+      } catch (e) {
+        debugPrint('Kullanıcı bilgileri okunamadı: $e');
       }
     }
 
@@ -177,15 +215,20 @@ class _OptiYouOperationsBoardScreenState
             .inFilter('id', clinicIds);
 
         final rows = (response as List<dynamic>)
-            .map((item) => Map<String, dynamic>.from(item as Map))
+            .map(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
             .toList();
 
         for (final row in rows) {
           final id = _asInt(row['id']);
           if (id == null) continue;
 
-          final clinicName = (row['clinic_name'] ?? '').toString().trim();
-          final clinicCode = (row['clinic_code'] ?? '').toString().trim();
+          final clinicName =
+              (row['clinic_name'] ?? '').toString().trim();
+
+          final clinicCode =
+              (row['clinic_code'] ?? '').toString().trim();
 
           if (clinicName.isNotEmpty && clinicCode.isNotEmpty) {
             clinicNames[id] = '$clinicName ($clinicCode)';
@@ -197,8 +240,8 @@ class _OptiYouOperationsBoardScreenState
             clinicNames[id] = '-';
           }
         }
-      } catch (_) {
-        // Klinik bilgisi okunamazsa fallback kullanılacak.
+      } catch (e) {
+        debugPrint('Klinik bilgileri okunamadı: $e');
       }
     }
 
@@ -207,12 +250,15 @@ class _OptiYouOperationsBoardScreenState
         final response = await _client
             .from('user_profiles_full')
             .select(
-              'user_id, first_name, last_name, username, email, role_code, role_name',
+              'user_id, first_name, last_name, username, email, '
+              'role_code, role_name',
             )
             .inFilter('user_id', expertUserIds);
 
         final rows = (response as List<dynamic>)
-            .map((item) => Map<String, dynamic>.from(item as Map))
+            .map(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
             .toList();
 
         for (final row in rows) {
@@ -234,8 +280,8 @@ class _OptiYouOperationsBoardScreenState
                       ? email
                       : 'Uzman #$id';
         }
-      } catch (_) {
-        // Uzman bilgisi okunamazsa fallback kullanılacak.
+      } catch (e) {
+        debugPrint('Uzman bilgileri okunamadı: $e');
       }
     }
 
@@ -246,30 +292,61 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  void _applySearch(String query) {
+  List<OptiYouOrderOperationItem> _filterActiveItems(
+    List<OptiYouOrderOperationItem> source,
+    String query,
+  ) {
     final q = query.trim().toLowerCase();
 
-    setState(() {
-      if (q.isEmpty) {
-        _filteredItems = _allItems;
-        return;
-      }
+    if (q.isEmpty) {
+      return List<OptiYouOrderOperationItem>.from(source);
+    }
 
-      _filteredItems = _allItems.where((item) {
-        return item.order.orderNo.toLowerCase().contains(q) ||
-            item.patientName.toLowerCase().contains(q) ||
-            item.expertName.toLowerCase().contains(q) ||
-            item.clinicName.toLowerCase().contains(q) ||
-            item.priorityLabel.toLowerCase().contains(q) ||
-            item.order.productType.toLowerCase().contains(q) ||
-            item.order.orderStatus.toLowerCase().contains(q);
-      }).toList();
+    return source.where((item) {
+      return _matchesQuery(item, q);
+    }).toList();
+  }
+
+  List<OptiYouOrderOperationItem> _filterArchivedItems(
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+
+    if (q.isEmpty) {
+      return List<OptiYouOrderOperationItem>.from(_archivedItems);
+    }
+
+    return _archivedItems.where((item) {
+      return _matchesQuery(item, q);
+    }).toList();
+  }
+
+  bool _matchesQuery(
+    OptiYouOrderOperationItem item,
+    String normalizedQuery,
+  ) {
+    return item.order.orderNo.toLowerCase().contains(normalizedQuery) ||
+        item.patientName.toLowerCase().contains(normalizedQuery) ||
+        item.expertName.toLowerCase().contains(normalizedQuery) ||
+        item.clinicName.toLowerCase().contains(normalizedQuery) ||
+        item.priorityLabel.toLowerCase().contains(normalizedQuery) ||
+        item.order.productType.toLowerCase().contains(normalizedQuery) ||
+        item.order.orderStatus.toLowerCase().contains(normalizedQuery);
+  }
+
+  void _applySearch(String query) {
+    setState(() {
+      _filteredItems = _filterActiveItems(_allItems, query);
     });
   }
 
-  List<OptiYouOrderOperationItem> _itemsForColumn(String columnCode) {
+  List<OptiYouOrderOperationItem> _itemsForColumn(
+    String columnCode,
+  ) {
     return _filteredItems
-        .where((item) => item.currentColumnCode == columnCode)
+        .where(
+          (item) => item.currentColumnCode == columnCode,
+        )
         .toList();
   }
 
@@ -292,19 +369,22 @@ class _OptiYouOperationsBoardScreenState
 
       if (!mounted) return;
 
+      final index = _allItems.indexWhere(
+        (element) => element.order.orderId == orderId,
+      );
+
+      if (index == -1) return;
+
+      final updatedItem = _allItems[index].copyWith(
+        currentColumnCode: newColumnCode,
+      );
+
       setState(() {
-        final index = _allItems.indexWhere(
-          (e) => e.order.orderId == item.order.orderId,
+        _allItems[index] = updatedItem;
+        _filteredItems = _filterActiveItems(
+          _allItems,
+          _searchController.text,
         );
-
-        if (index == -1) return;
-
-        _allItems[index] = _allItems[index].copyWith(
-          currentColumnCode: newColumnCode,
-        );
-
-        final query = _searchController.text.trim();
-        _applySearch(query);
       });
     } catch (e) {
       if (!mounted) return;
@@ -312,53 +392,635 @@ class _OptiYouOperationsBoardScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Kolon güncellenemedi: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  int _columnIndexOfItem(OptiYouOrderOperationItem item) {
+  int _columnIndexOfItem(
+    OptiYouOrderOperationItem item,
+  ) {
     return OptiYouOperationColumnCodes.all.indexWhere(
       (column) => column.code == item.currentColumnCode,
     );
   }
 
-  bool _canMoveLeft(OptiYouOrderOperationItem item) {
+  bool _canMoveLeft(
+    OptiYouOrderOperationItem item,
+  ) {
     return _columnIndexOfItem(item) > 0;
   }
 
-  bool _canMoveRight(OptiYouOrderOperationItem item) {
+  bool _canMoveRight(
+    OptiYouOrderOperationItem item,
+  ) {
     final index = _columnIndexOfItem(item);
-    return index >= 0 && index < OptiYouOperationColumnCodes.all.length - 1;
+
+    return index >= 0 &&
+        index < OptiYouOperationColumnCodes.all.length - 1;
   }
 
-  void _moveLeft(OptiYouOrderOperationItem item) {
+  bool _isCompletedItem(
+    OptiYouOrderOperationItem item,
+  ) {
+    return item.currentColumnCode ==
+        OptiYouOperationColumnCodes.completed;
+  }
+
+  void _moveLeft(
+    OptiYouOrderOperationItem item,
+  ) {
     final currentIndex = _columnIndexOfItem(item);
+
     if (currentIndex <= 0) return;
 
-    final previousColumn = OptiYouOperationColumnCodes.all[currentIndex - 1];
-    _moveItemToColumn(item, previousColumn.code);
+    final previousColumn =
+        OptiYouOperationColumnCodes.all[currentIndex - 1];
+
+    _moveItemToColumn(
+      item,
+      previousColumn.code,
+    );
   }
 
-  void _moveRight(OptiYouOrderOperationItem item) {
+  void _moveRight(
+    OptiYouOrderOperationItem item,
+  ) {
     final currentIndex = _columnIndexOfItem(item);
+
     if (currentIndex < 0 ||
-        currentIndex >= OptiYouOperationColumnCodes.all.length - 1) {
+        currentIndex >=
+            OptiYouOperationColumnCodes.all.length - 1) {
       return;
     }
 
-    final nextColumn = OptiYouOperationColumnCodes.all[currentIndex + 1];
-    _moveItemToColumn(item, nextColumn.code);
+    final nextColumn =
+        OptiYouOperationColumnCodes.all[currentIndex + 1];
+
+    _moveItemToColumn(
+      item,
+      nextColumn.code,
+    );
   }
 
-  String _formatDate(DateTime? date) {
+  Future<void> _confirmArchiveItem(
+    OptiYouOrderOperationItem item,
+  ) async {
+    if (_isArchiving) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Siparişi Arşivle'),
+          content: Text(
+            '${item.order.orderNo} numaralı sipariş arşive taşınacak.\n\n'
+            'Sipariş operasyon boardundan kaldırılacak ancak arşiv '
+            'içerisinde saklanmaya devam edecektir.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueGrey,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.archive_outlined),
+              label: const Text('Arşivle'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    await _archiveItem(item);
+  }
+
+  Future<void> _archiveItem(
+    OptiYouOrderOperationItem item,
+  ) async {
+    final orderId = item.order.orderId;
+
+    if (orderId == null) {
+      _showMessage(
+        'Sipariş ID bulunamadı.',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    setState(() {
+      _isArchiving = true;
+    });
+
+    try {
+      await _operationRepository.archiveOrder(
+        orderId: orderId,
+        sessionId: item.order.sessionId,
+        patientId: item.order.patientId,
+        archivedByUserId: widget.currentUser.userId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _allItems.removeWhere(
+          (element) => element.order.orderId == orderId,
+        );
+
+        _filteredItems = _filterActiveItems(
+          _allItems,
+          _searchController.text,
+        );
+
+        _archivedItems = [
+          item.copyWith(
+            currentColumnCode: OptiYouOperationColumnCodes.completed,
+          ),
+          ..._archivedItems.where(
+            (element) => element.order.orderId != orderId,
+          ),
+        ];
+
+        _isArchiving = false;
+      });
+
+      _showMessage(
+        '${item.order.orderNo} arşive taşındı.',
+        backgroundColor: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isArchiving = false;
+      });
+
+      _showMessage(
+        'Sipariş arşivlenemedi: $e',
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _restoreArchivedItem(
+    OptiYouOrderOperationItem item,
+  ) async {
+    final orderId = item.order.orderId;
+
+    if (orderId == null) {
+      _showMessage(
+        'Sipariş ID bulunamadı.',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    try {
+      await _operationRepository.restoreArchivedOrder(
+        orderId: orderId,
+      );
+
+      if (!mounted) return;
+
+      final restoredItem = item.copyWith(
+        currentColumnCode: OptiYouOperationColumnCodes.completed,
+      );
+
+      setState(() {
+        _archivedItems.removeWhere(
+          (element) => element.order.orderId == orderId,
+        );
+
+        _allItems = [
+          ..._allItems.where(
+            (element) => element.order.orderId != orderId,
+          ),
+          restoredItem,
+        ];
+
+        _filteredItems = _filterActiveItems(
+          _allItems,
+          _searchController.text,
+        );
+      });
+
+      _showMessage(
+        '${item.order.orderNo} Tamamlandı kolonuna geri taşındı.',
+        backgroundColor: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        'Sipariş arşivden çıkarılamadı: $e',
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _openArchiveDialog() async {
+    final archiveSearchController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            final visibleArchivedItems = _filterArchivedItems(
+              archiveSearchController.text,
+            );
+
+            return Dialog(
+              insetPadding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 980,
+                  maxHeight: 760,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.blueGrey.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              color: Colors.blueGrey.shade700,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Sipariş Arşivi',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Tamamlanan ve aktif operasyon akışından '
+                                  'kaldırılan siparişler',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Kapat',
+                            onPressed: () {
+                              Navigator.pop(dialogContext);
+                            },
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      TextField(
+                        controller: archiveSearchController,
+                        onChanged: (_) {
+                          dialogSetState(() {});
+                        },
+                        decoration: InputDecoration(
+                          hintText:
+                              'Sipariş no, kullanıcı, klinik, uzman veya ürün ara',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon:
+                              archiveSearchController.text.trim().isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Aramayı temizle',
+                                      onPressed: () {
+                                        archiveSearchController.clear();
+                                        dialogSetState(() {});
+                                      },
+                                      icon: const Icon(Icons.clear),
+                                    ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Text(
+                            '${visibleArchivedItems.length} arşivlenmiş sipariş',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () async {
+                              await _loadItems();
+
+                              if (!dialogContext.mounted) return;
+
+                              dialogSetState(() {});
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Yenile'),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 18),
+                      Expanded(
+                        child: visibleArchivedItems.isEmpty
+                            ? _buildArchiveEmptyState(
+                                archiveSearchController.text.trim().isEmpty
+                                    ? 'Arşivlenmiş sipariş bulunmuyor.'
+                                    : 'Arama kriterine uygun arşivlenmiş '
+                                        'sipariş bulunamadı.',
+                              )
+                            : ListView.separated(
+                                itemCount: visibleArchivedItems.length,
+                                separatorBuilder: (_, __) {
+                                  return const SizedBox(height: 10);
+                                },
+                                itemBuilder: (context, index) {
+                                  final item =
+                                      visibleArchivedItems[index];
+
+                                  return _buildArchivedOrderRow(
+                                    item: item,
+                                    onOpen: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              OptiYouOrderDetailScreen(
+                                            currentUser:
+                                                widget.currentUser,
+                                            operationItem: item,
+                                          ),
+                                        ),
+                                      );
+
+                                      if (!mounted) return;
+
+                                      await _loadItems();
+
+                                      if (!dialogContext.mounted) return;
+
+                                      dialogSetState(() {});
+                                    },
+                                    onRestore: () async {
+                                      final shouldRestore =
+                                          await _confirmRestoreArchivedItem(
+                                        item,
+                                      );
+
+                                      if (!shouldRestore) return;
+
+                                      await _restoreArchivedItem(item);
+
+                                      if (!dialogContext.mounted) return;
+
+                                      dialogSetState(() {});
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    archiveSearchController.dispose();
+  }
+
+  Future<bool> _confirmRestoreArchivedItem(
+    OptiYouOrderOperationItem item,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Arşivden Çıkar'),
+          content: Text(
+            '${item.order.orderNo} numaralı sipariş Tamamlandı '
+            'kolonuna geri taşınacak.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              icon: const Icon(Icons.unarchive_outlined),
+              label: const Text('Geri Al'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result == true;
+  }
+
+  Widget _buildArchivedOrderRow({
+    required OptiYouOrderOperationItem item,
+    required VoidCallback onOpen,
+    required VoidCallback onRestore,
+  }) {
+    final order = item.order;
+    final statusColor = _statusColor(order.orderStatus);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.archive_outlined,
+              color: Colors.blueGrey.shade700,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.orderNo,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  item.patientName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.clinicName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _productLabel(order.productType),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Uzman: ${item.expertName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Tarih: ${_formatDate(order.orderedAt)}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          _buildTinyChip(
+            _statusLabel(order.orderStatus),
+            statusColor,
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            tooltip: 'Sipariş detayını aç',
+            onPressed: onOpen,
+            icon: const Icon(Icons.open_in_new),
+          ),
+          const SizedBox(width: 4),
+          OutlinedButton.icon(
+            onPressed: onRestore,
+            icon: const Icon(
+              Icons.unarchive_outlined,
+              size: 18,
+            ),
+            label: const Text('Geri Al'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArchiveEmptyState(
+    String message,
+  ) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 68,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(
+    DateTime? date,
+  ) {
     if (date == null) return '—';
+
     return '${date.day.toString().padLeft(2, '0')}.'
         '${date.month.toString().padLeft(2, '0')}.'
         '${date.year}';
   }
 
-  String _productLabel(String productType) {
+  String _productLabel(
+    String productType,
+  ) {
     switch (productType) {
       case 'insole':
         return 'Tabanlık';
@@ -371,7 +1033,9 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  String _statusLabel(String status) {
+  String _statusLabel(
+    String status,
+  ) {
     switch (status) {
       case OrderStatuses.pending:
         return 'Beklemede';
@@ -390,7 +1054,9 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  Color _statusColor(String status) {
+  Color _statusColor(
+    String status,
+  ) {
     switch (status) {
       case OrderStatuses.pending:
         return Colors.orange;
@@ -409,7 +1075,9 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  Color _priorityColor(String priority) {
+  Color _priorityColor(
+    String priority,
+  ) {
     switch (priority.toLowerCase()) {
       case 'yüksek':
         return Colors.red;
@@ -422,10 +1090,27 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  static int? _asInt(dynamic value) {
+  void _showMessage(
+    String message, {
+    Color? backgroundColor,
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+      ),
+    );
+  }
+
+  static int? _asInt(
+    dynamic value,
+  ) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
+
     return int.tryParse(value.toString());
   }
 
@@ -452,6 +1137,17 @@ class _OptiYouOperationsBoardScreenState
                       hintText:
                           'Sipariş no, kullanıcı, uzman, klinik veya ürün ile ara',
                       prefixIcon: const Icon(Icons.search),
+                      suffixIcon:
+                          _searchController.text.trim().isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Aramayı temizle',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _applySearch('');
+                                  },
+                                  icon: const Icon(Icons.clear),
+                                ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -460,7 +1156,7 @@ class _OptiYouOperationsBoardScreenState
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
-                  onPressed: _loadItems,
+                  onPressed: _isLoading ? null : _loadItems,
                   icon: const Icon(Icons.refresh),
                   label: const Text('Yenile'),
                 ),
@@ -476,16 +1172,43 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  Widget _buildBoard(List<OptiYouOperationColumn> columns) {
+  Widget _buildBoard(
+    List<OptiYouOperationColumn> columns,
+  ) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     if (_errorMessage != null) {
       return Center(
-        child: Text(
-          _errorMessage!,
-          style: const TextStyle(color: Colors.red),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: _loadItems,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -503,15 +1226,21 @@ class _OptiYouOperationsBoardScreenState
           padding: const EdgeInsets.only(bottom: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: columns.map((column) {
-              final items = _itemsForColumn(column.code);
+            children: [
+              ...columns.map((column) {
+                final items = _itemsForColumn(column.code);
 
-              return Container(
-                width: 320,
-                margin: const EdgeInsets.only(right: 16),
-                child: _buildColumn(column, items),
-              );
-            }).toList(),
+                return Container(
+                  width: 320,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: _buildColumn(
+                    column,
+                    items,
+                  ),
+                );
+              }),
+              _buildArchivePanel(),
+            ],
           ),
         ),
       ),
@@ -526,7 +1255,9 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(
+          color: Colors.grey.shade300,
+        ),
       ),
       child: Column(
         children: [
@@ -539,7 +1270,9 @@ class _OptiYouOperationsBoardScreenState
                 top: Radius.circular(16),
               ),
               border: Border(
-                bottom: BorderSide(color: Colors.grey.shade300),
+                bottom: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
               ),
             ),
             child: Column(
@@ -556,7 +1289,7 @@ class _OptiYouOperationsBoardScreenState
                 Text(
                   '${items.length} sipariş',
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: Colors.grey.shade700,
                     fontSize: 11,
                   ),
                 ),
@@ -568,8 +1301,10 @@ class _OptiYouOperationsBoardScreenState
             child: items.isEmpty
                 ? Center(
                     child: Text(
-                      'Kart yok',
-                      style: TextStyle(color: Colors.grey[500]),
+                      'Sipariş yok',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                      ),
                     ),
                   )
                 : GridView.builder(
@@ -583,7 +1318,9 @@ class _OptiYouOperationsBoardScreenState
                     ),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
-                      return _buildOrderCard(items[index]);
+                      return _buildOrderCard(
+                        items[index],
+                      );
                     },
                   ),
           ),
@@ -592,7 +1329,89 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  Widget _buildOrderCard(OptiYouOrderOperationItem item) {
+  Widget _buildArchivePanel() {
+    final count = _archivedItems.length;
+
+    return Container(
+      width: 220,
+      height: 714,
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.blueGrey.withOpacity(0.28),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openArchiveDialog,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Badge(
+                  isLabelVisible: count > 0,
+                  label: Text(
+                    count.toString(),
+                  ),
+                  child: Icon(
+                    Icons.inventory_2_outlined,
+                    size: 82,
+                    color: Colors.blueGrey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Arşiv',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  '$count sipariş',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Tamamlanan siparişleri arşivde görüntülemek için tıklayın.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                OutlinedButton.icon(
+                  onPressed: _openArchiveDialog,
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    size: 18,
+                  ),
+                  label: const Text('Arşivi Gör'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(
+    OptiYouOrderOperationItem item,
+  ) {
     final order = item.order;
     final statusColor = _statusColor(order.orderStatus);
     final priorityColor = _priorityColor(item.priorityLabel);
@@ -630,13 +1449,18 @@ class _OptiYouOperationsBoardScreenState
     final order = item.order;
     final canMoveLeft = _canMoveLeft(item);
     final canMoveRight = _canMoveRight(item);
+    final isCompleted = _isCompletedItem(item);
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isCompleted
+              ? Colors.green.withOpacity(0.25)
+              : Colors.grey.shade200,
+        ),
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -693,7 +1517,7 @@ class _OptiYouOperationsBoardScreenState
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.grey[600],
+              color: Colors.grey.shade600,
               fontSize: 10.5,
             ),
           ),
@@ -705,14 +1529,32 @@ class _OptiYouOperationsBoardScreenState
               children: [
                 _buildStepArrowButton(
                   icon: Icons.chevron_left,
-                  enabled: canMoveLeft,
-                  onTap: canMoveLeft ? () => _moveLeft(item) : null,
+                  enabled: canMoveLeft && !_isArchiving,
+                  onTap: canMoveLeft
+                      ? () {
+                          _moveLeft(item);
+                        }
+                      : null,
                 ),
                 const SizedBox(width: 2),
                 _buildStepArrowButton(
-                  icon: Icons.chevron_right,
-                  enabled: canMoveRight,
-                  onTap: canMoveRight ? () => _moveRight(item) : null,
+                  icon: isCompleted
+                      ? Icons.archive_outlined
+                      : Icons.chevron_right,
+                  enabled:
+                      (isCompleted || canMoveRight) && !_isArchiving,
+                  tooltip: isCompleted
+                      ? 'Siparişi arşivle'
+                      : 'Sonraki adıma taşı',
+                  onTap: isCompleted
+                      ? () {
+                          _confirmArchiveItem(item);
+                        }
+                      : canMoveRight
+                          ? () {
+                              _moveRight(item);
+                            }
+                          : null,
                 ),
               ],
             ),
@@ -732,14 +1574,17 @@ class _OptiYouOperationsBoardScreenState
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: Colors.grey[800],
+        color: Colors.grey.shade800,
         fontSize: 11,
         fontWeight: fontWeight,
       ),
     );
   }
 
-  Widget _buildTinyChip(String label, Color color) {
+  Widget _buildTinyChip(
+    String label,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 6,
@@ -767,23 +1612,37 @@ class _OptiYouOperationsBoardScreenState
     required IconData icon,
     required bool enabled,
     required VoidCallback? onTap,
+    String? tooltip,
   }) {
-    return Material(
-      color: enabled ? Colors.grey.shade100 : Colors.transparent,
+    final button = Material(
+      color: enabled
+          ? Colors.grey.shade100
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(6),
         child: SizedBox(
-          width: 22,
-          height: 22,
+          width: 24,
+          height: 24,
           child: Icon(
             icon,
             size: 15,
-            color: enabled ? Colors.grey.shade800 : Colors.grey.shade400,
+            color: enabled
+                ? Colors.grey.shade800
+                : Colors.grey.shade400,
           ),
         ),
       ),
+    );
+
+    if (tooltip == null || tooltip.trim().isEmpty) {
+      return button;
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: button,
     );
   }
 }
