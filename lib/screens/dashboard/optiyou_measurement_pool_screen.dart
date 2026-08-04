@@ -32,6 +32,7 @@ class _OptiyouMeasurementPoolScreenState
 
   bool _isLoading = true;
   bool _isCreatingOrder = false;
+  bool _isUpdatingArchive = false;
 
   String _searchText = '';
   String _statusFilter = 'all';
@@ -42,6 +43,7 @@ class _OptiyouMeasurementPoolScreenState
   String _selectedCurrencyCode = 'TRY';
 
   List<_MeasurementPoolSession> _sessions = [];
+  List<_MeasurementPoolSession> _archivedSessions = [];
   final Set<int> _selectedSessionIds = {};
 
   @override
@@ -125,7 +127,10 @@ class _OptiyouMeasurementPoolScreenState
             design_form_completed,
             completed_at,
             created_at,
-            updated_at
+            updated_at,
+            is_archived,
+            archived_at,
+            archived_by_user_id
           ''')
           .eq('order_created', true)
           .order('completed_at', ascending: false);
@@ -153,8 +158,32 @@ class _OptiyouMeasurementPoolScreenState
 
       if (!mounted) return;
 
+      final activeSessions = enrichedSessions
+          .where((session) => !session.isArchived)
+          .toList();
+
+      final archivedSessions = enrichedSessions
+          .where((session) => session.isArchived)
+          .toList()
+        ..sort((a, b) {
+          final aDate = a.archivedAt ??
+              a.completedAt ??
+              a.updatedAt ??
+              a.createdAt;
+          final bDate = b.archivedAt ??
+              b.completedAt ??
+              b.updatedAt ??
+              b.createdAt;
+
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return bDate.compareTo(aDate);
+        });
+
       setState(() {
-        _sessions = enrichedSessions;
+        _sessions = activeSessions;
+        _archivedSessions = archivedSessions;
         _selectedSessionIds.clear();
         _isLoading = false;
       });
@@ -408,6 +437,494 @@ class _OptiyouMeasurementPoolScreenState
     if (mounted) {
       await _loadSessions();
     }
+  }
+
+  Future<void> _confirmArchiveSession(
+    _MeasurementPoolSession session,
+  ) async {
+    if (_isUpdatingArchive) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ölçümü Arşivle'),
+          content: Text(
+            '${session.sessionCode.isEmpty ? 'Bu ölçüm' : session.sessionCode} '
+            'ölçüm havuzundan kaldırılıp arşive taşınacak. '
+            'Daha sonra arşiv listesinden geri alabilirsin.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueGrey,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.archive_outlined),
+              label: const Text('Arşivle'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    await _archiveSession(session);
+  }
+
+  Future<void> _archiveSession(
+    _MeasurementPoolSession session,
+  ) async {
+    final sessionId = session.id;
+
+    if (sessionId == null) {
+      _showMessage(
+        'Oturum ID bulunamadı.',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingArchive = true;
+    });
+
+    try {
+      final archivedAt = DateTime.now();
+
+      await _client
+          .from('measurement_sessions')
+          .update({
+            'is_archived': true,
+            'archived_at': archivedAt.toIso8601String(),
+            'archived_by_user_id': widget.currentUser.userId,
+            'updated_at': archivedAt.toIso8601String(),
+          })
+          .eq('id', sessionId);
+
+      if (!mounted) return;
+
+      final archivedSession = session.copyWith(
+        isArchived: true,
+        archivedAt: archivedAt,
+        archivedByUserId: widget.currentUser.userId,
+      );
+
+      setState(() {
+        _sessions.removeWhere((item) => item.id == sessionId);
+        _selectedSessionIds.remove(sessionId);
+        _archivedSessions = [
+          archivedSession,
+          ..._archivedSessions.where((item) => item.id != sessionId),
+        ];
+        _isUpdatingArchive = false;
+      });
+
+      _showMessage(
+        '${session.sessionCode} arşive taşındı.',
+        backgroundColor: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUpdatingArchive = false;
+      });
+
+      _showMessage(
+        'Ölçüm arşivlenemedi: $e',
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _restoreArchivedSession(
+    _MeasurementPoolSession session,
+  ) async {
+    final sessionId = session.id;
+
+    if (sessionId == null) {
+      _showMessage(
+        'Oturum ID bulunamadı.',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    if (_isUpdatingArchive) return;
+
+    setState(() {
+      _isUpdatingArchive = true;
+    });
+
+    try {
+      final now = DateTime.now();
+
+      await _client
+          .from('measurement_sessions')
+          .update({
+            'is_archived': false,
+            'archived_at': null,
+            'archived_by_user_id': null,
+            'updated_at': now.toIso8601String(),
+          })
+          .eq('id', sessionId);
+
+      if (!mounted) return;
+
+      final restoredSession = session.copyWith(
+        isArchived: false,
+        clearArchivedAt: true,
+        clearArchivedByUserId: true,
+      );
+
+      setState(() {
+        _archivedSessions.removeWhere((item) => item.id == sessionId);
+        _sessions = [
+          restoredSession,
+          ..._sessions.where((item) => item.id != sessionId),
+        ];
+        _isUpdatingArchive = false;
+      });
+
+      _showMessage(
+        '${session.sessionCode} ölçüm havuzuna geri alındı.',
+        backgroundColor: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUpdatingArchive = false;
+      });
+
+      _showMessage(
+        'Ölçüm arşivden çıkarılamadı: $e',
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  Future<bool> _confirmRestoreArchivedSession(
+    _MeasurementPoolSession session,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Arşivden Çıkar'),
+          content: Text(
+            '${session.sessionCode.isEmpty ? 'Bu ölçüm' : session.sessionCode} '
+            'ölçüm havuzuna geri taşınacak.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.unarchive_outlined),
+              label: const Text('Geri Al'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result == true;
+  }
+
+  Future<void> _openMeasurementArchiveDialog() async {
+    final archiveSearchController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            final query =
+                archiveSearchController.text.trim().toLowerCase();
+
+            final visibleItems = _archivedSessions.where((session) {
+              if (query.isEmpty) return true;
+
+              final searchable = [
+                session.id?.toString() ?? '',
+                session.sessionCode,
+                session.patientLabel,
+                session.expertLabel,
+                session.clinicLabel,
+                session.effectiveStatus,
+                session.formattedDate,
+                session.formattedCompletedDate,
+                session.formattedArchivedDate,
+              ].join(' ').toLowerCase();
+
+              return searchable.contains(query);
+            }).toList();
+
+            return Dialog(
+              insetPadding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 920,
+                  maxHeight: 740,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: Colors.blueGrey.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              color: Colors.blueGrey.shade700,
+                            ),
+                          ),
+                          const SizedBox(width: 13),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ölçüm Arşivi',
+                                  style: TextStyle(
+                                    fontSize: 21,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Havuzdan kaldırılan ölçümleri görüntüle veya geri al.',
+                                  style: TextStyle(color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Kapat',
+                            onPressed: () => Navigator.pop(dialogContext),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: archiveSearchController,
+                        onChanged: (_) => dialogSetState(() {}),
+                        decoration: InputDecoration(
+                          hintText:
+                              'Session kodu, kullanıcı, uzman veya klinik ara',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon:
+                              archiveSearchController.text.trim().isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Aramayı temizle',
+                                      onPressed: () {
+                                        archiveSearchController.clear();
+                                        dialogSetState(() {});
+                                      },
+                                      icon: const Icon(Icons.clear),
+                                    ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Text(
+                            '${visibleItems.length} arşivlenmiş ölçüm',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: _isUpdatingArchive
+                                ? null
+                                : () async {
+                                    await _loadSessions();
+                                    if (!dialogContext.mounted) return;
+                                    dialogSetState(() {});
+                                  },
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Yenile'),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 18),
+                      Expanded(
+                        child: visibleItems.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.inventory_2_outlined,
+                                      size: 58,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      query.isEmpty
+                                          ? 'Arşivlenmiş ölçüm bulunmuyor.'
+                                          : 'Arama kriterine uygun ölçüm bulunamadı.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: visibleItems.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 9),
+                                itemBuilder: (context, index) {
+                                  final session = visibleItems[index];
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(13),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(13),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: Colors.blueGrey
+                                              .withOpacity(0.11),
+                                          child: Icon(
+                                            Icons.archive_outlined,
+                                            color:
+                                                Colors.blueGrey.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                session.sessionCode.isEmpty
+                                                    ? 'Session #${session.id ?? '—'}'
+                                                    : session.sessionCode,
+                                                style: const TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${session.patientLabel} • ${session.clinicLabel}',
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                'Uzman: ${session.expertLabel} • Arşiv: ${session.formattedArchivedDate}',
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color:
+                                                      Colors.grey.shade700,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Detayı aç',
+                                          onPressed: () =>
+                                              _openSessionDetail(session),
+                                          icon:
+                                              const Icon(Icons.open_in_new),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        OutlinedButton.icon(
+                                          onPressed: _isUpdatingArchive
+                                              ? null
+                                              : () async {
+                                                  final confirmed =
+                                                      await _confirmRestoreArchivedSession(
+                                                    session,
+                                                  );
+
+                                                  if (!confirmed) return;
+
+                                                  await _restoreArchivedSession(
+                                                    session,
+                                                  );
+
+                                                  if (!dialogContext
+                                                      .mounted) {
+                                                    return;
+                                                  }
+
+                                                  dialogSetState(() {});
+                                                },
+                                          icon: const Icon(
+                                            Icons.unarchive_outlined,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Geri Al'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    archiveSearchController.dispose();
+  }
+
+  void _showMessage(
+    String message, {
+    Color? backgroundColor,
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+      ),
+    );
   }
 
   Future<void> _createOrderFromSelectedSessions() async {
@@ -1052,6 +1569,27 @@ class _OptiyouMeasurementPoolScreenState
                   },
                 ),
               ),
+              Tooltip(
+                message: 'Ölçüm arşivini aç',
+                child: OutlinedButton(
+                  onPressed: _openMeasurementArchiveDialog,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 9,
+                    ),
+                  ),
+                  child: Badge(
+                    isLabelVisible: _archivedSessions.isNotEmpty,
+                    label: Text(_archivedSessions.length.toString()),
+                    child: const Icon(
+                      Icons.inventory_2_outlined,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
               OutlinedButton.icon(
                 onPressed: _loadSessions,
                 icon: const Icon(Icons.refresh, size: 17),
@@ -1367,6 +1905,24 @@ class _OptiyouMeasurementPoolScreenState
                     ),
                   ),
                 ),
+                IconButton(
+                  tooltip: 'Ölçümü arşivle',
+                  onPressed: _isUpdatingArchive
+                      ? null
+                      : () => _confirmArchiveSession(session),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
+                  icon: const Icon(
+                    Icons.archive_outlined,
+                    size: 17,
+                    color: Colors.blueGrey,
+                  ),
+                ),
+                const SizedBox(width: 4),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1665,6 +2221,9 @@ class _MeasurementPoolSession {
   final DateTime? completedAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isArchived;
+  final DateTime? archivedAt;
+  final int? archivedByUserId;
 
   final String? patientName;
   final String? expertName;
@@ -1690,6 +2249,9 @@ class _MeasurementPoolSession {
     required this.completedAt,
     required this.createdAt,
     required this.updatedAt,
+    required this.isArchived,
+    required this.archivedAt,
+    required this.archivedByUserId,
     required this.patientName,
     required this.expertName,
     required this.clinicName,
@@ -1716,6 +2278,9 @@ class _MeasurementPoolSession {
       completedAt: _asDateTime(map['completed_at']),
       createdAt: _asDateTime(map['created_at']),
       updatedAt: _asDateTime(map['updated_at']),
+      isArchived: _asBool(map['is_archived']),
+      archivedAt: _asDateTime(map['archived_at']),
+      archivedByUserId: _asInt(map['archived_by_user_id']),
       patientName: null,
       expertName: null,
       clinicName: null,
@@ -1728,6 +2293,11 @@ class _MeasurementPoolSession {
     String? expertName,
     String? clinicName,
     String? clinicCode,
+    bool? isArchived,
+    DateTime? archivedAt,
+    int? archivedByUserId,
+    bool clearArchivedAt = false,
+    bool clearArchivedByUserId = false,
   }) {
     return _MeasurementPoolSession(
       id: id,
@@ -1748,6 +2318,11 @@ class _MeasurementPoolSession {
       completedAt: completedAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      isArchived: isArchived ?? this.isArchived,
+      archivedAt: clearArchivedAt ? null : archivedAt ?? this.archivedAt,
+      archivedByUserId: clearArchivedByUserId
+          ? null
+          : archivedByUserId ?? this.archivedByUserId,
       patientName: patientName ?? this.patientName,
       expertName: expertName ?? this.expertName,
       clinicName: clinicName ?? this.clinicName,
@@ -1878,6 +2453,14 @@ class _MeasurementPoolSession {
 
   String get formattedCompletedDate {
     final value = completedAt ?? updatedAt ?? createdAt;
+
+    if (value == null) return '—';
+
+    return _formatDate(value);
+  }
+
+  String get formattedArchivedDate {
+    final value = archivedAt;
 
     if (value == null) return '—';
 
