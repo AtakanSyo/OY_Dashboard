@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
-import 'package:oy_site/screens/dashboard/dashboard_screen.dart';
+import 'package:oy_site/screens/dashboard/shell/dashboard_screen.dart';
 import 'package:oy_site/screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

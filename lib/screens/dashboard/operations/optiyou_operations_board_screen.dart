@@ -5,7 +5,7 @@ import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/optiyou_operation_column.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:oy_site/models/order_model.dart';
-import 'package:oy_site/screens/dashboard/optiyou_order_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/optiyou_order_detail_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/order_model.dart';
-import 'package:oy_site/screens/dashboard/optiyou_measurement_review_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/optiyou_measurement_review_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiyouMeasurementPoolScreen extends StatefulWidget {

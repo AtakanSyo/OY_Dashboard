@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/store_product_model.dart';
 import 'package:oy_site/models/store_measurement_summary_model.dart';
-import 'package:oy_site/screens/dashboard/store_screen.dart';
+import 'package:oy_site/screens/dashboard/store/store_screen.dart';
 
 import 'package:oy_site/services/payment/iyzico_checkout_service.dart';
 import 'package:oy_site/services/payment/payment_popup_handle.dart';

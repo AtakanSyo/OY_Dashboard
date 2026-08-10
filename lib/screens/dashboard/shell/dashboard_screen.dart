@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
-import 'package:oy_site/screens/dashboard/customer_analysis_results_screen.dart';
-import 'package:oy_site/screens/dashboard/patient_list_screen.dart';
-import 'package:oy_site/screens/dashboard/session_list_screen.dart';
-import 'package:oy_site/screens/dashboard/optiyou_operations_board_screen.dart';
-import 'package:oy_site/screens/dashboard/sales_statistics_screen.dart';
-import 'package:oy_site/screens/dashboard/customer_home_screen.dart';
-import 'package:oy_site/screens/dashboard/corporate_dashboard_screen.dart';
-import 'package:oy_site/screens/dashboard/corporate_department_analysis_screen.dart';
-import 'package:oy_site/screens/dashboard/corporate_trends_screen.dart';
-import 'package:oy_site/screens/dashboard/corporate_employees_screen.dart';
-import 'package:oy_site/screens/dashboard/corporate_reports_screen.dart';
-import 'package:oy_site/screens/dashboard/expert_control_panel_screen.dart';
-import 'package:oy_site/screens/dashboard/optiyou_measurement_pool_screen.dart';
+import 'package:oy_site/screens/dashboard/analysis/customer_analysis_results_screen.dart';
+import 'package:oy_site/screens/dashboard/patients/patient_list_screen.dart';
+import 'package:oy_site/screens/dashboard/sessions/session_list_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/optiyou_operations_board_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/sales_statistics_screen.dart';
+import 'package:oy_site/screens/dashboard/customer/customer_home_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_dashboard_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_department_analysis_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_trends_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_employees_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_reports_screen.dart';
+import 'package:oy_site/screens/dashboard/expert/expert_control_panel_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/optiyou_measurement_pool_screen.dart';
+import 'package:oy_site/screens/dashboard/orders/orders_screen.dart';
+import 'package:oy_site/screens/dashboard/profiles/corporate_profile_screen.dart';
+import 'package:oy_site/screens/dashboard/profiles/customer_profile_screen.dart';
+import 'package:oy_site/screens/dashboard/profiles/expert_profile_screen.dart';
+import 'package:oy_site/screens/dashboard/profiles/profile_screen.dart';
+import 'package:oy_site/screens/dashboard/store/store_screen.dart';
+import 'package:oy_site/screens/dashboard/support/support_screen.dart';
 
 import '/widgets/sidebar.dart';
 import '/widgets/topbar.dart';
-import 'profile_screen.dart';
-import 'customer_profile_screen.dart';
-import 'expert_profile_screen.dart';
-import 'corporate_profile_screen.dart';
-import 'orders_screen.dart';
-import 'store_screen.dart';
-import 'support_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final AppUser currentUser;

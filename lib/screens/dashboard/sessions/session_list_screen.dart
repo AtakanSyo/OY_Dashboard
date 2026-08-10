@@ -4,8 +4,8 @@ import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/patient.dart';
-import 'package:oy_site/screens/dashboard/create_session_screen.dart';
-import 'package:oy_site/screens/dashboard/session_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/sessions/create_session_screen.dart';
+import 'package:oy_site/screens/dashboard/sessions/session_detail_screen.dart';
 
 class SessionListScreen extends StatefulWidget {
   final AppUser currentUser;

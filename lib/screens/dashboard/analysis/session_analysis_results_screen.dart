@@ -3,7 +3,7 @@ import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/models/measurement_session.dart';
-import 'package:oy_site/screens/dashboard/analysis_results_view.dart';
+import 'package:oy_site/screens/dashboard/analysis/analysis_results_view.dart';
 
 class SessionAnalysisResultsScreen extends StatefulWidget {
   final AppUser currentUser;

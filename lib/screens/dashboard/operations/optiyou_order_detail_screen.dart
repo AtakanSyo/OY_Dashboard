@@ -14,11 +14,11 @@ import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/models/order_operation_file_model.dart';
 import 'package:oy_site/models/order_operation_state_model.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
-import 'package:oy_site/screens/dashboard/orthotic_design_form_screen.dart';
-import 'package:oy_site/screens/dashboard/session_analysis_results_screen.dart';
+import 'package:oy_site/screens/dashboard/orthotics/orthotic_design_form_screen.dart';
+import 'package:oy_site/screens/dashboard/analysis/session_analysis_results_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:oy_site/screens/dashboard/reference_insole_analysis_screen.dart';
+import 'package:oy_site/screens/dashboard/analysis/reference_insole_analysis_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class OptiYouOrderDetailScreen extends StatefulWidget {

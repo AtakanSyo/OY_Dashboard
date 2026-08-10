@@ -4,7 +4,7 @@ import 'package:oy_site/screens/auth/register_screen.dart';
 import 'package:oy_site/screens/home_screen.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:oy_site/screens/dashboard/dashboard_screen.dart';
+import 'package:oy_site/screens/dashboard/shell/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final dynamic pressureRepository;

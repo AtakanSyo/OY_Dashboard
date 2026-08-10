@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/store_product_model.dart';
-import 'package:oy_site/screens/dashboard/store_product_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/store/store_product_detail_screen.dart';
 import 'package:oy_site/models/store_measurement_summary_model.dart';
 
 class StoreScreen extends StatelessWidget {

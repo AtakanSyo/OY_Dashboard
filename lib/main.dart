@@ -10,7 +10,7 @@ import 'screens/auth/legal_consent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
-import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/dashboard/shell/dashboard_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/public/welcome_qr_screen.dart';
 

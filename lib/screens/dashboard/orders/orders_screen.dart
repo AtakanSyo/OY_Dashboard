@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_order_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/order_model.dart';
-import 'package:oy_site/screens/dashboard/order_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/orders/order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   final AppUser currentUser;

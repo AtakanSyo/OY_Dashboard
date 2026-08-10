@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient.dart';
-import 'package:oy_site/screens/dashboard/patient_create_screen.dart';
-import 'package:oy_site/screens/dashboard/patient_detail_screen.dart';
+import 'package:oy_site/screens/dashboard/patients/patient_create_screen.dart';
+import 'package:oy_site/screens/dashboard/patients/patient_detail_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   final AppUser currentUser;

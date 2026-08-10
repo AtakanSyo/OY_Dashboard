@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/auth/login_screen.dart';
-import 'package:oy_site/screens/dashboard/profile_screen.dart';
+import 'package:oy_site/screens/dashboard/profiles/profile_screen.dart';
 import 'package:oy_site/services/auth_service.dart';
 
 class Topbar extends StatelessWidget {
