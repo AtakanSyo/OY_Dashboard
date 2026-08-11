@@ -57,10 +57,9 @@ class SupabaseSessionScanRepository {
       report: report,
     );
 
-    await _client.from('session_scan_reports').upsert(
-          model.toUpsertMap(),
-          onConflict: 'session_id',
-        );
+    await _client
+        .from('session_scan_reports')
+        .upsert(model.toUpsertMap(), onConflict: 'session_id');
   }
 
   Future<void> saveScanFiles({
@@ -68,89 +67,99 @@ class SupabaseSessionScanRepository {
     required int patientId,
     required int expertUserId,
     required SessionScanAssets assets,
+    String? detectedWordPath,
     String? detectedPdfPath,
   }) async {
-    final files = <SessionScanFileModel>[
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.pdfReport,
-        path: detectedPdfPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.archLeftImage,
-        path: assets.archLeftPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.archRightImage,
-        path: assets.archRightPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.archSectionLeft,
-        path: assets.archSectionLeftPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.archSectionRight,
-        path: assets.archSectionRightPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.foot2dLeft,
-        path: assets.foot2dLeftPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.foot2dRight,
-        path: assets.foot2dRightPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.pronatorLeft,
-        path: assets.pronatorLeftPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.pronatorRight,
-        path: assets.pronatorRightPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.stlLeft,
-        path: assets.stlLeftPath,
-      ),
-      SessionScanFileModel.local(
-        sessionId: sessionId,
-        patientId: patientId,
-        expertUserId: expertUserId,
-        fileType: SessionScanFileTypes.stlRight,
-        path: assets.stlRightPath,
-      ),
-    ].where((file) {
-      return file.localFilePath != null && file.localFilePath!.trim().isNotEmpty;
-    }).toList();
+    final files =
+        <SessionScanFileModel>[
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.wordReport,
+            path: detectedWordPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.pdfReport,
+            path: detectedPdfPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.archLeftImage,
+            path: assets.archLeftPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.archRightImage,
+            path: assets.archRightPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.archSectionLeft,
+            path: assets.archSectionLeftPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.archSectionRight,
+            path: assets.archSectionRightPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.foot2dLeft,
+            path: assets.foot2dLeftPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.foot2dRight,
+            path: assets.foot2dRightPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.pronatorLeft,
+            path: assets.pronatorLeftPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.pronatorRight,
+            path: assets.pronatorRightPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.stlLeft,
+            path: assets.stlLeftPath,
+          ),
+          SessionScanFileModel.local(
+            sessionId: sessionId,
+            patientId: patientId,
+            expertUserId: expertUserId,
+            fileType: SessionScanFileTypes.stlRight,
+            path: assets.stlRightPath,
+          ),
+        ].where((file) {
+          return file.localFilePath != null &&
+              file.localFilePath!.trim().isNotEmpty;
+        }).toList();
 
     if (files.isEmpty) return;
 
@@ -158,7 +167,8 @@ class SupabaseSessionScanRepository {
 
     for (final file in files) {
       try {
-        final fileName = file.fileName ??
+        final fileName =
+            file.fileName ??
             '${file.fileType}_${DateTime.now().millisecondsSinceEpoch}';
 
         final storagePath = _storageService.buildSessionScanPath(
@@ -210,7 +220,9 @@ class SupabaseSessionScanRepository {
       }
     }
 
-    await _client.from('session_scan_files').upsert(
+    await _client
+        .from('session_scan_files')
+        .upsert(
           uploadedFiles.map((file) => file.toUpsertMap()).toList(),
           onConflict: 'session_id,file_type',
         );
@@ -222,6 +234,7 @@ class SupabaseSessionScanRepository {
     required int expertUserId,
     required ParsedScanReport? parsedReport,
     required SessionScanAssets? assets,
+    String? detectedWordPath,
     String? detectedPdfPath,
   }) async {
     if (parsedReport != null) {
@@ -239,6 +252,7 @@ class SupabaseSessionScanRepository {
         patientId: patientId,
         expertUserId: expertUserId,
         assets: assets,
+        detectedWordPath: detectedWordPath,
         detectedPdfPath: detectedPdfPath,
       );
     }

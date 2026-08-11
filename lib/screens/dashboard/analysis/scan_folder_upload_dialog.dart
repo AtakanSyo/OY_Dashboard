@@ -11,18 +11,21 @@ import 'package:oy_site/models/session_scan_assets.dart';
 import 'package:oy_site/services/analysis/analysis_runtime_cache.dart';
 import 'package:oy_site/services/analysis/plantar_pressure_mock_factory.dart';
 import 'package:oy_site/services/scan/scan_report_pdf_parser_service.dart';
+import 'package:oy_site/services/scan/scan_report_word_parser_service.dart';
 import 'package:oy_site/services/scan/session_scan_assets_parser.dart';
 import 'package:oy_site/services/session_analysis_service.dart';
 
 class ScanFolderUploadResult {
   final String folderPath;
   final List<String> fileNames;
+  final String? detectedWordPath;
   final String? detectedPdfPath;
   final ParsedScanReport? parsedReport;
 
   const ScanFolderUploadResult({
     required this.folderPath,
     required this.fileNames,
+    this.detectedWordPath,
     this.detectedPdfPath,
     this.parsedReport,
   });
@@ -49,6 +52,8 @@ class ScanFolderUploadDialog extends StatefulWidget {
 class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
   final ScanReportPdfParserService _pdfParserService =
       const ScanReportPdfParserService();
+  final ScanReportWordParserService _wordParserService =
+      const ScanReportWordParserService();
 
   final SessionScanAssetsParser _assetsParser = const SessionScanAssetsParser();
 
@@ -69,7 +74,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
   String? _errorMessage;
   String? _saveMessage;
 
+  String? _detectedWordPath;
   String? _detectedPdfPath;
+  String? _parsedReportSourceLabel;
   ParsedScanReport? _parsedReport;
   SessionScanAssets? _scanAssets;
 
@@ -81,7 +88,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       _analysisSaved = false;
       _errorMessage = null;
       _saveMessage = null;
+      _detectedWordPath = null;
       _detectedPdfPath = null;
+      _parsedReportSourceLabel = null;
       _parsedReport = null;
       _scanAssets = null;
       _selectedFolderPath = null;
@@ -118,20 +127,56 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       final fileNames = files.map((file) => file.uri.pathSegments.last).toList()
         ..sort();
 
+      String? detectedWordPath;
       String? detectedPdfPath;
       for (final file in files) {
-        if (file.path.toLowerCase().endsWith('.pdf')) {
+        final lowerPath = file.path.toLowerCase();
+        if (detectedWordPath == null && lowerPath.endsWith('.doc')) {
+          detectedWordPath = file.path;
+        }
+        if (detectedPdfPath == null && lowerPath.endsWith('.pdf')) {
           detectedPdfPath = file.path;
-          break;
         }
       }
 
       ParsedScanReport? parsedReport;
-      if (detectedPdfPath != null) {
+      String? parsedReportSourceLabel;
+      Object? wordParseError;
+      Object? pdfParseError;
+      if (detectedWordPath != null) {
+        try {
+          parsedReport = await _wordParserService.parseWordFile(
+            detectedWordPath,
+          );
+          parsedReportSourceLabel = 'Word';
+        } catch (e) {
+          wordParseError = e;
+          debugPrint('Word report parse error: $e');
+        }
+      }
+      if (parsedReport == null && detectedPdfPath != null) {
         try {
           parsedReport = await _pdfParserService.parsePdfFile(detectedPdfPath);
+          parsedReportSourceLabel = detectedWordPath == null
+              ? 'PDF'
+              : 'PDF (Word fallback)';
         } catch (e) {
-          _errorMessage = 'PDF bulundu ancak parse edilemedi: $e';
+          pdfParseError = e;
+          debugPrint('PDF report parse error: $e');
+        }
+      }
+
+      String? reportParseErrorMessage;
+      if (parsedReport == null) {
+        if (wordParseError != null && pdfParseError != null) {
+          reportParseErrorMessage =
+              'Word ve PDF raporlari parse edilemedi. Word: $wordParseError PDF: $pdfParseError';
+        } else if (wordParseError != null) {
+          reportParseErrorMessage =
+              'Word raporu parse edilemedi: $wordParseError';
+        } else if (pdfParseError != null) {
+          reportParseErrorMessage =
+              'PDF raporu parse edilemedi: $pdfParseError';
         }
       }
 
@@ -147,9 +192,12 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       setState(() {
         _selectedFolderPath = folderPath;
         _fileNames = fileNames;
+        _detectedWordPath = detectedWordPath;
         _detectedPdfPath = detectedPdfPath;
+        _parsedReportSourceLabel = parsedReportSourceLabel;
         _parsedReport = parsedReport;
         _scanAssets = scanAssets;
+        _errorMessage = reportParseErrorMessage;
         _isLoading = false;
         _isProcessingUpload = true;
         _saveMessage =
@@ -164,7 +212,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         if (!mounted) return;
         setState(() {
           _saveMessage =
-              '3D scan verileri kaydedildi. PDF parse edilemediği için analiz sonucu oluşturulmadı.';
+              '3D scan verileri kaydedildi. Rapor parse edilemediği için analiz sonucu oluşturulmadı.';
         });
       }
     } catch (e) {
@@ -191,6 +239,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       ScanFolderUploadResult(
         folderPath: _selectedFolderPath!,
         fileNames: _fileNames,
+        detectedWordPath: _detectedWordPath,
         detectedPdfPath: _detectedPdfPath,
         parsedReport: _parsedReport,
       ),
@@ -227,6 +276,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         expertUserId: expertUserId,
         parsedReport: _parsedReport,
         assets: _scanAssets,
+        detectedWordPath: _detectedWordPath,
         detectedPdfPath: _detectedPdfPath,
       );
 
@@ -293,13 +343,12 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         setState(() {
           _isSavingAnalysis = false;
           _analysisSaved = false;
-          _saveMessage =
-              'Analiz geçici olarak hazırlandı. Henüz kaydedilmedi.';
+          _saveMessage = 'Analiz geçici olarak hazırlandı. Henüz kaydedilmedi.';
         });
         return;
       }
 
-      await _analysisRepository.saveAnalysisResult(
+      await _analysisRepository.upsertAnalysisResult(
         userId: userId,
         patientId: patientId,
         sessionId: sessionId,
@@ -336,7 +385,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     final report = _parsedReport;
 
     if (report == null) {
-      if (_detectedPdfPath == null) {
+      if (_detectedWordPath == null && _detectedPdfPath == null) {
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -346,7 +395,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             border: Border.all(color: Colors.grey.shade300),
           ),
           child: Text(
-            'Klasörde parse edilecek PDF bulunamadı.',
+            'Klasörde parse edilecek Word veya PDF raporu bulunamadı.',
             style: TextStyle(color: Colors.grey[700]),
           ),
         );
@@ -361,7 +410,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
           border: Border.all(color: Colors.orange.withOpacity(0.2)),
         ),
         child: Text(
-          'PDF bulundu ancak veri önizlemesi oluşturulamadı.',
+          'Rapor bulundu ancak veri önizlemesi oluşturulamadı.',
           style: TextStyle(color: Colors.orange[900]),
         ),
       );
@@ -378,12 +427,11 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'PDF Analiz Önizlemesi',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+          Text(
+            _parsedReportSourceLabel == null
+                ? 'Rapor Analiz Önizlemesi'
+                : 'Rapor Analiz Önizlemesi ($_parsedReportSourceLabel)',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 12),
           _buildSaveStatusBox(),
@@ -582,10 +630,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
               children: [
                 Text(
                   report.recommendationText!,
-                  style: TextStyle(
-                    color: Colors.grey[800],
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: Colors.grey[800], height: 1.4),
                 ),
               ],
             ),
@@ -628,7 +673,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             const SizedBox(width: 10),
           ] else ...[
             Icon(
-              hasError ? Icons.warning_amber_outlined : Icons.check_circle_outline,
+              hasError
+                  ? Icons.warning_amber_outlined
+                  : Icons.check_circle_outline,
               size: 18,
               color: hasError ? Colors.orange : Colors.teal,
             ),
@@ -687,10 +734,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
           const SizedBox(height: 10),
           Container(
@@ -773,11 +817,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             ),
             const SizedBox(width: 10),
           ] else ...[
-            const Icon(
-              Icons.info_outline,
-              color: Colors.teal,
-              size: 18,
-            ),
+            const Icon(Icons.info_outline, color: Colors.teal, size: 18),
             const SizedBox(width: 8),
           ],
           Expanded(
@@ -831,7 +871,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
               ),
               const SizedBox(height: 8),
               Text(
-                '3D tarama klasörünü seç. Klasörde PDF varsa otomatik parse edilerek temel analiz verileri gösterilir.',
+                '3D tarama klasörünü seç. Word raporu birincil kaynak olarak parse edilir; gerekirse PDF yedek kaynak olarak kullanılır.',
                 style: TextStyle(color: Colors.grey[700]),
               ),
               const SizedBox(height: 20),
@@ -857,14 +897,20 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
               ),
               const SizedBox(height: 16),
               _buildGlobalSaveStatusBox(),
+              if (_detectedWordPath != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Bulunan Word: $_detectedWordPath',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               if (_detectedPdfPath != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     'Bulunan PDF: $_detectedPdfPath',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               Expanded(
@@ -883,75 +929,71 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
                         child: _isLoading
                             ? const Center(child: CircularProgressIndicator())
                             : _errorMessage != null
-                                ? Center(
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: const TextStyle(color: Colors.red),
+                            ? Center(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              )
+                            : _fileNames.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'Henüz klasör seçilmedi.',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Bulunan dosyalar (${_fileNames.length})',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                  )
-                                : _fileNames.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          'Henüz klasör seçilmedi.',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      )
-                                    : Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Bulunan dosyalar (${_fileNames.length})',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: _fileNames.length,
-                                              separatorBuilder: (_, __) =>
-                                                  const SizedBox(height: 8),
-                                              itemBuilder: (context, index) {
-                                                final fileName = _fileNames[index];
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Expanded(
+                                    child: ListView.separated(
+                                      itemCount: _fileNames.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: 8),
+                                      itemBuilder: (context, index) {
+                                        final fileName = _fileNames[index];
 
-                                                return Container(
-                                                  padding:
-                                                      const EdgeInsets.all(10),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius:
-                                                        BorderRadius.circular(10),
-                                                    border: Border.all(
-                                                      color:
-                                                          Colors.grey.shade300,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      const Icon(
-                                                        Icons
-                                                            .insert_drive_file_outlined,
-                                                        color: Colors.teal,
-                                                      ),
-                                                      const SizedBox(width: 10),
-                                                      Expanded(
-                                                        child: Text(
-                                                          fileName,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
+                                        return Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey.shade300,
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons
+                                                    .insert_drive_file_outlined,
+                                                color: Colors.teal,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  fileName,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                     const SizedBox(width: 16),

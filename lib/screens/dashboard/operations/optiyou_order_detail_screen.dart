@@ -5,8 +5,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:oy_site/data/repositories/supabase_anthropometric_clinical_info_repository.dart';
 import 'package:oy_site/data/repositories/supabase_order_operation_repository.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
+import 'package:oy_site/models/anthropometric_clinical_info_model.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
@@ -45,6 +47,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   final SupabasePatientInviteRepository _inviteRepository =
       SupabasePatientInviteRepository();
+
+  final SupabaseAnthropometricClinicalInfoRepository _clinicalInfoRepository =
+      SupabaseAnthropometricClinicalInfoRepository();
 
   final GlobalKey _packagingQrCardKey = GlobalKey();
 
@@ -473,6 +478,143 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           currentUser: widget.currentUser,
           session: session,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openClinicalInfo() async {
+    final session = await _ensureSessionLoaded();
+
+    if (session?.sessionId == null) {
+      _showMessage('Bu siparişe bağlı ölçüm oturumu okunamadı.');
+      return;
+    }
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.medical_information_outlined),
+            SizedBox(width: 10),
+            Expanded(child: Text('Klinik / Antropometrik Bilgiler')),
+          ],
+        ),
+        content: SizedBox(
+          width: 680,
+          child: FutureBuilder<AnthropometricClinicalInfoModel?>(
+            future: _clinicalInfoRepository.getBySessionId(session!.sessionId!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox(
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return const Text(
+                  'Klinik / antropometrik bilgiler yüklenemedi.',
+                );
+              }
+              final info = snapshot.data;
+              if (info == null) {
+                return const Text(
+                  'Bu ölçüm oturumu için klinik / antropometrik bilgi bulunamadı.',
+                );
+              }
+              return _buildClinicalInfoContent(info);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClinicalInfoContent(AnthropometricClinicalInfoModel info) {
+    String number(double? value, {String suffix = ''}) => value == null
+        ? 'Belirtilmedi'
+        : '${value.toStringAsFixed(value % 1 == 0 ? 0 : 1)}$suffix';
+    String text(String? value) => value == null || value.trim().isEmpty
+        ? 'Belirtilmedi'
+        : value.trim();
+
+    final pathologies = <String>[
+      if (info.halluxValgus) 'Halluks valgus',
+      if (info.heelSpur) 'Topuk dikeni',
+      if (info.flatFoot) 'Düz tabanlık',
+      if (info.pesCavus) 'Yüksek kavisli ayak',
+      if (info.mortonNeuroma) 'Morton nöroması',
+      if (info.achillesProblem) 'Aşil problemi',
+      if (info.metatarsalPain) 'Metatarsal ağrı',
+    ];
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 620),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildClinicalSection('Antropometrik Bilgiler', [
+              ('Boy', number(info.heightCm, suffix: ' cm')),
+              ('Kilo', number(info.weightKg, suffix: ' kg')),
+              ('Vücut kitle indeksi', number(info.bmi)),
+              ('Ayakkabı numarası', number(info.shoeSizeEu)),
+            ]),
+            _buildClinicalSection('Meslek ve Günlük Yaşam', [
+              ('Meslek', text(info.profession)),
+              ('Günlük ayakta kalma', number(info.dailyStandingHours, suffix: ' saat')),
+              ('İş tanımı', text(info.jobDescription)),
+              ('Spor yapıyor', info.doesSport ? 'Evet' : 'Hayır'),
+              if (info.doesSport) ('Spor bilgisi', text(info.sportDescription)),
+            ]),
+            _buildClinicalSection('Klinik Bilgiler', [
+              ('Mevcut şikâyet', text(info.currentComplaint)),
+              ('Tanı / ön tanı', text(info.diagnosisPreDiagnosis)),
+              ('Diyabet', info.hasDiabetes ? 'Var' : 'Yok'),
+              if (info.hasDiabetes) ('Diyabet notu', text(info.diabetesNote)),
+              ('Patolojiler', pathologies.isEmpty ? 'Belirtilmedi' : pathologies.join(', ')),
+              ('Diğer patolojiler', text(info.otherPathologies)),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClinicalSection(
+    String title,
+    List<(String, String)> values,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          )),
+          const SizedBox(height: 8),
+          ...values.map((value) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 180,
+                  child: Text(value.$1, style: TextStyle(color: Colors.grey.shade700)),
+                ),
+                Expanded(child: Text(value.$2, style: const TextStyle(fontWeight: FontWeight.w600))),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
@@ -1944,6 +2086,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 icon: Icons.analytics_outlined,
                 label: 'Analiz Raporunu Görüntüle',
                 onPressed: _openAnalysisResults,
+              ),
+              _buildActionButton(
+                icon: Icons.medical_information_outlined,
+                label: 'Antropometrik Bilgileri Görüntüle',
+                onPressed: _openClinicalInfo,
               ),
               _buildActionButton(
                 icon: Icons.straighten_outlined,

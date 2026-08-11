@@ -26,35 +26,71 @@ class ScanReportTextParser {
       leftArchLength: _extractPairDouble(text, 'Arch length', isLeft: true),
       rightArchLength: _extractPairDouble(text, 'Arch length', isLeft: false),
 
-      leftFirstMetaLength:
-          _extractPairDouble(text, 'First meta length', isLeft: true),
-      rightFirstMetaLength:
-          _extractPairDouble(text, 'First meta length', isLeft: false),
+      leftFirstMetaLength: _extractPairDouble(
+        text,
+        'First meta length',
+        isLeft: true,
+      ),
+      rightFirstMetaLength: _extractPairDouble(
+        text,
+        'First meta length',
+        isLeft: false,
+      ),
 
-      leftFifthMetaLength:
-          _extractPairDouble(text, 'Fifth meta length', isLeft: true),
-      rightFifthMetaLength:
-          _extractPairDouble(text, 'Fifth meta length', isLeft: false),
+      leftFifthMetaLength: _extractPairDouble(
+        text,
+        'Fifth meta length',
+        isLeft: true,
+      ),
+      rightFifthMetaLength: _extractPairDouble(
+        text,
+        'Fifth meta length',
+        isLeft: false,
+      ),
 
-      leftHalluxBumpsLength:
-          _extractPairDouble(text, 'Hallux bumps length', isLeft: true),
-      rightHalluxBumpsLength:
-          _extractPairDouble(text, 'Hallux bumps length', isLeft: false),
+      leftHalluxBumpsLength: _extractPairDouble(
+        text,
+        'Hallux bumps length',
+        isLeft: true,
+      ),
+      rightHalluxBumpsLength: _extractPairDouble(
+        text,
+        'Hallux bumps length',
+        isLeft: false,
+      ),
 
-      leftFootFlankLength:
-          _extractPairDouble(text, 'Foot flank length', isLeft: true),
-      rightFootFlankLength:
-          _extractPairDouble(text, 'Foot flank length', isLeft: false),
+      leftFootFlankLength: _extractPairDouble(
+        text,
+        'Foot flank length',
+        isLeft: true,
+      ),
+      rightFootFlankLength: _extractPairDouble(
+        text,
+        'Foot flank length',
+        isLeft: false,
+      ),
 
-      leftHeelCenterLength:
-          _extractPairDouble(text, 'Heel center length', isLeft: true),
-      rightHeelCenterLength:
-          _extractPairDouble(text, 'Heel center length', isLeft: false),
+      leftHeelCenterLength: _extractPairDouble(
+        text,
+        'Heel center length',
+        isLeft: true,
+      ),
+      rightHeelCenterLength: _extractPairDouble(
+        text,
+        'Heel center length',
+        isLeft: false,
+      ),
 
-      leftHeelMarginLength:
-          _extractPairDouble(text, 'Heel margin length', isLeft: true),
-      rightHeelMarginLength:
-          _extractPairDouble(text, 'Heel margin length', isLeft: false),
+      leftHeelMarginLength: _extractPairDouble(
+        text,
+        'Heel margin length',
+        isLeft: true,
+      ),
+      rightHeelMarginLength: _extractPairDouble(
+        text,
+        'Heel margin length',
+        isLeft: false,
+      ),
 
       leftFootWidth: _extractPairDouble(text, 'Foot width', isLeft: true),
       rightFootWidth: _extractPairDouble(text, 'Foot width', isLeft: false),
@@ -65,47 +101,88 @@ class ScanReportTextParser {
       leftToeWidth: _extractPairDouble(text, 'Toe width', isLeft: true),
       rightToeWidth: _extractPairDouble(text, 'Toe width', isLeft: false),
 
-      leftArchOutsideWidth:
-          _extractPairDouble(text, 'Arch outside width', isLeft: true),
-      rightArchOutsideWidth:
-          _extractPairDouble(text, 'Arch outside width', isLeft: false),
+      leftArchOutsideWidth: _extractPairDouble(
+        text,
+        'Arch outside width',
+        isLeft: true,
+      ),
+      rightArchOutsideWidth: _extractPairDouble(
+        text,
+        'Arch outside width',
+        isLeft: false,
+      ),
 
-      leftFootFlankWidth:
-          _extractPairDouble(text, 'Foot flank width', isLeft: true),
-      rightFootFlankWidth:
-          _extractPairDouble(text, 'Foot flank width', isLeft: false),
+      leftFootFlankWidth: _extractPairDouble(
+        text,
+        'Foot flank width',
+        isLeft: true,
+      ),
+      rightFootFlankWidth: _extractPairDouble(
+        text,
+        'Foot flank width',
+        isLeft: false,
+      ),
 
-      leftHeelCenterWidth:
-          _extractPairDouble(text, 'Heel center width', isLeft: true),
-      rightHeelCenterWidth:
-          _extractPairDouble(text, 'Heel center width', isLeft: false),
+      leftHeelCenterWidth: _extractPairDouble(
+        text,
+        'Heel center width',
+        isLeft: true,
+      ),
+      rightHeelCenterWidth: _extractPairDouble(
+        text,
+        'Heel center width',
+        isLeft: false,
+      ),
 
-      leftTotalHeelWidth:
-          _extractPairDouble(text, 'Total heel width', isLeft: true),
-      rightTotalHeelWidth:
-          _extractPairDouble(text, 'Total heel width', isLeft: false),
+      leftTotalHeelWidth: _extractPairDouble(
+        text,
+        'Total heel width',
+        isLeft: true,
+      ),
+      rightTotalHeelWidth: _extractPairDouble(
+        text,
+        'Total heel width',
+        isLeft: false,
+      ),
 
       leftArchHeight: _extractPairDouble(text, 'Arch height', isLeft: true),
       rightArchHeight: _extractPairDouble(text, 'Arch height', isLeft: false),
 
-      leftFirstMetaJointHeight:
-          _extractPairDouble(text, 'First meta joint height', isLeft: true),
-      rightFirstMetaJointHeight:
-          _extractPairDouble(text, 'First meta joint height', isLeft: false),
+      leftFirstMetaJointHeight: _extractPairDouble(
+        text,
+        'First meta joint height',
+        isLeft: true,
+      ),
+      rightFirstMetaJointHeight: _extractPairDouble(
+        text,
+        'First meta joint height',
+        isLeft: false,
+      ),
 
-      leftHeelProtrusionHeight:
-          _extractPairDouble(text, 'Heel protrusion height', isLeft: true),
-      rightHeelProtrusionHeight:
-          _extractPairDouble(text, 'Heel protrusion height', isLeft: false),
+      leftHeelProtrusionHeight: _extractPairDouble(
+        text,
+        'Heel protrusion height',
+        isLeft: true,
+      ),
+      rightHeelProtrusionHeight: _extractPairDouble(
+        text,
+        'Heel protrusion height',
+        isLeft: false,
+      ),
 
       leftHalluxAngle: _extractPairDouble(text, 'Hallux angle', isLeft: true),
-      rightHalluxAngle:
-          _extractPairDouble(text, 'Hallux angle', isLeft: false),
+      rightHalluxAngle: _extractPairDouble(text, 'Hallux angle', isLeft: false),
 
-      leftPronatorAngle:
-          _extractPairDouble(text, 'Pronator angle', isLeft: true),
-      rightPronatorAngle:
-          _extractPairDouble(text, 'Pronator angle', isLeft: false),
+      leftPronatorAngle: _extractPairDouble(
+        text,
+        'Pronator angle',
+        isLeft: true,
+      ),
+      rightPronatorAngle: _extractPairDouble(
+        text,
+        'Pronator angle',
+        isLeft: false,
+      ),
 
       leftKneeAngle: _extractPairDouble(text, 'Knee angle', isLeft: true),
       rightKneeAngle: _extractPairDouble(text, 'Knee angle', isLeft: false),
@@ -133,9 +210,11 @@ class ScanReportTextParser {
       leftArchWidthIndex: _extractArchWidthIndex(text, isLeft: true),
       rightArchWidthIndex: _extractArchWidthIndex(text, isLeft: false),
 
-      leftHalluxType: _extractNamedType(text, 'Hallux Type', isLeft: true) ??
+      leftHalluxType:
+          _extractNamedType(text, 'Hallux Type', isLeft: true) ??
           _extractNamedType(text, 'Hallgux Type', isLeft: true),
-      rightHalluxType: _extractNamedType(text, 'Hallux Type', isLeft: false) ??
+      rightHalluxType:
+          _extractNamedType(text, 'Hallux Type', isLeft: false) ??
           _extractNamedType(text, 'Hallgux Type', isLeft: false),
 
       leftHeelType: _extractNamedType(text, 'Heel type', isLeft: true),
@@ -143,7 +222,7 @@ class ScanReportTextParser {
 
       leftKneeType: _extractNamedType(text, 'Knee type', isLeft: true),
       rightKneeType: _extractNamedType(text, 'Knee type', isLeft: false),
-
+      rawText: rawText,
     );
   }
 
@@ -255,14 +334,14 @@ class ScanReportTextParser {
       // Page 1 extracted text:
       // Left foot Right foot Severe Flat Arch Type Severe Flat
       RegExp(
-        r'Left foot\s+Right foot\s+(.+?)\s+Arch Type\s+(.+?)(?=\s+\d|\s+low|\s+high|\s+High arch foot|\s+Arch height|$)',
+        r'Arch analysis\s+Left foot\s+Right foot\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})\s+Arch Type\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})(?=\s+-?\d|\s+low|\s+high|\s+High arch foot|\s+Arch height|$)',
         caseSensitive: false,
       ),
 
       // More direct:
       // Severe Flat Arch Type Severe Flat
       RegExp(
-        r'(.+?)\s+Arch Type\s+(.+?)(?=\s+\d|\s+low|\s+high|\s+High arch foot|\s+Arch height|$)',
+        r'([A-Za-z]+(?:\s+[A-Za-z]+){0,2})\s+Arch Type\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})(?=\s+-?\d|\s+low|\s+high|\s+High arch foot|\s+Arch height|$)',
         caseSensitive: false,
       ),
     ];
@@ -314,11 +393,7 @@ class ScanReportTextParser {
     return null;
   }
 
-  String? _extractNamedType(
-    String text,
-    String label, {
-    required bool isLeft,
-  }) {
+  String? _extractNamedType(String text, String label, {required bool isLeft}) {
     final escapedLabel = _labelPattern(label);
 
     final patterns = <RegExp>[
@@ -385,12 +460,21 @@ class ScanReportTextParser {
 
     var cleaned = value
         .replaceAll(RegExp(r'\s+'), ' ')
-        .replaceAll(RegExp(r'^(Left foot|Right foot)\s+', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s+(Left foot|Right foot)$', caseSensitive: false), '')
+        .replaceAll(
+          RegExp(r'^(Left foot|Right foot)\s+', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(r'\s+(Left foot|Right foot)$', caseSensitive: false),
+          '',
+        )
         .trim();
 
     cleaned = cleaned
-        .replaceAll(RegExp(r'\s+Evaluation criteria.*$', caseSensitive: false), '')
+        .replaceAll(
+          RegExp(r'\s+Evaluation criteria.*$', caseSensitive: false),
+          '',
+        )
         .replaceAll(RegExp(r'\s+Normal:.*$', caseSensitive: false), '')
         .replaceAll(RegExp(r'\s+Schematic.*$', caseSensitive: false), '')
         .replaceAll(RegExp(r'\s+Item description.*$', caseSensitive: false), '')

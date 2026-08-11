@@ -128,6 +128,7 @@ class SessionScanFileModel {
 }
 
 class SessionScanFileTypes {
+  static const String wordReport = 'word_report';
   static const String pdfReport = 'pdf_report';
 
   static const String archLeftImage = 'arch_left_image';

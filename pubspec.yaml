@@ -30,6 +30,7 @@ dependencies:
   desktop_drop: any
   supabase_flutter: ^2.9.0
   syncfusion_flutter_pdf: ^24.1.41
+  image: ^4.8.0
   url_launcher: ^6.3.1
   qr_flutter: ^4.1.0
   archive: ^4.0.9
@@ -58,3 +59,4 @@ flutter:
     - assets/products.csv
     - assets/images/
     - assets/heatmaps/
+    - assets/fonts/

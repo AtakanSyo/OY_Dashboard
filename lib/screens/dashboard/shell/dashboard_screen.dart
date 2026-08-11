@@ -42,6 +42,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  final List<int> _navigationHistory = [];
 
   @override
   void initState() {
@@ -73,7 +74,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       case RoleCodes.customer:
         return [
-          CustomerHomeScreen(currentUser: widget.currentUser),
+          CustomerHomeScreen(
+            currentUser: widget.currentUser,
+            onNavigate: _onItemSelected,
+          ),
           CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
           StoreScreen(currentUserEmail: widget.currentUser.email),
@@ -115,9 +119,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onItemSelected(int index) {
     if (index < 0 || index >= _pages.length) return;
+    if (index == _selectedIndex) return;
 
     setState(() {
+      _navigationHistory.add(_selectedIndex);
       _selectedIndex = index;
+    });
+  }
+
+  void _goBack() {
+    if (_navigationHistory.isEmpty) return;
+
+    setState(() {
+      _selectedIndex = _navigationHistory.removeLast();
     });
   }
 
@@ -129,27 +143,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _selectedIndex = 0;
     }
 
-    return Scaffold(
-      body: Row(
-        children: [
-          Sidebar(
-            onItemSelected: _onItemSelected,
-            selectedIndex: _selectedIndex,
-            currentUser: widget.currentUser,
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Topbar(
-                  currentUser: widget.currentUser,
-                ),
-                Expanded(
-                  child: pages[_selectedIndex],
-                ),
-              ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        body: Row(
+          children: [
+            Sidebar(
+              onItemSelected: _onItemSelected,
+              selectedIndex: _selectedIndex,
+              currentUser: widget.currentUser,
             ),
-          ),
-        ],
+            Expanded(
+              child: Column(
+                children: [
+                  Topbar(
+                    currentUser: widget.currentUser,
+                  ),
+                  Expanded(
+                    child: pages[_selectedIndex],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

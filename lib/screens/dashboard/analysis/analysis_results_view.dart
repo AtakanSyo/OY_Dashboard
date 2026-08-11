@@ -3,20 +3,15 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-import 'dart:typed_data';
-
-import 'package:flutter/material.dart';
 import 'package:oy_site/data/repositories/supabase_session_pressure_repository.dart';
+import 'package:oy_site/data/repositories/supabase_session_scan_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
+import 'package:oy_site/models/parsed_scan_report.dart';
 import 'package:oy_site/models/session_pressure_recording_model.dart';
+import 'package:oy_site/screens/dashboard/analysis/widgets/analysis_comparison_widgets.dart';
+import 'package:oy_site/services/report/analysis_pdf_report_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-enum FootSelectionSide {
-  left,
-  right,
-}
 
 class AnalysisResultsView extends StatefulWidget {
   final AppUser currentUser;
@@ -33,8 +28,7 @@ class AnalysisResultsView extends StatefulWidget {
   });
 
   @override
-  State<AnalysisResultsView> createState() =>
-      _AnalysisResultsViewState();
+  State<AnalysisResultsView> createState() => _AnalysisResultsViewState();
 }
 
 class _AnalysisResultsViewState extends State<AnalysisResultsView> {
@@ -42,11 +36,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
   final SupabaseSessionPressureRepository _pressureRepository =
       SupabaseSessionPressureRepository();
+  final SupabaseSessionScanRepository _scanRepository =
+      SupabaseSessionScanRepository();
+  final AnalysisPdfReportService _pdfReportService = AnalysisPdfReportService();
 
   late int _selectedIndex;
-
-  FootSelectionSide _selectedFootSide =
-      FootSelectionSide.left;
+  bool _isExportingPdf = false;
+  bool _isInitialPageLoading = true;
 
   // ---------------------------------------------------------------------------
   // Değerlendirme görselleri
@@ -57,6 +53,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
   /// session_scan_files.file_type → signed URL
   final Map<String, String> _evaluationVisualUrls = {};
+  final Map<String, Uint8List> _evaluationVisualBytes = {};
+  ParsedScanReport? _sessionScanReport;
 
   // ---------------------------------------------------------------------------
   // Basınç ölçümleri
@@ -74,38 +72,20 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   _PressureRecordingData? _selectedPressureData;
 
   int _selectedPressureFrameIndex = 0;
+  _PressurePointSelection? _selectedPressurePoint;
 
   CustomerAnalysisResult? get _selectedResult {
     if (widget.results.isEmpty) return null;
 
-    if (_selectedIndex < 0 ||
-        _selectedIndex >= widget.results.length) {
+    if (_selectedIndex < 0 || _selectedIndex >= widget.results.length) {
       return null;
     }
 
     return widget.results[_selectedIndex];
   }
 
-  bool get _isLeftSelected {
-    return _selectedFootSide == FootSelectionSide.left;
-  }
-
   String get _displayPageTitle {
-    final title = widget.pageTitle.trim();
-
-    if (title.isEmpty) {
-      return 'Ayak Sağlığı Değerlendirmesi';
-    }
-
-    return title
-        .replaceAll(
-          RegExp('analiz', caseSensitive: false),
-          'Değerlendirme',
-        )
-        .replaceAll(
-          RegExp('analizi', caseSensitive: false),
-          'Değerlendirmesi',
-        );
+    return 'Değerlendirme Sonuçları';
   }
 
   @override
@@ -126,10 +106,16 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Future<void> _reloadSelectedSessionData() async {
-    await Future.wait([
-      _loadEvaluationVisuals(),
-      _loadPressureRecordings(),
-    ]);
+    if (mounted) setState(() => _isInitialPageLoading = true);
+    try {
+      await Future.wait([
+        _loadEvaluationVisuals(),
+        _loadPressureRecordings(),
+        _loadSessionScanReport(),
+      ]);
+    } finally {
+      if (mounted) setState(() => _isInitialPageLoading = false);
+    }
   }
 
   Future<void> _selectResult(int index) async {
@@ -145,17 +131,48 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       _selectedIndex = index;
 
       _evaluationVisualUrls.clear();
+      _evaluationVisualBytes.clear();
+      _sessionScanReport = null;
       _evaluationVisualsError = null;
 
       _pressureRecordings = [];
       _selectedPressureRecording = null;
       _selectedPressureData = null;
       _selectedPressureFrameIndex = 0;
+      _selectedPressurePoint = null;
       _pressureRecordsError = null;
       _pressureDataError = null;
     });
 
     await _reloadSelectedSessionData();
+  }
+
+  Future<void> _loadSessionScanReport() async {
+    final sessionId = _selectedResult?.sessionId;
+    if (sessionId == null) return;
+
+    try {
+      final stored = await _scanRepository.getReportBySessionId(
+        sessionId: sessionId,
+      );
+      if (!mounted || _selectedResult?.sessionId != sessionId) return;
+      final parsed = stored?.toParsedScanReport();
+      setState(() {
+        _sessionScanReport = parsed?.hasAnyCoreMeasurement == true
+            ? parsed
+            : null;
+      });
+    } catch (e) {
+      debugPrint('Oturum tarama raporu yüklenemedi: $e');
+    }
+  }
+
+  ParsedScanReport? _reportFor(CustomerAnalysisResult result) {
+    if (_sessionScanReport == null) return result.parsedReport;
+    return ParsedScanReport.merge(
+      preferred: _sessionScanReport,
+      fallback: result.parsedReport,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -173,8 +190,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _evaluationVisualUrls.clear();
-        _evaluationVisualsError =
-            'Bu değerlendirme için oturum ID bulunamadı.';
+        _evaluationVisualBytes.clear();
+        _evaluationVisualsError = 'Bu değerlendirme için oturum ID bulunamadı.';
         _isLoadingEvaluationVisuals = false;
       });
 
@@ -187,6 +204,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       _isLoadingEvaluationVisuals = true;
       _evaluationVisualsError = null;
       _evaluationVisualUrls.clear();
+      _evaluationVisualBytes.clear();
     });
 
     try {
@@ -206,11 +224,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           .order('created_at', ascending: false);
 
       final rows = (response as List<dynamic>)
-          .map(
-            (item) => Map<String, dynamic>.from(
-              item as Map,
-            ),
-          )
+          .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
       const supportedImageTypes = <String>{
@@ -225,10 +239,10 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       };
 
       final urls = <String, String>{};
+      final imageBytes = <String, Uint8List>{};
 
       for (final row in rows) {
-        final fileType =
-            row['file_type']?.toString().trim() ?? '';
+        final fileType = row['file_type']?.toString().trim() ?? '';
 
         if (!supportedImageTypes.contains(fileType)) {
           continue;
@@ -240,11 +254,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           continue;
         }
 
-        final bucket =
-            row['storage_bucket']?.toString().trim() ?? '';
+        final bucket = row['storage_bucket']?.toString().trim() ?? '';
 
-        final storagePath =
-            row['storage_path']?.toString().trim() ?? '';
+        final storagePath = row['storage_path']?.toString().trim() ?? '';
 
         if (bucket.isEmpty || storagePath.isEmpty) {
           continue;
@@ -253,12 +265,20 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         try {
           final signedUrl = await _client.storage
               .from(bucket)
-              .createSignedUrl(
-                _normalizeStoragePath(storagePath),
-                60 * 60 * 6,
-              );
+              .createSignedUrl(_normalizeStoragePath(storagePath), 60 * 60 * 6);
 
           urls[fileType] = signedUrl;
+
+          try {
+            imageBytes[fileType] = await _client.storage
+                .from(bucket)
+                .download(_normalizeStoragePath(storagePath));
+          } catch (e) {
+            debugPrint(
+              'PDF için görsel indirilemedi. '
+              'Tür: $fileType, yol: $storagePath, hata: $e',
+            );
+          }
         } catch (e) {
           debugPrint(
             'Signed URL oluşturulamadı. '
@@ -278,6 +298,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         _evaluationVisualUrls
           ..clear()
           ..addAll(urls);
+        _evaluationVisualBytes
+          ..clear()
+          ..addAll(imageBytes);
 
         _isLoadingEvaluationVisuals = false;
 
@@ -301,13 +324,10 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingEvaluationVisuals = false;
-        _evaluationVisualsError =
-            'Değerlendirme görselleri yüklenemedi: $e';
+        _evaluationVisualsError = 'Değerlendirme görselleri yüklenemedi: $e';
       });
 
-      debugPrint(
-        'Değerlendirme görselleri yüklenemedi: $e',
-      );
+      debugPrint('Değerlendirme görselleri yüklenemedi: $e');
     }
   }
 
@@ -357,11 +377,11 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       _selectedPressureRecording = null;
       _selectedPressureData = null;
       _selectedPressureFrameIndex = 0;
+      _selectedPressurePoint = null;
     });
 
     try {
-      final records =
-          await _pressureRepository.getRecordingsBySessionId(
+      final records = await _pressureRepository.getRecordingsBySessionId(
         sessionId: requestedSessionId,
       );
 
@@ -388,8 +408,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingPressureRecords = false;
-        _pressureRecordsError =
-            'Basınç ölçüm kayıtları yüklenemedi: $e';
+        _pressureRecordsError = 'Basınç ölçüm kayıtları yüklenemedi: $e';
       });
     }
   }
@@ -415,9 +434,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       Map<String, dynamic>? jsonMap;
 
       if (recording.rawFramesJson != null) {
-        jsonMap = Map<String, dynamic>.from(
-          recording.rawFramesJson!,
-        );
+        jsonMap = Map<String, dynamic>.from(recording.rawFramesJson!);
       }
 
       if (jsonMap == null) {
@@ -436,18 +453,12 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
         final Uint8List bytes = await _client.storage
             .from(bucket)
-            .download(
-              _normalizeStoragePath(storagePath),
-            );
+            .download(_normalizeStoragePath(storagePath));
 
-        final decoded = jsonDecode(
-          utf8.decode(bytes),
-        );
+        final decoded = jsonDecode(utf8.decode(bytes));
 
         if (decoded is! Map) {
-          throw Exception(
-            'Basınç kayıt dosyasının JSON yapısı geçersiz.',
-          );
+          throw Exception('Basınç kayıt dosyasının JSON yapısı geçersiz.');
         }
 
         jsonMap = Map<String, dynamic>.from(decoded);
@@ -479,8 +490,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingPressureData = false;
-        _pressureDataError =
-            'Basınç kayıt verisi açılamadı: $e';
+        _pressureDataError = 'Basınç kayıt verisi açılamadı: $e';
       });
     }
   }
@@ -512,8 +522,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds.remainder(60);
-    final milliseconds =
-        duration.inMilliseconds.remainder(1000);
+    final milliseconds = duration.inMilliseconds.remainder(1000);
 
     if (minutes > 0) {
       return '$minutes dk '
@@ -538,28 +547,122 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     return value.toStringAsFixed(3);
   }
 
-  String _safeText(
-    String? value, {
-    String fallback = '—',
-  }) {
+  String _safeText(String? value, {String fallback = '—'}) {
     final normalized = (value ?? '').trim();
-    return normalized.isEmpty ? fallback : normalized;
+    return _translateAssessmentText(normalized.isEmpty ? fallback : normalized);
   }
 
-  bool _hasText(String? value) {
-    return value != null && value.trim().isNotEmpty;
+  String _translateAssessmentText(String value) {
+    var translated = value;
+    const replacements = <String, String>{
+      'Severe Flat': 'İleri Düzey Düz Taban',
+      'Moderate Flat': 'Orta Düzey Düz Taban',
+      'Mild Flat': 'Hafif Düz Taban',
+      'Flat Foot': 'Düz Taban',
+      'High Arch': 'Yüksek Ark',
+      'Normal Arch': 'Normal Ark',
+      'Normal Hallgux': 'Normal Halluks',
+      'Normal Hallux': 'Normal Halluks',
+      'Normal Heel': 'Normal Topuk',
+      'Neutral': 'Nötr',
+      'Severity': 'İleri Düzey',
+      'Severe': 'İleri Düzey',
+      'Moderate': 'Orta Düzey',
+      'Mild': 'Hafif',
+      'Flat': 'Düz Taban',
+      'Normal': 'Normal',
+    };
+    for (final entry in replacements.entries) {
+      translated = translated.replaceAll(
+        RegExp(RegExp.escape(entry.key), caseSensitive: false),
+        entry.value,
+      );
+    }
+    return translated;
   }
 
-  String _sideLabel() {
-    return _isLeftSelected ? 'Sol Ayak' : 'Sağ Ayak';
+  String _archAssessmentLabel(double? value) {
+    if (value == null) return 'Veri bulunmuyor';
+    if (value < 0.21) return 'Yüksek Ark';
+    if (value <= 0.26) return 'Normal Ark';
+    if (value <= 0.28) return 'Hafif Düz Taban';
+    if (value <= 0.30) return 'Orta Düzey Düz Taban';
+    return 'İleri Düzey Düz Taban';
   }
 
-  CustomerFootSummary _selectedFoot(
-    CustomerAnalysisResult result,
-  ) {
-    return _isLeftSelected
-        ? result.leftFoot
-        : result.rightFoot;
+  double? _archHeatPosition(double? value) {
+    if (value == null) return null;
+    if (value < 0.21) {
+      return (0.25 * (value / 0.21)).clamp(0.0, 0.25);
+    }
+    if (value <= 0.26) {
+      return (0.4 + ((value - 0.21) / 0.05) * 0.2).clamp(0.4, 0.6);
+    }
+    return (0.6 + ((value - 0.26) / 0.08) * 0.4).clamp(0.6, 1.0);
+  }
+
+  double? _archWidthHeatPosition(double? value) {
+    if (value == null) return null;
+    return (value / 0.70).clamp(0.0, 1.0);
+  }
+
+  String _assessmentWithValue(String assessment, String value) {
+    if (value == '—') return assessment;
+    return '$assessment • $value';
+  }
+
+  String _angleAssessmentLabel(
+    double? value, {
+    required double mild,
+    required double moderate,
+    required double severe,
+  }) {
+    if (value == null) return 'Veri bulunmuyor';
+    final magnitude = value.abs();
+    if (magnitude < mild) return 'Normal';
+    if (magnitude < moderate) return 'Hafif';
+    if (magnitude < severe) return 'Orta Düzey';
+    return 'İleri Düzey';
+  }
+
+  double? _angleHeatPosition(double? value, double severeThreshold) {
+    if (value == null) return null;
+    return (0.5 + (value / severeThreshold) * 0.5).clamp(0.0, 1.0);
+  }
+
+  Future<void> _saveSelectedResultAsPdf() async {
+    final result = _selectedResult;
+    if (result == null || _isExportingPdf) return;
+
+    setState(() {
+      _isExportingPdf = true;
+    });
+
+    try {
+      final saved = await _pdfReportService.saveReport(
+        result: result,
+        pageTitle: _displayPageTitle,
+        imageUrls: Map<String, String>.from(_evaluationVisualUrls),
+        imageBytes: Map<String, Uint8List>.from(_evaluationVisualBytes),
+        reportOverride: _reportFor(result),
+      );
+
+      if (!mounted || !saved) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PDF raporu kaydedildi.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PDF raporu oluşturulamadı: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExportingPdf = false;
+        });
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -571,9 +674,25 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     final selected = _selectedResult;
 
     if (widget.results.isEmpty || selected == null) {
+      return const Center(child: Text('Değerlendirme sonucu bulunamadı.'));
+    }
+
+    if (_isInitialPageLoading) {
       return const Center(
-        child: Text(
-          'Değerlendirme sonucu bulunamadı.',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: CircularProgressIndicator(strokeWidth: 4),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Değerlendirme verileri hazırlanıyor...',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
         ),
       );
     }
@@ -582,9 +701,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       padding: const EdgeInsets.all(20),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 1240,
-          ),
+          constraints: const BoxConstraints(maxWidth: 1240),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -592,18 +709,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               const SizedBox(height: 18),
               _buildSectionCard(
                 title: 'Ölçüm Geçmişi',
-                subtitle:
-                    'Görüntülemek istediğiniz ölçüm oturumunu seçin.',
+                subtitle: 'Görüntülemek istediğiniz ölçüm oturumunu seçin.',
                 child: _buildSessionCards(),
               ),
-              const SizedBox(height: 18),
-              _buildFootSelectionSection(),
-              const SizedBox(height: 18),
-              _buildAnatomicalMeasurementsSection(selected),
               const SizedBox(height: 18),
               _buildEvaluationFindingsSection(selected),
               const SizedBox(height: 18),
               _buildPressureMeasurementsSection(),
+              const SizedBox(height: 18),
+              _buildAnatomicalMeasurementsSection(selected),
+              const SizedBox(height: 18),
+              _buildProductSection(),
             ],
           ),
         ),
@@ -628,7 +744,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             width: 66,
             height: 66,
             decoration: BoxDecoration(
-              color: Colors.teal.withOpacity(0.10),
+              color: Colors.teal.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
@@ -641,6 +757,28 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           final information = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              OutlinedButton.icon(
+                onPressed: _isExportingPdf ? null : _saveSelectedResultAsPdf,
+                icon: _isExportingPdf
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: Text(
+                  _isExportingPdf ? 'PDF hazırlanıyor...' : 'PDF Kaydet',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.teal.shade800,
+                  side: BorderSide(color: Colors.teal.shade300),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Text(
                 _displayPageTitle,
                 style: const TextStyle(
@@ -652,10 +790,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               Text(
                 '3D anatomik ölçümler, görsel incelemeler ve '
                 'plantar basınç ölçüm sonuçları.',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  height: 1.4,
-                ),
+                style: TextStyle(color: Colors.grey.shade700, height: 1.4),
               ),
             ],
           );
@@ -665,19 +800,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             decoration: BoxDecoration(
               color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.grey.shade300,
-              ),
+              border: Border.all(color: Colors.grey.shade300),
             ),
             child: Column(
               crossAxisAlignment: isNarrow
                   ? CrossAxisAlignment.start
                   : CrossAxisAlignment.end,
               children: [
-                _headerMetaRow(
-                  Icons.badge_outlined,
-                  result.sessionCode,
-                ),
+                _headerMetaRow(Icons.badge_outlined, result.sessionCode),
                 const SizedBox(height: 7),
                 _headerMetaRow(
                   Icons.calendar_today_outlined,
@@ -722,26 +852,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  Widget _headerMetaRow(
-    IconData icon,
-    String value,
-  ) {
+  Widget _headerMetaRow(IconData icon, String value) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Colors.teal,
-        ),
+        Icon(icon, size: 16, color: Colors.teal),
         const SizedBox(width: 7),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -756,101 +877,83 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
-      children: List.generate(
-        widget.results.length,
-        (index) {
-          final result = widget.results[index];
-          final isSelected = index == _selectedIndex;
+      children: List.generate(widget.results.length, (index) {
+        final result = widget.results[index];
+        final isSelected = index == _selectedIndex;
 
-          return InkWell(
-            onTap: () => _selectResult(index),
-            borderRadius: BorderRadius.circular(14),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 230,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.teal.withOpacity(0.08)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.teal
-                      : Colors.grey.shade300,
-                  width: isSelected ? 1.5 : 1,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5,
-                  ),
-                ],
+        return InkWell(
+          onTap: () => _selectResult(index),
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 230,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Colors.teal.withValues(alpha: 0.08)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? Colors.teal : Colors.grey.shade300,
+                width: isSelected ? 1.5 : 1,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          result.sessionCode,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 5),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        result.sessionCode,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
                         ),
                       ),
-                      if (isSelected)
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.teal,
-                          size: 19,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  _smallInformationRow(
-                    Icons.calendar_today_outlined,
-                    _formatDate(result.analysisDate),
-                  ),
-                  const SizedBox(height: 7),
-                  _smallInformationRow(
-                    Icons.location_on_outlined,
-                    result.locationLabel.trim().isEmpty
-                        ? '—'
-                        : result.locationLabel,
-                  ),
-                ],
-              ),
+                    ),
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.teal,
+                        size: 19,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                _smallInformationRow(
+                  Icons.calendar_today_outlined,
+                  _formatDate(result.analysisDate),
+                ),
+                const SizedBox(height: 7),
+                _smallInformationRow(
+                  Icons.location_on_outlined,
+                  result.locationLabel.trim().isEmpty
+                      ? '—'
+                      : result.locationLabel,
+                ),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }),
     );
   }
 
-  Widget _smallInformationRow(
-    IconData icon,
-    String value,
-  ) {
+  Widget _smallInformationRow(IconData icon, String value) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 15,
-          color: Colors.grey.shade700,
-        ),
+        Icon(icon, size: 15, color: Colors.grey.shade700),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
           ),
         ),
       ],
@@ -858,604 +961,321 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   // ---------------------------------------------------------------------------
-  // Foot selection
-  // ---------------------------------------------------------------------------
-
-  Widget _buildFootSelectionSection() {
-    return _buildSectionCard(
-      title: 'Değerlendirilen Ayak',
-      subtitle:
-          'Anatomik değerler ve görseller seçilen ayağa göre güncellenir.',
-      child: Row(
-        children: [
-          Expanded(
-            child: _footSideButton(
-              label: 'Sol Ayak',
-              icon: Icons.keyboard_double_arrow_left,
-              selected: _isLeftSelected,
-              onTap: () {
-                setState(() {
-                  _selectedFootSide = FootSelectionSide.left;
-                });
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _footSideButton(
-              label: 'Sağ Ayak',
-              icon: Icons.keyboard_double_arrow_right,
-              selected: !_isLeftSelected,
-              onTap: () {
-                setState(() {
-                  _selectedFootSide = FootSelectionSide.right;
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _footSideButton({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.teal.withOpacity(0.10)
-              : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? Colors.teal
-                : Colors.grey.shade300,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? Colors.teal
-                  : Colors.grey.shade700,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: selected
-                    ? Colors.teal
-                    : Colors.black87,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
   // Anatomical measurements
   // ---------------------------------------------------------------------------
 
-  Widget _buildAnatomicalMeasurementsSection(
-    CustomerAnalysisResult result,
-  ) {
-    final report = result.parsedReport;
+  Widget _buildAnatomicalMeasurementsSection(CustomerAnalysisResult result) {
+    final report = _reportFor(result);
 
     if (report == null) {
       return _buildExpandableSectionCard(
         title: 'Anatomik Ölçümler',
-        subtitle:
-            '${_sideLabel()} için 3D tarama değerleri.',
+        subtitle: 'Sol ve sağ ayak için 3D tarama değerleri.',
         icon: Icons.straighten_outlined,
         initiallyExpanded: false,
         child: _emptyInformationState(
           icon: Icons.straighten_outlined,
-          message:
-              'Bu ölçüm için ayrıştırılmış 3D tarama '
-              'raporu bulunmuyor.',
+          message: 'Bu ölçüm için ayrıştırılmış 3D tarama raporu bulunmuyor.',
         ),
       );
     }
 
-    final measurements = <_AnatomicalMeasurement>[
-      _AnatomicalMeasurement(
-        title: 'Ayak Uzunluğu',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftFootLength
-              : report.rightFootLength,
-        ),
+    final measurements = <AnalysisComparisonValue>[
+      AnalysisComparisonValue(
+        label: 'Ayak Uzunluğu',
+        leftValue: _formatMillimeter(report.leftFootLength),
+        rightValue: _formatMillimeter(report.rightFootLength),
         icon: Icons.straighten,
-        description:
-            'Topuk ile en uzun parmak arasındaki mesafe.',
+        description: 'Topuk ile en uzun parmak arasındaki mesafe.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Taban Uzunluğu',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftSoleLength
-              : report.rightSoleLength,
-        ),
+      AnalysisComparisonValue(
+        label: 'Taban Uzunluğu',
+        leftValue: _formatMillimeter(report.leftSoleLength),
+        rightValue: _formatMillimeter(report.rightSoleLength),
         icon: Icons.linear_scale,
-        description:
-            'Ayak tabanının anatomik temas uzunluğu.',
+        description: 'Ayak tabanının anatomik temas uzunluğu.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Ayak Genişliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftFootWidth
-              : report.rightFootWidth,
-        ),
+      AnalysisComparisonValue(
+        label: 'Ayak Genişliği',
+        leftValue: _formatMillimeter(report.leftFootWidth),
+        rightValue: _formatMillimeter(report.rightFootWidth),
         icon: Icons.swap_horiz,
-        description:
-            'Ön ayaktaki en geniş anatomik mesafe.',
+        description: 'Ön ayaktaki en geniş anatomik mesafe.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Parmak Önü Genişliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftToeWidth
-              : report.rightToeWidth,
-        ),
+      AnalysisComparisonValue(
+        label: 'Parmak Önü Genişliği',
+        leftValue: _formatMillimeter(report.leftToeWidth),
+        rightValue: _formatMillimeter(report.rightToeWidth),
         icon: Icons.compare_arrows,
-        description:
-            'Parmak kökleri seviyesindeki genişlik.',
+        description: 'Parmak kökleri seviyesindeki genişlik.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Ark Uzunluğu',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftArchLength
-              : report.rightArchLength,
-        ),
+      AnalysisComparisonValue(
+        label: 'Ark Uzunluğu',
+        leftValue: _formatMillimeter(report.leftArchLength),
+        rightValue: _formatMillimeter(report.rightArchLength),
         icon: Icons.architecture,
-        description:
-            'Medial longitudinal ark uzunluğu.',
+        description: 'Medial longitudinal ark uzunluğu.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Ark Yüksekliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftArchHeight
-              : report.rightArchHeight,
-        ),
+      AnalysisComparisonValue(
+        label: 'Ark Yüksekliği',
+        leftValue: _formatMillimeter(report.leftArchHeight),
+        rightValue: _formatMillimeter(report.rightArchHeight),
         icon: Icons.height,
-        description:
-            'Ayak kemerinin maksimum yüksekliği.',
+        description: 'Ayak kemerinin maksimum yüksekliği.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Dış Ark Genişliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftArchOutsideWidth
-              : report.rightArchOutsideWidth,
-        ),
+      AnalysisComparisonValue(
+        label: 'Dış Ark Genişliği',
+        leftValue: _formatMillimeter(report.leftArchOutsideWidth),
+        rightValue: _formatMillimeter(report.rightArchOutsideWidth),
         icon: Icons.open_in_full,
-        description:
-            'Ark bölgesinin dış genişlik ölçümü.',
+        description: 'Ark bölgesinin dış genişlik ölçümü.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Topuk Genişliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftTotalHeelWidth
-              : report.rightTotalHeelWidth,
-        ),
+      AnalysisComparisonValue(
+        label: 'Topuk Genişliği',
+        leftValue: _formatMillimeter(report.leftTotalHeelWidth),
+        rightValue: _formatMillimeter(report.rightTotalHeelWidth),
         icon: Icons.horizontal_rule,
-        description:
-            'Topuk bölgesinin toplam genişliği.',
+        description: 'Topuk bölgesinin toplam genişliği.',
       ),
-      _AnatomicalMeasurement(
-        title: '1. Metatars Uzunluğu',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftFirstMetaLength
-              : report.rightFirstMetaLength,
-        ),
+      AnalysisComparisonValue(
+        label: '1. Metatars Uzunluğu',
+        leftValue: _formatMillimeter(report.leftFirstMetaLength),
+        rightValue: _formatMillimeter(report.rightFirstMetaLength),
         icon: Icons.looks_one_outlined,
-        description:
-            'Birinci metatarsal anatomik uzunluğu.',
+        description: 'Birinci metatarsal anatomik uzunluğu.',
       ),
-      _AnatomicalMeasurement(
-        title: '5. Metatars Uzunluğu',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftFifthMetaLength
-              : report.rightFifthMetaLength,
-        ),
+      AnalysisComparisonValue(
+        label: '5. Metatars Uzunluğu',
+        leftValue: _formatMillimeter(report.leftFifthMetaLength),
+        rightValue: _formatMillimeter(report.rightFifthMetaLength),
         icon: Icons.filter_5,
-        description:
-            'Beşinci metatarsal anatomik uzunluğu.',
+        description: 'Beşinci metatarsal anatomik uzunluğu.',
       ),
-      _AnatomicalMeasurement(
-        title: 'Metatars Eklem Yüksekliği',
-        value: _formatMillimeter(
-          _isLeftSelected
-              ? report.leftFirstMetaJointHeight
-              : report.rightFirstMetaJointHeight,
-        ),
+      AnalysisComparisonValue(
+        label: 'Metatars Eklem Yüksekliği',
+        leftValue: _formatMillimeter(report.leftFirstMetaJointHeight),
+        rightValue: _formatMillimeter(report.rightFirstMetaJointHeight),
         icon: Icons.vertical_align_top,
-        description:
-            'Birinci metatars eklem bölgesindeki yükseklik.',
-      ),
-      _AnatomicalMeasurement(
-        title: 'Ayakkabı Numarası',
-        value: _safeText(
-          _isLeftSelected
-              ? report.leftShoeSize
-              : report.rightShoeSize,
-        ),
-        icon: Icons.shopping_bag_outlined,
-        description:
-            '3D tarama raporunda önerilen numara.',
+        description: 'Birinci metatars eklem bölgesindeki yükseklik.',
       ),
     ];
 
     return _buildExpandableSectionCard(
       title: 'Anatomik Ölçümler',
-      subtitle:
-          '${_sideLabel()} için 3D tarama raporundan '
-          'alınan anatomik veriler.',
+      subtitle: '3D taramadan alınan anatomik ölçüm değerleri.',
       icon: Icons.straighten_outlined,
       initiallyExpanded: false,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          int crossAxisCount;
-
-          if (constraints.maxWidth >= 1040) {
-            crossAxisCount = 4;
-          } else if (constraints.maxWidth >= 700) {
-            crossAxisCount = 3;
-          } else if (constraints.maxWidth >= 440) {
-            crossAxisCount = 2;
-          } else {
-            crossAxisCount = 1;
-          }
-
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: measurements.length,
-            gridDelegate:
-                SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              mainAxisExtent: 154,
-            ),
-            itemBuilder: (context, index) {
-              return _buildAnatomicalMeasurementTile(
-                measurements[index],
-              );
-            },
-          );
-        },
-      ),
+      child: AnalysisComparisonTable(values: measurements),
     );
   }
-
-  Widget _buildAnatomicalMeasurementTile(
-    _AnatomicalMeasurement measurement,
-  ) {
-    final hasValue = measurement.value != '—';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: hasValue
-            ? Colors.teal.withOpacity(0.045)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: hasValue
-              ? Colors.teal.withOpacity(0.18)
-              : Colors.grey.shade300,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: hasValue
-                      ? Colors.teal.withOpacity(0.10)
-                      : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  measurement.icon,
-                  size: 18,
-                  color: hasValue
-                      ? Colors.teal
-                      : Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  measurement.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 11),
-          Text(
-            measurement.value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: hasValue
-                  ? Colors.teal.shade800
-                  : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Text(
-              measurement.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 11,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Evaluation findings
   // ---------------------------------------------------------------------------
 
-  Widget _buildEvaluationFindingsSection(
-    CustomerAnalysisResult result,
-  ) {
-    final report = result.parsedReport;
-    final foot = _selectedFoot(result);
+  Widget _buildEvaluationFindingsSection(CustomerAnalysisResult result) {
+    final report = _reportFor(result);
+    final leftFoot = result.leftFoot;
+    final rightFoot = result.rightFoot;
 
-    final archImage = _isLeftSelected
-        ? _evaluationVisualUrls['arch_left_image']
-        : _evaluationVisualUrls['arch_right_image'];
-
-    final archSectionImage = _isLeftSelected
-        ? _evaluationVisualUrls['arch_section_left']
-        : _evaluationVisualUrls['arch_section_right'];
-
-    final foot2dImage = _isLeftSelected
-        ? _evaluationVisualUrls['foot_2d_left']
-        : _evaluationVisualUrls['foot_2d_right'];
-
-    final pronatorImage = _isLeftSelected
-        ? _evaluationVisualUrls['pronator_left']
-        : _evaluationVisualUrls['pronator_right'];
-
-    final archIndex = _isLeftSelected
-        ? report?.leftArchIndex
-        : report?.rightArchIndex;
-
-    final archWidthIndex = _isLeftSelected
-        ? report?.leftArchWidthIndex
-        : report?.rightArchWidthIndex;
-
-    final archType = _isLeftSelected
-        ? report?.leftArchType
-        : report?.rightArchType;
-
-    final halluxAngle = _isLeftSelected
-        ? report?.leftHalluxAngle
-        : report?.rightHalluxAngle;
-
-    final halluxType = _isLeftSelected
-        ? report?.leftHalluxType
-        : report?.rightHalluxType;
-
-    final pronatorAngle = _isLeftSelected
-        ? report?.leftPronatorAngle
-        : report?.rightPronatorAngle;
-
-    final heelType = _isLeftSelected
-        ? report?.leftHeelType
-        : report?.rightHeelType;
-
-    final kneeAngle = _isLeftSelected
-        ? report?.leftKneeAngle
-        : report?.rightKneeAngle;
-
-    final kneeType = _isLeftSelected
-        ? report?.leftKneeType
-        : report?.rightKneeType;
-
-    final findings = <_EvaluationFindingPanelData>[
-      _EvaluationFindingPanelData(
+    final findings = <AnalysisFindingComparisonData>[
+      AnalysisFindingComparisonData(
         title: 'Ark ve Kemer Yapısı',
-        subtitle:
-            'Ayak kemeri yüksekliği, genişliği ve yüzey formu.',
+        subtitle: 'Ayak kemeri yüksekliği, genişliği ve yüzey formu.',
         icon: Icons.architecture_outlined,
-        imageSource: archImage,
-        secondaryImageSource: archSectionImage,
-        imageTitle: 'Ark Yükseklik Haritası',
-        secondaryImageTitle: 'Ark Kesit Görüntüsü',
-        description: foot.archSupportNeed.trim().isNotEmpty
-            ? foot.archSupportNeed
+        leftDescription: leftFoot.archSupportNeed.trim().isNotEmpty
+            ? leftFoot.archSupportNeed
             : _safeText(
                 report?.recommendationText,
-                fallback:
-                    'Ark yapısına ilişkin açıklama bulunmuyor.',
+                fallback: 'Sol ark yapısına ilişkin açıklama bulunmuyor.',
               ),
+        rightDescription: rightFoot.archSupportNeed.trim().isNotEmpty
+            ? rightFoot.archSupportNeed
+            : _safeText(
+                report?.recommendationText,
+                fallback: 'Sağ ark yapısına ilişkin açıklama bulunmuyor.',
+              ),
+        images: [
+          AnalysisFindingImage(
+            title: 'Ark Yükseklik Haritası',
+            leftUrl: _evaluationVisualUrls['arch_left_image'],
+            rightUrl: _evaluationVisualUrls['arch_right_image'],
+            assessments: [
+              AnalysisAssessmentData(
+                title: 'Ark İndeksi',
+                leftLabel: _assessmentWithValue(
+                  _archAssessmentLabel(report?.leftArchIndex),
+                  _formatDecimal(report?.leftArchIndex),
+                ),
+                rightLabel: _assessmentWithValue(
+                  _archAssessmentLabel(report?.rightArchIndex),
+                  _formatDecimal(report?.rightArchIndex),
+                ),
+                leftPosition: _archHeatPosition(report?.leftArchIndex),
+                rightPosition: _archHeatPosition(report?.rightArchIndex),
+              ),
+            ],
+          ),
+          AnalysisFindingImage(
+            title: 'Ark Kesit Görüntüsü',
+            leftUrl: _evaluationVisualUrls['arch_section_left'],
+            rightUrl: _evaluationVisualUrls['arch_section_right'],
+            assessments: [
+              AnalysisAssessmentData(
+                title: 'Ark Genişlik İndeksi',
+                leftLabel: _formatDecimal(report?.leftArchWidthIndex),
+                rightLabel: _formatDecimal(report?.rightArchWidthIndex),
+                leftPosition: _archWidthHeatPosition(
+                  report?.leftArchWidthIndex,
+                ),
+                rightPosition: _archWidthHeatPosition(
+                  report?.rightArchWidthIndex,
+                ),
+              ),
+            ],
+          ),
+        ],
         metrics: [
-          _FindingMetric(
-            label: 'Ark Tipi',
-            value: _safeText(
-              archType,
-              fallback: _safeText(foot.footType),
-            ),
-          ),
-          _FindingMetric(
-            label: 'Ark İndeksi',
-            value: _formatDecimal(archIndex),
-          ),
-          _FindingMetric(
-            label: 'Ark Genişlik İndeksi',
-            value: _formatDecimal(archWidthIndex),
-          ),
-          _FindingMetric(
+          AnalysisComparisonValue(
             label: 'Ark Yüksekliği',
-            value: _formatMillimeter(
-              _isLeftSelected
-                  ? report?.leftArchHeight
-                  : report?.rightArchHeight,
-            ),
+            leftValue: _formatMillimeter(report?.leftArchHeight),
+            rightValue: _formatMillimeter(report?.rightArchHeight),
+            icon: Icons.height,
           ),
         ],
       ),
-      _EvaluationFindingPanelData(
+      AnalysisFindingComparisonData(
         title: 'Ayak Formu ve Başparmak Hizalanması',
-        subtitle:
-            'Ayak görünümü, ön ayak formu ve halluks açısı.',
+        subtitle: 'Ön ayak formu ve halluks açısının iki taraflı görünümü.',
         icon: Icons.accessibility_new_outlined,
-        imageSource: foot2dImage,
-        imageTitle: 'Ayak Görüntüsü',
-        description: foot.mainFinding.trim().isNotEmpty
-            ? foot.mainFinding
-            : _halluxDescription(halluxAngle),
+        leftDescription: leftFoot.mainFinding.trim().isNotEmpty
+            ? leftFoot.mainFinding
+            : _halluxDescription(report?.leftHalluxAngle),
+        rightDescription: rightFoot.mainFinding.trim().isNotEmpty
+            ? rightFoot.mainFinding
+            : _halluxDescription(report?.rightHalluxAngle),
+        images: [
+          AnalysisFindingImage(
+            title: 'Ayak Görüntüsü',
+            leftUrl: _evaluationVisualUrls['foot_2d_left'],
+            rightUrl: _evaluationVisualUrls['foot_2d_right'],
+            assessments: [
+              AnalysisAssessmentData(
+                title: 'Halluks Açısı ve Tipi',
+                leftLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.leftHalluxAngle,
+                    mild: 10,
+                    moderate: 20,
+                    severe: 30,
+                  ),
+                  _formatDegree(report?.leftHalluxAngle),
+                ),
+                rightLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.rightHalluxAngle,
+                    mild: 10,
+                    moderate: 20,
+                    severe: 30,
+                  ),
+                  _formatDegree(report?.rightHalluxAngle),
+                ),
+                leftPosition: _angleHeatPosition(report?.leftHalluxAngle, 30),
+                rightPosition: _angleHeatPosition(report?.rightHalluxAngle, 30),
+              ),
+            ],
+          ),
+        ],
         metrics: [
-          _FindingMetric(
-            label: 'Halluks Açısı',
-            value: _formatDegree(halluxAngle),
-          ),
-          _FindingMetric(
-            label: 'Halluks Tipi',
-            value: _safeText(halluxType),
-          ),
-          _FindingMetric(
+          AnalysisComparisonValue(
             label: 'Ayak Genişliği',
-            value: _formatMillimeter(
-              _isLeftSelected
-                  ? report?.leftFootWidth
-                  : report?.rightFootWidth,
-            ),
+            leftValue: _formatMillimeter(report?.leftFootWidth),
+            rightValue: _formatMillimeter(report?.rightFootWidth),
+            icon: Icons.swap_horiz,
           ),
-          _FindingMetric(
+          AnalysisComparisonValue(
             label: 'Parmak Genişliği',
-            value: _formatMillimeter(
-              _isLeftSelected
-                  ? report?.leftToeWidth
-                  : report?.rightToeWidth,
-            ),
+            leftValue: _formatMillimeter(report?.leftToeWidth),
+            rightValue: _formatMillimeter(report?.rightToeWidth),
+            icon: Icons.compare_arrows,
           ),
         ],
       ),
-      _EvaluationFindingPanelData(
+      AnalysisFindingComparisonData(
         title: 'Arka Ayak ve Pronasyon',
-        subtitle:
-            'Topuk-bilek hizalanması ve pronasyon açısı.',
+        subtitle: 'Topuk-bilek, pronasyon ve diz hizalanması.',
         icon: Icons.rotate_90_degrees_ccw,
-        imageSource: pronatorImage,
-        imageTitle: 'Ayak-Bilek Hizalanması',
-        description: foot.balanceSummary.trim().isNotEmpty
-            ? foot.balanceSummary
-            : _pronationDescription(pronatorAngle),
-        metrics: [
-          _FindingMetric(
-            label: 'Pronasyon Açısı',
-            value: _formatDegree(pronatorAngle),
-          ),
-          _FindingMetric(
-            label: 'Topuk Tipi',
-            value: _safeText(heelType),
-          ),
-          _FindingMetric(
-            label: 'Diz Açısı',
-            value: _formatDegree(kneeAngle),
-          ),
-          _FindingMetric(
-            label: 'Diz Hizalanması',
-            value: _safeText(kneeType),
+        leftDescription: leftFoot.balanceSummary.trim().isNotEmpty
+            ? leftFoot.balanceSummary
+            : _pronationDescription(report?.leftPronatorAngle),
+        rightDescription: rightFoot.balanceSummary.trim().isNotEmpty
+            ? rightFoot.balanceSummary
+            : _pronationDescription(report?.rightPronatorAngle),
+        images: [
+          AnalysisFindingImage(
+            title: 'Ayak-Bilek Hizalanması',
+            leftUrl: _evaluationVisualUrls['pronator_left'],
+            rightUrl: _evaluationVisualUrls['pronator_right'],
+            assessments: [
+              AnalysisAssessmentData(
+                title: 'Pronasyon Açısı ve Topuk Tipi',
+                leftLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.leftPronatorAngle,
+                    mild: 4,
+                    moderate: 8,
+                    severe: 15,
+                  ),
+                  _formatDegree(report?.leftPronatorAngle),
+                ),
+                rightLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.rightPronatorAngle,
+                    mild: 4,
+                    moderate: 8,
+                    severe: 15,
+                  ),
+                  _formatDegree(report?.rightPronatorAngle),
+                ),
+                leftPosition: _angleHeatPosition(report?.leftPronatorAngle, 15),
+                rightPosition: _angleHeatPosition(
+                  report?.rightPronatorAngle,
+                  15,
+                ),
+              ),
+              AnalysisAssessmentData(
+                title: 'Diz Açısı ve Hizalanması',
+                leftLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.leftKneeAngle,
+                    mild: 4,
+                    moderate: 8,
+                    severe: 15,
+                  ),
+                  _formatDegree(report?.leftKneeAngle),
+                ),
+                rightLabel: _assessmentWithValue(
+                  _angleAssessmentLabel(
+                    report?.rightKneeAngle,
+                    mild: 4,
+                    moderate: 8,
+                    severe: 15,
+                  ),
+                  _formatDegree(report?.rightKneeAngle),
+                ),
+                leftPosition: _angleHeatPosition(report?.leftKneeAngle, 15),
+                rightPosition: _angleHeatPosition(report?.rightKneeAngle, 15),
+              ),
+            ],
           ),
         ],
-      ),
-      _EvaluationFindingPanelData(
-        title: 'İç Taban ve Ürün Değerlendirmesi',
-        subtitle:
-            'Anatomik sonuçlar doğrultusunda kayıtlı öneriler.',
-        icon: Icons.design_services_outlined,
-        description: _safeText(
-          _isLeftSelected
-              ? report?.leftInsoleRecommendation
-              : report?.rightInsoleRecommendation,
-          fallback: _safeText(
-            report?.recommendationText,
-            fallback:
-                'Bu ölçüm için ürün önerisi kaydedilmemiş.',
-          ),
-        ),
-        metrics: [
-          _FindingMetric(
-            label: 'Ayak Tipi',
-            value: _safeText(
-              foot.footType,
-              fallback: _safeText(archType),
-            ),
-          ),
-          _FindingMetric(
-            label: 'Ayakkabı Numarası',
-            value: _safeText(
-              _isLeftSelected
-                  ? report?.leftShoeSize
-                  : report?.rightShoeSize,
-            ),
-          ),
-          _FindingMetric(
-            label: 'Ana Bulgu',
-            value: _safeText(foot.mainFinding),
-          ),
-          _FindingMetric(
-            label: 'Destek İhtiyacı',
-            value: _safeText(foot.archSupportNeed),
-          ),
-        ],
+        metrics: [],
       ),
     ];
 
     return _buildSectionCard(
       title: 'Değerlendirme Bulguları ve Görseller',
       subtitle:
-          '${_sideLabel()} için 3D tarama görselleri ve '
-          'ölçüm değerlendirmeleri.',
+          'Sol ve sağ ayak açıklamaları, görselleri ve değerleri birlikte gösterilir.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1464,9 +1284,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             const SizedBox(height: 14),
             Text(
               'Görseller Supabase Storage üzerinden yükleniyor...',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(color: Colors.grey.shade700),
             ),
             const SizedBox(height: 14),
           ],
@@ -1478,255 +1296,131 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             ),
             const SizedBox(height: 14),
           ],
-          ...findings.map(
-            (finding) => Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: _buildEvaluationFindingPanel(
-                finding,
-              ),
-            ),
-          ),
+          _buildFindingTileColumns(findings),
         ],
       ),
     );
   }
 
-  Widget _buildEvaluationFindingPanel(
-    _EvaluationFindingPanelData data,
+  Widget _buildFindingTileColumns(
+    List<AnalysisFindingComparisonData> findings,
   ) {
-    final hasImages = _hasText(data.imageSource) ||
-        _hasText(data.secondaryImageSource);
+    Widget buildColumn(Iterable<AnalysisFindingComparisonData> items) {
+      return Column(
+        children: items
+            .map(
+              (finding) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AnalysisFindingComparisonPanel(
+                  data: finding,
+                  imageBuilder: _buildComparisonImage,
+                ),
+              ),
+            )
+            .toList(),
+      );
+    }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade300,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 980) {
+          return buildColumn(findings);
+        }
+
+        final left = findings.isEmpty
+            ? <AnalysisFindingComparisonData>[]
+            : <AnalysisFindingComparisonData>[findings.first];
+        final right = findings.length <= 1
+            ? <AnalysisFindingComparisonData>[]
+            : findings.skip(1).toList();
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: buildColumn(left)),
+            const SizedBox(width: 14),
+            Expanded(child: buildColumn(right)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildProductSection() {
+    return _buildSectionCard(
+      title: 'Ürün Değerlendirmesi',
+      subtitle: 'Değerlendirme sonucuna göre önerilen ürün.',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.teal.withValues(alpha: 0.055),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: Colors.teal.withValues(alpha: 0.18)),
         ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 820;
-
-          final content = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: const Row(
+          children: [
+            Icon(Icons.design_services_outlined, color: Colors.teal, size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      data.icon,
-                      color: Colors.teal,
-                    ),
+                  Text(
+                    'Size Önerilen Ürün',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          data.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          data.subtitle,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  SizedBox(height: 5),
+                  Text('Ürün belirlenmedi.'),
                 ],
               ),
-              const SizedBox(height: 15),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: data.metrics
-                    .map(_buildFindingMetric)
-                    .toList(),
-              ),
-              if (data.description.trim().isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.055),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    data.description,
-                    style: const TextStyle(
-                      height: 1.45,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          );
-
-          final images = hasImages
-              ? _buildFindingImages(data)
-              : null;
-
-          if (isNarrow || images == null) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                content,
-                if (images != null) ...[
-                  const SizedBox(height: 16),
-                  images,
-                ],
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: content,
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                flex: 4,
-                child: images,
-              ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFindingMetric(
-    _FindingMetric metric,
-  ) {
-    return Container(
-      constraints: const BoxConstraints(
-        minWidth: 145,
-        maxWidth: 220,
-      ),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            metric.label,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            metric.value,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              height: 1.25,
-            ),
-          ),
-        ],
+  Widget _buildComparisonImage(String? source, String title) {
+    final aspectRatio = _evaluationImageAspectRatio(title);
+    final normalized = (source ?? '').trim();
+    if (normalized.isEmpty) {
+      return AspectRatio(
+        aspectRatio: aspectRatio,
+        child: _imageUnavailableState('Görsel bulunamadı.'),
+      );
+    }
+
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: _evaluationImageTile(
+        title: title,
+        source: normalized,
+        fit: title.toLowerCase().contains('ark yükseklik')
+            ? BoxFit.cover
+            : BoxFit.contain,
       ),
     );
   }
 
-  /// Önceki sürümde Expanded doğrudan SizedBox altına
-  /// yerleştirildiği için tek görselli kartlar dikey olarak uzuyordu.
-  Widget _buildFindingImages(
-    _EvaluationFindingPanelData data,
-  ) {
-    final imageWidgets = <Widget>[];
-
-    if (_hasText(data.imageSource)) {
-      imageWidgets.add(
-        _evaluationImageTile(
-          title: data.imageTitle ??
-              'Değerlendirme Görseli',
-          source: data.imageSource!,
-        ),
-      );
-    }
-
-    if (_hasText(data.secondaryImageSource)) {
-      imageWidgets.add(
-        _evaluationImageTile(
-          title: data.secondaryImageTitle ??
-              'İkinci Değerlendirme Görseli',
-          source: data.secondaryImageSource!,
-        ),
-      );
-    }
-
-    if (imageWidgets.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    if (imageWidgets.length == 1) {
-      return SizedBox(
-        height: 270,
-        child: imageWidgets.first,
-      );
-    }
-
-    return SizedBox(
-      height: 270,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: imageWidgets[0],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: imageWidgets[1],
-          ),
-        ],
-      ),
-    );
+  double _evaluationImageAspectRatio(String title) {
+    final normalized = title.toLowerCase();
+    if (normalized.contains('ark kesit')) return 1.9;
+    if (normalized.contains('ark yükseklik')) return 0.58;
+    if (normalized.contains('ayak-bilek')) return 1.15;
+    return 0.68;
   }
 
   Widget _evaluationImageTile({
     required String title,
     required String source,
+    required BoxFit fit,
   }) {
     final normalizedSource = source.trim();
 
     return InkWell(
       onTap: () {
-        _openImagePreview(
-          title,
-          normalizedSource,
-        );
+        _openImagePreview(title, normalizedSource);
       },
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -1735,20 +1429,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Colors.grey.shade300,
-          ),
+          border: Border.all(color: Colors.grey.shade300),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.image_outlined,
-                  size: 17,
-                  color: Colors.teal,
-                ),
+                const Icon(Icons.image_outlined, size: 17, color: Colors.teal),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
@@ -1761,20 +1449,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.open_in_full,
-                  size: 16,
-                  color: Colors.black45,
-                ),
+                const Icon(Icons.open_in_full, size: 16, color: Colors.black45),
               ],
             ),
             const SizedBox(height: 10),
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: _buildNetworkImage(
-                  normalizedSource,
-                ),
+                child: _buildNetworkImage(normalizedSource, fit: fit),
               ),
             ),
           ],
@@ -1783,14 +1465,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  Widget _buildNetworkImage(
-    String source, {
-    BoxFit fit = BoxFit.contain,
-  }) {
+  Widget _buildNetworkImage(String source, {BoxFit fit = BoxFit.contain}) {
     if (source.trim().isEmpty) {
-      return _imageUnavailableState(
-        'Görsel yolu bulunamadı.',
-      );
+      return _imageUnavailableState('Görsel yolu bulunamadı.');
     }
 
     return Container(
@@ -1801,43 +1478,27 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       child: Image.network(
         source,
         fit: fit,
-        loadingBuilder: (
-          context,
-          child,
-          loadingProgress,
-        ) {
+        loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) {
             return child;
           }
 
-          return const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-            ),
-          );
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         },
-        errorBuilder: (
-          context,
-          error,
-          stackTrace,
-        ) {
+        errorBuilder: (context, error, stackTrace) {
           debugPrint(
             'Görsel gösterilemedi:\n'
             '$source\n'
             '$error',
           );
 
-          return _imageUnavailableState(
-            'Görsel dosyası açılamadı.',
-          );
+          return _imageUnavailableState('Görsel dosyası açılamadı.');
         },
       ),
     );
   }
 
-  Widget _imageUnavailableState(
-    String message,
-  ) {
+  Widget _imageUnavailableState(String message) {
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -1856,9 +1517,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -1866,20 +1525,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  void _openImagePreview(
-    String title,
-    String source,
-  ) {
+  void _openImagePreview(String title, String source) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return Dialog(
           insetPadding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 1050,
-              maxHeight: 780,
-            ),
+            constraints: const BoxConstraints(maxWidth: 1050, maxHeight: 780),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -1917,27 +1570,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                           child: Image.network(
                             source,
                             fit: BoxFit.contain,
-                            loadingBuilder: (
-                              context,
-                              child,
-                              loadingProgress,
-                            ) {
+                            loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) {
                                 return child;
                               }
 
                               return const CircularProgressIndicator();
                             },
-                            errorBuilder: (
-                              context,
-                              error,
-                              stackTrace,
-                            ) {
+                            errorBuilder: (context, error, stackTrace) {
                               return const Padding(
                                 padding: EdgeInsets.all(30),
-                                child: Text(
-                                  'Görsel açılamadı.',
-                                ),
+                                child: Text('Görsel açılamadı.'),
                               );
                             },
                           ),
@@ -2005,17 +1648,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   Widget _buildPressureMeasurementsSection() {
     return _buildSectionCard(
       title: 'Plantar Basınç Ölçümleri',
-      subtitle:
-          'Seçili oturum sırasında kaydedilen basınç ölçüm kayıtları.',
+      subtitle: 'Seçili oturum sırasında kaydedilen basınç ölçüm kayıtları.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_isLoadingPressureRecords)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: Center(child: CircularProgressIndicator()),
             )
           else if (_pressureRecordsError != null)
             _errorInformationState(
@@ -2044,8 +1684,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       spacing: 10,
       runSpacing: 10,
       children: _pressureRecordings.map((recording) {
-        final selected =
-            recording.id == _selectedPressureRecording?.id;
+        final selected = recording.id == _selectedPressureRecording?.id;
 
         return InkWell(
           onTap: () {
@@ -2060,13 +1699,11 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
               color: selected
-                  ? Colors.indigo.withOpacity(0.08)
+                  ? Colors.indigo.withValues(alpha: 0.08)
                   : Colors.grey.shade50,
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                color: selected
-                    ? Colors.indigo
-                    : Colors.grey.shade300,
+                color: selected ? Colors.indigo : Colors.grey.shade300,
                 width: selected ? 1.4 : 1,
               ),
             ),
@@ -2078,9 +1715,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                     Icon(
                       Icons.monitor_heart_outlined,
                       size: 18,
-                      color: selected
-                          ? Colors.indigo
-                          : Colors.grey.shade700,
+                      color: selected ? Colors.indigo : Colors.grey.shade700,
                     ),
                     const SizedBox(width: 7),
                     Expanded(
@@ -2088,9 +1723,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                         recording.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -2098,19 +1731,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 const SizedBox(height: 8),
                 Text(
                   _formatDateTime(recording.recordedAt),
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   '${recording.frameCount} kare • '
                   '${_formatDuration(recording.durationMs)}',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
               ],
             ),
@@ -2126,17 +1753,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     if (recording == null) {
       return _emptyInformationState(
         icon: Icons.touch_app_outlined,
-        message:
-            'Görüntülemek için bir basınç kaydı seçin.',
+        message: 'Görüntülemek için bir basınç kaydı seçin.',
       );
     }
 
     if (_isLoadingPressureData) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 36),
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -2152,9 +1776,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     final data = _selectedPressureData;
 
     if (data == null || data.frames.isEmpty) {
-      return _buildPressureSummaryWithoutFrames(
-        recording,
-      );
+      return _buildPressureSummaryWithoutFrames(recording);
     }
 
     final frameIndex = _selectedPressureFrameIndex
@@ -2171,11 +1793,6 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildPressureRecordingHeader(
-          recording,
-          data,
-        ),
-        const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             final isNarrow = constraints.maxWidth < 850;
@@ -2184,112 +1801,29 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               data: data,
               frame: frame,
               frameIndex: frameIndex,
+              stats: stats,
             );
 
             final metrics = _buildPressureMetricsPanel(
-              recording: recording,
               data: data,
               stats: stats,
             );
 
             if (isNarrow) {
               return Column(
-                children: [
-                  heatmap,
-                  const SizedBox(height: 16),
-                  metrics,
-                ],
+                children: [metrics, const SizedBox(height: 16), heatmap],
               );
             }
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 3,
-                  child: heatmap,
-                ),
+                Expanded(flex: 1, child: metrics),
                 const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: metrics,
-                ),
+                Expanded(flex: 4, child: heatmap),
               ],
             );
           },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPressureRecordingHeader(
-    SessionPressureRecordingModel recording,
-    _PressureRecordingData data,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.indigo.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.indigo.withOpacity(0.16),
-        ),
-      ),
-      child: Wrap(
-        spacing: 18,
-        runSpacing: 10,
-        alignment: WrapAlignment.spaceBetween,
-        children: [
-          _pressureHeaderValue(
-            'Kayıt',
-            recording.title,
-          ),
-          _pressureHeaderValue(
-            'Tarih',
-            _formatDateTime(recording.recordedAt),
-          ),
-          _pressureHeaderValue(
-            'Kare',
-            '${data.frames.length}',
-          ),
-          _pressureHeaderValue(
-            'Süre',
-            _formatDuration(
-              data.durationMs > 0
-                  ? data.durationMs
-                  : recording.durationMs,
-            ),
-          ),
-          _pressureHeaderValue(
-            'Matris',
-            '${data.rows} × ${data.cols}',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pressureHeaderValue(
-    String label,
-    String value,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey.shade700,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-          ),
         ),
       ],
     );
@@ -2299,6 +1833,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     required _PressureRecordingData data,
     required _PressureFrameData frame,
     required int frameIndex,
+    required _PressureFrameStats stats,
   }) {
     return Container(
       width: double.infinity,
@@ -2306,9 +1841,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2318,10 +1851,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               const Expanded(
                 child: Text(
                   'Basınç Isı Haritası',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
               Text(
@@ -2333,31 +1863,42 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               ),
             ],
           ),
-          if (frame.timestamp != null) ...[
-            const SizedBox(height: 5),
-            Text(
-              _formatDateTime(frame.timestamp),
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-              ),
-            ),
-          ],
           const SizedBox(height: 13),
           AspectRatio(
-            aspectRatio: data.cols <= 0 || data.rows <= 0
-                ? 2
-                : data.cols / data.rows,
+            aspectRatio: 452 / 344,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: CustomPaint(
-                painter: _PressureHeatmapPainter(
-                  matrix: frame.matrix,
-                  configuredMaxValue:
-                      data.maxVisualValue,
-                  threshold: data.threshold,
-                ),
-                child: const SizedBox.expand(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) {
+                      _selectPressurePoint(
+                        position: details.localPosition,
+                        size: Size(constraints.maxWidth, constraints.maxHeight),
+                        matrix: frame.matrix,
+                        data: data,
+                        stats: stats,
+                      );
+                    },
+                    child: CustomPaint(
+                      painter: _PressureHeatmapPainter(
+                        matrix: frame.matrix,
+                        configuredMaxValue: data.maxVisualValue,
+                        threshold: data.threshold,
+                        centerOfPressureX: stats.centerOfPressureX,
+                        centerOfPressureY: stats.centerOfPressureY,
+                        selectedRow: _selectedPressurePoint?.row,
+                        selectedCol: _selectedPressurePoint?.col,
+                        selectedPressureKpa:
+                            _selectedPressurePoint?.pressureKpa,
+                        selectedForceNewton:
+                            _selectedPressurePoint?.forceNewton,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -2371,63 +1912,23 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               label: '${frameIndex + 1}',
               onChanged: (value) {
                 setState(() {
-                  _selectedPressureFrameIndex =
-                      value.round();
+                  _selectedPressureFrameIndex = value.round();
+                  _selectedPressurePoint = null;
                 });
               },
             ),
-          Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Düşük',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 11,
-                ),
-              ),
-              Container(
-                width: 150,
-                height: 10,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF0D47A1),
-                      Color(0xFF00BCD4),
-                      Color(0xFF4CAF50),
-                      Color(0xFFFFEB3B),
-                      Color(0xFFFF9800),
-                      Color(0xFFF44336),
-                    ],
-                  ),
-                ),
-              ),
-              Text(
-                'Yüksek',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
   Widget _buildPressureMetricsPanel({
-    required SessionPressureRecordingModel recording,
     required _PressureRecordingData data,
     required _PressureFrameStats stats,
   }) {
     final totalLoad = stats.totalLoad;
 
-    final leftPercent = totalLoad <= 0
-        ? 0.0
-        : stats.leftLoad / totalLoad * 100;
+    final leftPercent = totalLoad <= 0 ? 0.0 : stats.leftLoad / totalLoad * 100;
 
     final rightPercent = totalLoad <= 0
         ? 0.0
@@ -2437,9 +1938,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ? 0.0
         : stats.forefootLoad / totalLoad * 100;
 
-    final heelPercent = totalLoad <= 0
-        ? 0.0
-        : stats.heelLoad / totalLoad * 100;
+    final heelPercent = totalLoad <= 0 ? 0.0 : stats.heelLoad / totalLoad * 100;
 
     return Container(
       width: double.infinity,
@@ -2447,48 +1946,23 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Seçili Kare Özeti',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+            'Yük Dağılımı',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          if (data.weightKg != null) ...[
+            const SizedBox(height: 13),
+            _pressureMetricTile(
+              'Kilo',
+              '${data.weightKg!.toStringAsFixed(1)} kg',
+              Icons.monitor_weight_outlined,
             ),
-          ),
-          const SizedBox(height: 13),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _pressureMetricTile(
-                'Maksimum Ham Değer',
-                stats.maxValue.toStringAsFixed(1),
-                Icons.trending_up,
-              ),
-              _pressureMetricTile(
-                'Ortalama Temas',
-                stats.averageContactValue
-                    .toStringAsFixed(1),
-                Icons.analytics_outlined,
-              ),
-              _pressureMetricTile(
-                'Temas Hücresi',
-                '${stats.contactCellCount}',
-                Icons.grid_view_outlined,
-              ),
-              _pressureMetricTile(
-                'Toplam Ham Yük',
-                stats.totalLoad.toStringAsFixed(0),
-                Icons.scale_outlined,
-              ),
-            ],
-          ),
+          ],
           const SizedBox(height: 17),
           _percentageDistribution(
             title: 'Sol / Sağ Yük Dağılımı',
@@ -2505,92 +1979,72 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             secondLabel: 'Topuk',
             secondValue: heelPercent,
           ),
-          const SizedBox(height: 15),
-          _buildPressureCenterInformation(stats),
-          if (data.weightKg != null &&
-              data.cellAreaCm2 != null) ...[
-            const SizedBox(height: 15),
-            _buildApproximatePressureValues(
-              data: data,
-              stats: stats,
-            ),
-          ],
-          const SizedBox(height: 15),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(
-                color: Colors.orange.withOpacity(0.18),
-              ),
-            ),
-            child: Text(
-              'Ham sensör değerleri doğrudan kPa değildir. '
-              'Kilo ve sensör alanı kullanılarak gösterilen '
-              'fiziksel değerler yaklaşık değerlerdir.',
-              style: TextStyle(
-                color: Colors.orange.shade900,
-                fontSize: 11,
-                height: 1.35,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Kayıt özeti: maksimum '
-            '${recording.maxPressure?.toStringAsFixed(1) ?? '—'}, '
-            'ortalama '
-            '${recording.avgPressure?.toStringAsFixed(2) ?? '—'}',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 11,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _pressureMetricTile(
-    String label,
-    String value,
-    IconData icon,
-  ) {
+  void _selectPressurePoint({
+    required Offset position,
+    required Size size,
+    required List<List<double>> matrix,
+    required _PressureRecordingData data,
+    required _PressureFrameStats stats,
+  }) {
+    if (matrix.isEmpty || size.width <= 0 || size.height <= 0) return;
+    final rows = matrix.length;
+    final cols = matrix.map((row) => row.length).fold<int>(0, math.max);
+    if (rows <= 0 || cols <= 0) return;
+
+    final col = (position.dx / size.width * cols).floor().clamp(0, cols - 1);
+    final row = (position.dy / size.height * rows).floor().clamp(0, rows - 1);
+    final value = col < matrix[row].length ? matrix[row][col] : 0.0;
+
+    double? forceNewton;
+    double? pressureKpa;
+    final weightKg = data.weightKg;
+    final cellAreaCm2 = data.cellAreaCm2;
+    if (weightKg != null &&
+        weightKg > 0 &&
+        cellAreaCm2 != null &&
+        cellAreaCm2 > 0 &&
+        stats.totalLoad > 0) {
+      forceNewton = weightKg * 9.80665 * (value / stats.totalLoad);
+      pressureKpa = forceNewton / (cellAreaCm2 / 10000) / 1000;
+    }
+
+    setState(() {
+      _selectedPressurePoint = _PressurePointSelection(
+        row: row,
+        col: col,
+        forceNewton: forceNewton,
+        pressureKpa: pressureKpa,
+      );
+    });
+  }
+
+  Widget _pressureMetricTile(String label, String value, IconData icon) {
     return Container(
       width: 155,
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: Colors.indigo.withOpacity(0.055),
+        color: Colors.indigo.withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(11),
-        border: Border.all(
-          color: Colors.indigo.withOpacity(0.14),
-        ),
+        border: Border.all(color: Colors.indigo.withValues(alpha: 0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: Colors.indigo,
-          ),
+          Icon(icon, size: 18, color: Colors.indigo),
           const SizedBox(height: 7),
           Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 3),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 10,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 10),
           ),
         ],
       ),
@@ -2604,29 +2058,16 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     required String secondLabel,
     required double secondValue,
   }) {
-    final normalizedFirst = (firstValue / 100)
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final normalizedFirst = (firstValue / 100).clamp(0.0, 1.0).toDouble();
 
-    final firstFlex = math.max(
-      1,
-      (normalizedFirst * 1000).round(),
-    );
+    final firstFlex = math.max(1, (normalizedFirst * 1000).round());
 
-    final secondFlex = math.max(
-      1,
-      ((1 - normalizedFirst) * 1000).round(),
-    );
+    final secondFlex = math.max(1, ((1 - normalizedFirst) * 1000).round());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
@@ -2636,15 +2077,11 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               children: [
                 Expanded(
                   flex: firstFlex,
-                  child: Container(
-                    color: Colors.teal,
-                  ),
+                  child: Container(color: Colors.teal),
                 ),
                 Expanded(
                   flex: secondFlex,
-                  child: Container(
-                    color: Colors.indigo,
-                  ),
+                  child: Container(color: Colors.indigo),
                 ),
               ],
             ),
@@ -2680,102 +2117,6 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     );
   }
 
-  Widget _buildPressureCenterInformation(
-    _PressureFrameStats stats,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.my_location_outlined,
-            color: Colors.teal,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              stats.centerOfPressureX == null ||
-                      stats.centerOfPressureY == null
-                  ? 'Basınç merkezi hesaplanamadı.'
-                  : 'Basınç merkezi: '
-                      'X ${stats.centerOfPressureX!.toStringAsFixed(1)}, '
-                      'Y ${stats.centerOfPressureY!.toStringAsFixed(1)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildApproximatePressureValues({
-    required _PressureRecordingData data,
-    required _PressureFrameStats stats,
-  }) {
-    final weightKg = data.weightKg;
-    final cellAreaCm2 = data.cellAreaCm2;
-
-    if (weightKg == null ||
-        weightKg <= 0 ||
-        cellAreaCm2 == null ||
-        cellAreaCm2 <= 0 ||
-        stats.totalLoad <= 0 ||
-        stats.contactCellCount <= 0) {
-      return const SizedBox.shrink();
-    }
-
-    final bodyForceNewton = weightKg * 9.80665;
-
-    final maxCellForce = bodyForceNewton *
-        (stats.maxValue / stats.totalLoad);
-
-    final cellAreaM2 = cellAreaCm2 / 10000;
-
-    final maxPressureKpa =
-        maxCellForce / cellAreaM2 / 1000;
-
-    final contactAreaM2 =
-        stats.contactCellCount * cellAreaM2;
-
-    final averagePressureKpa =
-        bodyForceNewton / contactAreaM2 / 1000;
-
-    final contactAreaCm2 =
-        stats.contactCellCount * cellAreaCm2;
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        _pressureMetricTile(
-          'Yaklaşık Maksimum Basınç',
-          '${maxPressureKpa.toStringAsFixed(1)} kPa',
-          Icons.speed_outlined,
-        ),
-        _pressureMetricTile(
-          'Ortalama Temas Basıncı',
-          '${averagePressureKpa.toStringAsFixed(1)} kPa',
-          Icons.compress,
-        ),
-        _pressureMetricTile(
-          'Yaklaşık Temas Alanı',
-          '${contactAreaCm2.toStringAsFixed(1)} cm²',
-          Icons.crop_free_outlined,
-        ),
-      ],
-    );
-  }
-
   Widget _buildPressureSummaryWithoutFrames(
     SessionPressureRecordingModel recording,
   ) {
@@ -2785,19 +2126,14 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             recording.title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 17,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -2816,16 +2152,12 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               ),
               _pressureMetricTile(
                 'Maksimum Ham Değer',
-                recording.maxPressure
-                        ?.toStringAsFixed(1) ??
-                    '—',
+                recording.maxPressure?.toStringAsFixed(1) ?? '—',
                 Icons.trending_up,
               ),
               _pressureMetricTile(
                 'Ortalama Ham Değer',
-                recording.avgPressure
-                        ?.toStringAsFixed(2) ??
-                    '—',
+                recording.avgPressure?.toStringAsFixed(2) ?? '—',
                 Icons.analytics_outlined,
               ),
             ],
@@ -2847,13 +2179,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
     final cols = matrix
         .map((row) => row.length)
-        .fold<int>(
-          0,
-          (current, value) => math.max(
-            current,
-            value,
-          ),
-        );
+        .fold<int>(0, (current, value) => math.max(current, value));
 
     double totalLoad = 0;
     double leftLoad = 0;
@@ -2916,12 +2242,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       rightLoad: rightLoad,
       forefootLoad: forefootLoad,
       heelLoad: heelLoad,
-      centerOfPressureX: totalLoad <= 0
-          ? null
-          : weightedX / totalLoad,
-      centerOfPressureY: totalLoad <= 0
-          ? null
-          : weightedY / totalLoad,
+      centerOfPressureX: totalLoad <= 0 ? null : weightedX / totalLoad,
+      centerOfPressureY: totalLoad <= 0 ? null : weightedY / totalLoad,
     );
   }
 
@@ -2943,20 +2265,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
-          if (subtitle != null &&
-              subtitle.trim().isNotEmpty) ...[
+          if (subtitle != null && subtitle.trim().isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
               subtitle,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.35,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, height: 1.35),
             ),
           ],
           const SizedBox(height: 15),
@@ -2985,47 +2300,28 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
           maintainState: true,
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 8,
-          ),
-          childrenPadding: const EdgeInsets.fromLTRB(
-            18,
-            0,
-            18,
-            18,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
           leading: Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.teal.withOpacity(0.10),
+              color: Colors.teal.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(
-              icon,
-              color: Colors.teal,
-              size: 21,
-            ),
+            child: Icon(icon, color: Colors.teal, size: 21),
           ),
           title: Text(
             title,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
-          subtitle: subtitle == null ||
-                  subtitle.trim().isEmpty
+          subtitle: subtitle == null || subtitle.trim().isEmpty
               ? null
               : Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     subtitle,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      height: 1.35,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade700, height: 1.35),
                   ),
                 ),
           children: [
@@ -3048,25 +2344,16 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: Colors.teal,
-            size: 28,
-          ),
+          Icon(icon, color: Colors.teal, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.4,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, height: 1.4),
             ),
           ),
         ],
@@ -3082,28 +2369,20 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.05),
+        color: Colors.red.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: Colors.red.withOpacity(0.18),
-        ),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.18)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.red,
-              ),
+              const Icon(Icons.error_outline, color: Colors.red),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    height: 1.4,
-                  ),
+                  style: const TextStyle(color: Colors.red, height: 1.4),
                 ),
               ),
             ],
@@ -3123,15 +2402,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     return BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: Colors.grey.shade200,
-      ),
-      boxShadow: const [
-        BoxShadow(
-          color: Colors.black12,
-          blurRadius: 8,
-        ),
-      ],
+      border: Border.all(color: Colors.grey.shade200),
+      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
     );
   }
 }
@@ -3144,11 +2416,23 @@ class _PressureHeatmapPainter extends CustomPainter {
   final List<List<double>> matrix;
   final double configuredMaxValue;
   final double threshold;
+  final double? centerOfPressureX;
+  final double? centerOfPressureY;
+  final int? selectedRow;
+  final int? selectedCol;
+  final double? selectedPressureKpa;
+  final double? selectedForceNewton;
 
   const _PressureHeatmapPainter({
     required this.matrix,
     required this.configuredMaxValue,
     required this.threshold,
+    required this.centerOfPressureX,
+    required this.centerOfPressureY,
+    required this.selectedRow,
+    required this.selectedCol,
+    required this.selectedPressureKpa,
+    required this.selectedForceNewton,
   });
 
   @override
@@ -3164,13 +2448,7 @@ class _PressureHeatmapPainter extends CustomPainter {
 
     final cols = matrix
         .map((row) => row.length)
-        .fold<int>(
-          0,
-          (current, value) => math.max(
-            current,
-            value,
-          ),
-        );
+        .fold<int>(0, (current, value) => math.max(current, value));
 
     if (rows <= 0 || cols <= 0) return;
 
@@ -3192,36 +2470,126 @@ class _PressureHeatmapPainter extends CustomPainter {
     final cellHeight = size.height / rows;
 
     final paint = Paint()
-      ..style = PaintingStyle.fill;
+      ..style = PaintingStyle.fill
+      ..maskFilter = MaskFilter.blur(
+        BlurStyle.normal,
+        math.max(cellWidth, cellHeight) * 0.28,
+      );
 
     for (int row = 0; row < rows; row++) {
       final rowData = matrix[row];
 
       for (int col = 0; col < cols; col++) {
-        final value = col < rowData.length
-            ? rowData[col]
-            : 0.0;
+        final value = col < rowData.length ? rowData[col] : 0.0;
 
-        if (value <= threshold) {
-          paint.color = const Color(0xFF0A1728);
-        } else {
-          final normalized = (value / effectiveMax)
-              .clamp(0.0, 1.0)
-              .toDouble();
-
-          paint.color = _heatmapColor(normalized);
-        }
-
-        canvas.drawRect(
-          Rect.fromLTWH(
-            col * cellWidth,
-            row * cellHeight,
-            cellWidth + 0.5,
-            cellHeight + 0.5,
+        if (value <= threshold) continue;
+        final normalized = (value / effectiveMax).clamp(0.0, 1.0).toDouble();
+        paint.color = _heatmapColor(
+          normalized,
+        ).withValues(alpha: 0.78 + normalized * 0.22);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset((col + 0.5) * cellWidth, (row + 0.5) * cellHeight),
+            width: cellWidth * 1.65,
+            height: cellHeight * 1.65,
           ),
           paint,
         );
       }
+    }
+
+    if (centerOfPressureX != null && centerOfPressureY != null) {
+      final center = Offset(
+        (centerOfPressureX! + 0.5) * cellWidth,
+        (centerOfPressureY! + 0.5) * cellHeight,
+      );
+      canvas.drawCircle(
+        center,
+        9,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        center,
+        9,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawLine(
+        center - const Offset(13, 0),
+        center + const Offset(13, 0),
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 2,
+      );
+      canvas.drawLine(
+        center - const Offset(0, 13),
+        center + const Offset(0, 13),
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 2,
+      );
+    }
+
+    if (selectedRow != null && selectedCol != null) {
+      final selected = Offset(
+        (selectedCol! + 0.5) * cellWidth,
+        (selectedRow! + 0.5) * cellHeight,
+      );
+      canvas.drawCircle(
+        selected,
+        8,
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke,
+      );
+
+      final label = selectedPressureKpa == null || selectedForceNewton == null
+          ? 'Fiziksel değer hesaplanamadı'
+          : '${selectedPressureKpa!.toStringAsFixed(1)} kPa  •  '
+                '${selectedForceNewton!.toStringAsFixed(2)} N';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: math.max(120, size.width * 0.42));
+      const padding = 8.0;
+      final bubbleWidth = textPainter.width + padding * 2;
+      final bubbleHeight = textPainter.height + padding * 2;
+      var bubbleLeft = selected.dx + 14;
+      if (bubbleLeft + bubbleWidth > size.width - 4) {
+        bubbleLeft = selected.dx - bubbleWidth - 14;
+      }
+      bubbleLeft = bubbleLeft.clamp(4.0, size.width - bubbleWidth - 4);
+      final bubbleTop = (selected.dy - bubbleHeight / 2).clamp(
+        4.0,
+        size.height - bubbleHeight - 4,
+      );
+      final bubbleRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(bubbleLeft, bubbleTop, bubbleWidth, bubbleHeight),
+        const Radius.circular(8),
+      );
+      canvas.drawRRect(bubbleRect, Paint()..color = const Color(0xE6222B45));
+      canvas.drawRRect(
+        bubbleRect,
+        Paint()
+          ..color = Colors.white70
+          ..style = PaintingStyle.stroke,
+      );
+      textPainter.paint(
+        canvas,
+        Offset(bubbleRect.left + padding, bubbleRect.top + padding),
+      );
     }
   }
 
@@ -3266,68 +2634,22 @@ class _PressureHeatmapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-    covariant _PressureHeatmapPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant _PressureHeatmapPainter oldDelegate) {
     return oldDelegate.matrix != matrix ||
-        oldDelegate.configuredMaxValue !=
-            configuredMaxValue ||
-        oldDelegate.threshold != threshold;
+        oldDelegate.configuredMaxValue != configuredMaxValue ||
+        oldDelegate.threshold != threshold ||
+        oldDelegate.centerOfPressureX != centerOfPressureX ||
+        oldDelegate.centerOfPressureY != centerOfPressureY ||
+        oldDelegate.selectedRow != selectedRow ||
+        oldDelegate.selectedCol != selectedCol ||
+        oldDelegate.selectedPressureKpa != selectedPressureKpa ||
+        oldDelegate.selectedForceNewton != selectedForceNewton;
   }
 }
 
 // -----------------------------------------------------------------------------
 // View data classes
 // -----------------------------------------------------------------------------
-
-class _AnatomicalMeasurement {
-  final String title;
-  final String value;
-  final IconData icon;
-  final String description;
-
-  const _AnatomicalMeasurement({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.description,
-  });
-}
-
-class _EvaluationFindingPanelData {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String description;
-  final List<_FindingMetric> metrics;
-
-  final String? imageSource;
-  final String? secondaryImageSource;
-  final String? imageTitle;
-  final String? secondaryImageTitle;
-
-  const _EvaluationFindingPanelData({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.description,
-    required this.metrics,
-    this.imageSource,
-    this.secondaryImageSource,
-    this.imageTitle,
-    this.secondaryImageTitle,
-  });
-}
-
-class _FindingMetric {
-  final String label;
-  final String value;
-
-  const _FindingMetric({
-    required this.label,
-    required this.value,
-  });
-}
 
 // -----------------------------------------------------------------------------
 // Pressure JSON models
@@ -3357,34 +2679,21 @@ class _PressureRecordingData {
     required this.frames,
   });
 
-  factory _PressureRecordingData.fromJson(
-    Map<String, dynamic> map,
-  ) {
-    final visualSettings =
-        _asMap(map['visual_settings']);
+  factory _PressureRecordingData.fromJson(Map<String, dynamic> map) {
+    final visualSettings = _asMap(map['visual_settings']);
 
-    final anthropometric =
-        _asMap(map['anthropometric']);
+    final anthropometric = _asMap(map['anthropometric']);
 
     final rawFrames = _asList(map['frames']);
 
     final frames = rawFrames
-        .map(
-          (item) => _PressureFrameData.fromJson(
-            _asMap(item),
-          ),
-        )
-        .where(
-          (frame) => frame.matrix.isNotEmpty,
-        )
+        .map((item) => _PressureFrameData.fromJson(_asMap(item)))
+        .where((frame) => frame.matrix.isNotEmpty)
         .toList();
 
-    final detectedRows = frames.isEmpty
-        ? 0
-        : frames.first.matrix.length;
+    final detectedRows = frames.isEmpty ? 0 : frames.first.matrix.length;
 
-    final detectedCols = frames.isEmpty ||
-            frames.first.matrix.isEmpty
+    final detectedCols = frames.isEmpty || frames.first.matrix.isEmpty
         ? 0
         : frames.first.matrix.first.length;
 
@@ -3392,44 +2701,29 @@ class _PressureRecordingData {
     final cols = _toInt(map['cols']) ?? detectedCols;
 
     final storedCellAreaCm2 = _toDouble(
-      anthropometric['cell_area_cm2'] ??
-          map['cell_area_cm2'],
+      anthropometric['cell_area_cm2'] ?? map['cell_area_cm2'],
     );
 
-    double? calculatedCellAreaCm2 =
-        storedCellAreaCm2;
+    double? calculatedCellAreaCm2 = storedCellAreaCm2;
 
     // PressureMeasurementDialog içindeki sensör ölçüsü:
     // 452 × 344 mm, 64 × 32 hücre.
-    if (calculatedCellAreaCm2 == null &&
-        rows > 0 &&
-        cols > 0) {
+    if (calculatedCellAreaCm2 == null && rows > 0 && cols > 0) {
       final cellWidthMm = 452.0 / cols;
       final cellHeightMm = 344.0 / rows;
 
-      calculatedCellAreaCm2 =
-          (cellWidthMm * cellHeightMm) / 100;
+      calculatedCellAreaCm2 = (cellWidthMm * cellHeightMm) / 100;
     }
 
     return _PressureRecordingData(
       rows: rows,
       cols: cols,
-      durationMs:
-          _toInt(map['duration_ms']) ?? 0,
-      maxVisualValue: _toDouble(
-            visualSettings['max_value'] ??
-                map['max_value'],
-          ) ??
-          0,
-      threshold: _toDouble(
-            visualSettings['threshold'] ??
-                map['threshold'],
-          ) ??
-          0,
-      weightKg: _toDouble(
-        anthropometric['weight_kg'] ??
-            map['weight_kg'],
-      ),
+      durationMs: _toInt(map['duration_ms']) ?? 0,
+      maxVisualValue:
+          _toDouble(visualSettings['max_value'] ?? map['max_value']) ?? 0,
+      threshold:
+          _toDouble(visualSettings['threshold'] ?? map['threshold']) ?? 0,
+      weightKg: _toDouble(anthropometric['weight_kg'] ?? map['weight_kg']),
       cellAreaCm2: calculatedCellAreaCm2,
       frames: frames,
     );
@@ -3464,9 +2758,7 @@ class _PressureRecordingData {
     if (value == null) return null;
     if (value is num) return value.toDouble();
 
-    return double.tryParse(
-      value.toString().replaceAll(',', '.'),
-    );
+    return double.tryParse(value.toString().replaceAll(',', '.'));
   }
 }
 
@@ -3474,14 +2766,9 @@ class _PressureFrameData {
   final DateTime? timestamp;
   final List<List<double>> matrix;
 
-  const _PressureFrameData({
-    required this.timestamp,
-    required this.matrix,
-  });
+  const _PressureFrameData({required this.timestamp, required this.matrix});
 
-  factory _PressureFrameData.fromJson(
-    Map<String, dynamic> map,
-  ) {
+  factory _PressureFrameData.fromJson(Map<String, dynamic> map) {
     final rawMatrix = map['matrix'];
 
     final matrix = <List<double>>[];
@@ -3496,22 +2783,31 @@ class _PressureFrameData {
               return value.toDouble();
             }
 
-            return double.tryParse(
-                  value.toString(),
-                ) ??
-                0.0;
+            return double.tryParse(value.toString()) ?? 0.0;
           }).toList(),
         );
       }
     }
 
     return _PressureFrameData(
-      timestamp: DateTime.tryParse(
-        (map['timestamp'] ?? '').toString(),
-      ),
+      timestamp: DateTime.tryParse((map['timestamp'] ?? '').toString()),
       matrix: matrix,
     );
   }
+}
+
+class _PressurePointSelection {
+  final int row;
+  final int col;
+  final double? forceNewton;
+  final double? pressureKpa;
+
+  const _PressurePointSelection({
+    required this.row,
+    required this.col,
+    required this.forceNewton,
+    required this.pressureKpa,
+  });
 }
 
 class _PressureFrameStats {
@@ -3542,14 +2838,14 @@ class _PressureFrameStats {
   });
 
   const _PressureFrameStats.empty()
-      : maxValue = 0,
-        totalLoad = 0,
-        averageContactValue = 0,
-        contactCellCount = 0,
-        leftLoad = 0,
-        rightLoad = 0,
-        forefootLoad = 0,
-        heelLoad = 0,
-        centerOfPressureX = null,
-        centerOfPressureY = null;
+    : maxValue = 0,
+      totalLoad = 0,
+      averageContactValue = 0,
+      contactCellCount = 0,
+      leftLoad = 0,
+      rightLoad = 0,
+      forefootLoad = 0,
+      heelLoad = 0,
+      centerOfPressureX = null,
+      centerOfPressureY = null;
 }
