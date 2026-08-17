@@ -64,8 +64,11 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
           if (!mounted) return;
           setState(() => _ready = true);
         })
-        .catchError((Object _) {
-          // Poster zaten görünür durumda; sessizce onunla devam edilir.
+        .catchError((Object error) {
+          // Poster zaten görünür durumda; onunla devam edilir. Hata yine de
+          // loglanır: platformda video eklentisi yoksa sessizce poster'a
+          // düşmek, sorunu fark etmeyi zorlaştırıyor.
+          debugPrint('HERO_VIDEO: başlatılamadı ($error) — poster gösteriliyor');
           if (!mounted) return;
           setState(() => _ready = false);
         });

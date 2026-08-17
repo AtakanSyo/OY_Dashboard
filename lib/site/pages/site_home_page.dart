@@ -20,7 +20,6 @@ class SiteHomePage extends StatelessWidget {
     return const SiteScaffold(
       children: [
         _HeroSection(),
-        _TrustStripSection(),
         _ProcessSection(),
         _InsoleTechnologiesSection(),
         _ModelFinderSection(),
@@ -122,73 +121,6 @@ class _HeroSection extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Hero'nun hemen altındaki ince güven şeridi.
-///
-/// Bu üç madde daha önce hero'nun içindeydi; hero videonun üzerinde sade
-/// kalsın diye aşağı alındı.
-class _TrustStripSection extends StatelessWidget {
-  const _TrustStripSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final device = context.device;
-
-    return SiteSection(
-      background: SiteColors.surfaceRaised,
-      padding: EdgeInsets.symmetric(
-        horizontal: device.gutter,
-        vertical: device.isMobile ? SiteSpacing.x3 : SiteSpacing.x4,
-      ),
-      child: const _HeroBenefits(),
-    );
-  }
-}
-
-class _HeroBenefits extends StatelessWidget {
-  const _HeroBenefits();
-
-  static const List<({IconData icon, String label})> _items = [
-    (icon: Icons.timer_outlined, label: '2 Dakikada Tarama'),
-    (icon: Icons.straighten_outlined, label: 'Bilimsel Ölçüm'),
-    (icon: Icons.local_shipping_outlined, label: 'Hızlı Gönderim'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: SiteSpacing.x2,
-      runSpacing: SiteSpacing.md,
-      children: [
-        for (final item in _items)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SiteColors.primarySoft,
-                  borderRadius: BorderRadius.circular(SiteRadius.sm),
-                ),
-                child: Icon(item.icon, size: 17, color: SiteColors.primary),
-              ),
-              const SizedBox(width: SiteSpacing.sm),
-              // Dar ekranda etiket satırı taşırmasın.
-              Flexible(
-                child: Text(
-                  item.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: SiteType.action(context, strong: true),
-                ),
-              ),
-            ],
-          ),
-      ],
     );
   }
 }
