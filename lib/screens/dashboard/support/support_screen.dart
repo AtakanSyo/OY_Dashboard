@@ -1,32 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SupportScreen extends StatefulWidget {
   final AppUser currentUser;
 
-  const SupportScreen({
-    super.key,
-    required this.currentUser,
-  });
+  const SupportScreen({super.key, required this.currentUser});
 
   @override
   State<SupportScreen> createState() => _SupportScreenState();
 }
 
 class _SupportScreenState extends State<SupportScreen> {
-  static const String _supportEmail = 'general@optiyou.com.tr';
-
-  static const List<String> _supportPhoneNumbers = [
+  static const _supportEmail = 'general@optiyou.com.tr';
+  static const _supportPhoneNumbers = [
     '+90 534 884 23 19',
     '+90 507 290 37 13',
   ];
 
   final _issueFormKey = GlobalKey<FormState>();
-
-  final TextEditingController _issueTitleController = TextEditingController();
-  final TextEditingController _issueDescriptionController =
-      TextEditingController();
+  final _issueTitleController = TextEditingController();
+  final _issueDescriptionController = TextEditingController();
 
   String _selectedIssueType = 'technical';
   String _selectedPriority = 'normal';
@@ -39,206 +34,185 @@ class _SupportScreenState extends State<SupportScreen> {
     super.dispose();
   }
 
-  String _getWelcomeText() {
-    if (widget.currentUser.isExpert) {
-      return 'Uzman paneli, ölçüm süreçleri ve sipariş yönetimi hakkında destek alabilirsiniz.';
-    }
-
-    if (widget.currentUser.isCustomer) {
-      return 'Siparişleriniz, ürünleriniz ve kullanım süreci hakkında destek alabilirsiniz.';
-    }
-
-    if (widget.currentUser.isOptiYouTeam) {
-      return 'Operasyon, kullanıcı akışı ve sistem yönetimi için destek seçeneklerini kullanabilirsiniz.';
-    }
-
-    return 'Yardıma mı ihtiyacınız var? Aşağıdaki seçeneklerden birini seçebilirsiniz.';
+  String _welcomeText(AppLocalizations l10n) {
+    if (widget.currentUser.isExpert) return l10n.expertSupportIntro;
+    if (widget.currentUser.isCustomer) return l10n.customerSupportIntro;
+    if (widget.currentUser.isOptiYouTeam) return l10n.teamSupportIntro;
+    return l10n.genericSupportIntro;
   }
 
-  String _issueTypeLabel(String value) {
+  String _roleText(AppLocalizations l10n) {
+    final role = widget.currentUser.isCustomer
+        ? l10n.customerRole
+        : widget.currentUser.isExpert
+        ? l10n.expertRole
+        : widget.currentUser.isOptiYouTeam
+        ? l10n.optiyouTeamRole
+        : widget.currentUser.roleName;
+    final clinic = widget.currentUser.clinicName?.trim() ?? '';
+    return clinic.isEmpty ? role : '$role • $clinic';
+  }
+
+  String _issueTypeLabel(String value, AppLocalizations l10n) {
     switch (value) {
       case 'technical':
-        return 'Teknik Sorun';
+        return l10n.technicalIssue;
       case 'measurement':
-        return 'Ölçüm / Analiz Sorunu';
+        return l10n.measurementIssue;
       case 'order':
-        return 'Sipariş Süreci';
+        return l10n.orderIssue;
       case 'account':
-        return 'Hesap / Kullanıcı Sorunu';
-      case 'other':
-        return 'Diğer';
+        return l10n.accountIssue;
       default:
-        return value;
+        return l10n.otherIssue;
     }
   }
 
-  String _priorityLabel(String value) {
+  String _priorityLabel(String value, AppLocalizations l10n) {
     switch (value) {
       case 'low':
-        return 'Düşük';
-      case 'normal':
-        return 'Normal';
+        return l10n.lowPriority;
       case 'high':
-        return 'Yüksek';
+        return l10n.highPriority;
       case 'urgent':
-        return 'Acil';
+        return l10n.urgentPriority;
       default:
-        return value;
+        return l10n.normal;
     }
   }
 
-  Future<void> _launchUri(Uri uri) async {
-    final canLaunch = await canLaunchUrl(uri);
-
-    if (!canLaunch) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bu işlem cihazda açılamadı.'),
-          backgroundColor: Colors.red,
-        ),
+  Future<bool> _launchUri(Uri uri) async {
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
       );
-      return;
+      if (launched) return true;
+    } catch (_) {
+      // The same user-facing error is shown for unsupported handlers and errors.
     }
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).actionCouldNotOpen),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return false;
+  }
 
-    await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
+  Future<void> _callPhoneNumber(String phoneNumber) {
+    return _launchUri(
+      Uri(scheme: 'tel', path: phoneNumber.replaceAll(' ', '')),
+    ).then((_) {});
+  }
+
+  Uri _emailUri({required String subject, required String body}) {
+    return Uri(
+      scheme: 'mailto',
+      path: _supportEmail,
+      queryParameters: {'subject': subject, 'body': body},
     );
   }
 
-  Future<void> _callPhoneNumber(String phoneNumber) async {
-    final cleaned = phoneNumber.replaceAll(' ', '');
-    final uri = Uri(
-      scheme: 'tel',
-      path: cleaned,
-    );
-
-    await _launchUri(uri);
+  List<String> _userInformation(AppLocalizations l10n) {
+    return [
+      l10n.personalInformation,
+      '${l10n.fullName}: ${widget.currentUser.displayName}',
+      '${l10n.email}: ${widget.currentUser.email}',
+      '${l10n.role}: ${_roleText(l10n)}',
+      if ((widget.currentUser.clinicName ?? '').trim().isNotEmpty)
+        '${l10n.clinicLabel}: ${widget.currentUser.clinicName}',
+    ];
   }
 
   Future<void> _sendSupportEmail() async {
-    final subject = Uri.encodeComponent('Optiyou Destek Talebi');
-    final body = Uri.encodeComponent(
-      [
-        'Merhaba Optiyou destek ekibi,',
-        '',
-        'Destek almak istiyorum.',
-        '',
-        'Kullanıcı Bilgileri',
-        'Ad Soyad: ${widget.currentUser.displayName}',
-        'E-posta: ${widget.currentUser.email}',
-        'Rol: ${widget.currentUser.roleName}',
-        if (widget.currentUser.clinicName != null &&
-            widget.currentUser.clinicName!.trim().isNotEmpty)
-          'Klinik: ${widget.currentUser.clinicName}',
-        '',
-        'Mesaj:',
-      ].join('\n'),
+    final l10n = AppLocalizations.of(context);
+    final body = [
+      l10n.helloUser(widget.currentUser.displayName),
+      '',
+      l10n.genericSupportIntro,
+      '',
+      ..._userInformation(l10n),
+      '',
+      '${l10n.messageLabel}:',
+    ].join('\n');
+    await _launchUri(
+      _emailUri(subject: 'OptiYou - ${l10n.supportCenter}', body: body),
     );
-
-    final uri = Uri.parse(
-      'mailto:$_supportEmail?subject=$subject&body=$body',
-    );
-
-    await _launchUri(uri);
   }
 
   Future<void> _submitIssueReport() async {
     if (!_issueFormKey.currentState!.validate()) return;
+    setState(() => _isSendingIssue = true);
+    final l10n = AppLocalizations.of(context);
+    final body = [
+      l10n.reportIssue,
+      '',
+      '${l10n.issueType}: ${_issueTypeLabel(_selectedIssueType, l10n)}',
+      '${l10n.priority}: ${_priorityLabel(_selectedPriority, l10n)}',
+      '${l10n.subjectTitle}: ${_issueTitleController.text.trim()}',
+      '',
+      '${l10n.issueDescription}:',
+      _issueDescriptionController.text.trim(),
+      '',
+      ..._userInformation(l10n),
+    ].join('\n');
 
-    setState(() {
-      _isSendingIssue = true;
-    });
-
-    final subject = Uri.encodeComponent(
-      'Optiyou Sorun Bildirimi - ${_issueTitleController.text.trim()}',
-    );
-
-    final body = Uri.encodeComponent(
-      [
-        'Sorun Bildirimi',
-        '',
-        'Sorun Türü: ${_issueTypeLabel(_selectedIssueType)}',
-        'Öncelik: ${_priorityLabel(_selectedPriority)}',
-        'Başlık: ${_issueTitleController.text.trim()}',
-        '',
-        'Açıklama:',
-        _issueDescriptionController.text.trim(),
-        '',
-        'Kullanıcı Bilgileri',
-        'Ad Soyad: ${widget.currentUser.displayName}',
-        'E-posta: ${widget.currentUser.email}',
-        'Rol: ${widget.currentUser.roleName}',
-        if (widget.currentUser.clinicName != null &&
-            widget.currentUser.clinicName!.trim().isNotEmpty)
-          'Klinik: ${widget.currentUser.clinicName}',
-      ].join('\n'),
-    );
-
-    final uri = Uri.parse(
-      'mailto:$_supportEmail?subject=$subject&body=$body',
-    );
-
-    await _launchUri(uri);
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSendingIssue = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sorun bildirimi için e-posta uygulaması açıldı.'),
-        backgroundColor: Colors.green,
+    final launched = await _launchUri(
+      _emailUri(
+        subject:
+            'OptiYou - ${l10n.reportIssue}: '
+            '${_issueTitleController.text.trim()}',
+        body: body,
       ),
     );
+    if (!mounted) return;
+    setState(() => _isSendingIssue = false);
+    if (launched) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.emailAppOpened),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   void _showCallSupportDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Destek Sorumlusunu Ara'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.callSupport),
         content: SizedBox(
           width: 420,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Aşağıdaki numaralardan destek sorumlusuna ulaşabilirsiniz.',
-                style: TextStyle(height: 1.4),
-              ),
+              Text(l10n.callSupportDescription),
               const SizedBox(height: 16),
               ..._supportPhoneNumbers.map(
-                (phoneNumber) => Container(
+                (number) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.06),
+                    color: Colors.teal.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Colors.teal.withOpacity(0.18),
+                      color: Colors.teal.withValues(alpha: 0.18),
                     ),
                   ),
                   child: ListTile(
                     leading: const CircleAvatar(
                       backgroundColor: Colors.teal,
-                      child: Icon(
-                        Icons.phone,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      child: Icon(Icons.phone, color: Colors.white),
                     ),
                     title: Text(
-                      phoneNumber,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
+                      number,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    subtitle: const Text('Aramak için tıklayın'),
-                    onTap: () => _callPhoneNumber(phoneNumber),
+                    subtitle: Text(l10n.tapToCall),
+                    onTap: () => _callPhoneNumber(number),
                   ),
                 ),
               ),
@@ -247,8 +221,8 @@ class _SupportScreenState extends State<SupportScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -257,167 +231,126 @@ class _SupportScreenState extends State<SupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final roleText =
-        '${widget.currentUser.roleName}${widget.currentUser.clinicName != null && widget.currentUser.clinicName!.trim().isNotEmpty ? ' • ${widget.currentUser.clinicName}' : ''}';
-
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Destek Merkezi'),
-        backgroundColor: Colors.teal,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildHeader(roleText),
-                const SizedBox(height: 24),
-                _buildQuickContactSection(),
-                const SizedBox(height: 20),
-                _buildIssueReportSection(),
-                const SizedBox(height: 20),
-                _buildFaqSection(),
-                const SizedBox(height: 24),
-                Text(
-                  'Destek talepleriniz en kısa sürede değerlendirilecektir.',
-                  style: TextStyle(color: Colors.grey.shade700),
-                  textAlign: TextAlign.center,
+      backgroundColor: Colors.grey.shade50,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final pagePadding = constraints.maxWidth < 650 ? 16.0 : 24.0;
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(pagePadding),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 980),
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        l10n.supportCenter,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _buildHeader(l10n),
+                    const SizedBox(height: 20),
+                    _buildQuickContactSection(l10n),
+                    const SizedBox(height: 20),
+                    _buildIssueReportSection(l10n),
+                    const SizedBox(height: 20),
+                    _buildFaqSection(l10n),
+                    const SizedBox(height: 22),
+                    Text(
+                      l10n.supportClosingNote,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildHeader(String roleText) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 8,
-            offset: Offset(0, 2),
-            color: Colors.black12,
-          ),
-        ],
-      ),
+  Widget _buildHeader(AppLocalizations l10n) {
+    return _SupportCard(
       child: Column(
         children: [
-          Container(
-            width: 74,
-            height: 74,
-            decoration: BoxDecoration(
-              color: Colors.teal.withOpacity(0.10),
-              shape: BoxShape.circle,
-            ),
+          CircleAvatar(
+            radius: 36,
+            backgroundColor: Colors.teal.withValues(alpha: 0.10),
             child: const Icon(
               Icons.support_agent,
-              size: 42,
+              size: 40,
               color: Colors.teal,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Text(
-            'Merhaba, ${widget.currentUser.displayName}',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            l10n.helloUser(widget.currentUser.displayName),
             textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            _getWelcomeText(),
+            _welcomeText(l10n),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.black54,
-              height: 1.4,
-            ),
+            style: const TextStyle(color: Colors.black54, height: 1.4),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
-            roleText,
+            _roleText(l10n),
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.teal.shade700,
               fontWeight: FontWeight.w600,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickContactSection() {
-    return _buildSectionCard(
-      title: 'Hızlı Destek',
-      subtitle: 'Destek ekibine telefon veya e-posta ile ulaşabilirsiniz.',
+  Widget _buildQuickContactSection(AppLocalizations l10n) {
+    return _SectionCard(
+      title: l10n.quickSupport,
+      subtitle: l10n.quickSupportSubtitle,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 680;
-
           final callButton = ElevatedButton.icon(
             onPressed: _showCallSupportDialog,
-            icon: const Icon(
-              Icons.phone_in_talk_outlined,
-              color: Colors.white,
-            ),
-            label: const Text(
-              'Destek Sorumlusunu Ara',
-              style: TextStyle(color: Colors.white),
-            ),
+            icon: const Icon(Icons.phone_in_talk_outlined),
+            label: Text(l10n.callSupport),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           );
-
-          final mailButton = OutlinedButton.icon(
+          final emailButton = OutlinedButton.icon(
             onPressed: _sendSupportEmail,
             icon: const Icon(Icons.email_outlined),
             label: const Text(_supportEmail),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           );
-
-          if (isNarrow) {
+          if (constraints.maxWidth < 620) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                callButton,
-                const SizedBox(height: 10),
-                mailButton,
-              ],
+              children: [callButton, const SizedBox(height: 10), emailButton],
             );
           }
-
           return Row(
             children: [
               Expanded(child: callButton),
               const SizedBox(width: 12),
-              Expanded(child: mailButton),
+              Expanded(child: emailButton),
             ],
           );
         },
@@ -425,104 +358,76 @@ class _SupportScreenState extends State<SupportScreen> {
     );
   }
 
-  Widget _buildIssueReportSection() {
-    return _buildSectionCard(
-      title: 'Sorun Bildir',
-      subtitle:
-          'Yaşadığınız problemi detaylı şekilde iletin. Form e-posta olarak hazırlanır.',
+  Widget _buildIssueReportSection(AppLocalizations l10n) {
+    final issueTypes = [
+      'technical',
+      'measurement',
+      'order',
+      'account',
+      'other',
+    ];
+    final priorities = ['low', 'normal', 'high', 'urgent'];
+    return _SectionCard(
+      title: l10n.reportIssue,
+      subtitle: l10n.issueReportSubtitle,
       child: Form(
         key: _issueFormKey,
         child: Column(
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 680;
-
-                final issueTypeField = DropdownButtonFormField<String>(
+                final typeField = DropdownButtonFormField<String>(
                   initialValue: _selectedIssueType,
-                  decoration: const InputDecoration(
-                    labelText: 'Sorun Türü',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.issueType,
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'technical',
-                      child: Text('Teknik Sorun'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'measurement',
-                      child: Text('Ölçüm / Analiz Sorunu'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'order',
-                      child: Text('Sipariş Süreci'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'account',
-                      child: Text('Hesap / Kullanıcı Sorunu'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'other',
-                      child: Text('Diğer'),
-                    ),
-                  ],
+                  items: issueTypes
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(_issueTypeLabel(value, l10n)),
+                        ),
+                      )
+                      .toList(),
                   onChanged: _isSendingIssue
                       ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _selectedIssueType = value;
-                          });
-                        },
+                      : (value) => setState(
+                          () => _selectedIssueType = value ?? 'technical',
+                        ),
                 );
-
                 final priorityField = DropdownButtonFormField<String>(
                   initialValue: _selectedPriority,
-                  decoration: const InputDecoration(
-                    labelText: 'Öncelik',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.priority,
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'low',
-                      child: Text('Düşük'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'normal',
-                      child: Text('Normal'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'high',
-                      child: Text('Yüksek'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'urgent',
-                      child: Text('Acil'),
-                    ),
-                  ],
+                  items: priorities
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(_priorityLabel(value, l10n)),
+                        ),
+                      )
+                      .toList(),
                   onChanged: _isSendingIssue
                       ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _selectedPriority = value;
-                          });
-                        },
+                      : (value) => setState(
+                          () => _selectedPriority = value ?? 'normal',
+                        ),
                 );
-
-                if (isNarrow) {
+                if (constraints.maxWidth < 620) {
                   return Column(
                     children: [
-                      issueTypeField,
+                      typeField,
                       const SizedBox(height: 12),
                       priorityField,
                     ],
                   );
                 }
-
                 return Row(
                   children: [
-                    Expanded(child: issueTypeField),
+                    Expanded(child: typeField),
                     const SizedBox(width: 12),
                     Expanded(child: priorityField),
                   ],
@@ -533,20 +438,16 @@ class _SupportScreenState extends State<SupportScreen> {
             TextFormField(
               controller: _issueTitleController,
               enabled: !_isSendingIssue,
-              decoration: const InputDecoration(
-                labelText: 'Konu Başlığı',
-                hintText: 'Örn. Ölçüm sonucu açılmıyor',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.subjectTitle,
+                hintText: l10n.subjectTitleHint,
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Konu başlığı zorunludur';
+                  return l10n.subjectRequired;
                 }
-
-                if (value.trim().length < 4) {
-                  return 'Konu başlığı biraz daha açıklayıcı olmalıdır';
-                }
-
+                if (value.trim().length < 4) return l10n.subjectTooShort;
                 return null;
               },
             ),
@@ -555,37 +456,31 @@ class _SupportScreenState extends State<SupportScreen> {
               controller: _issueDescriptionController,
               enabled: !_isSendingIssue,
               maxLines: 6,
-              decoration: const InputDecoration(
-                labelText: 'Sorun Açıklaması',
-                hintText:
-                    'Yaşadığınız problemi, hangi ekranda oluştuğunu ve varsa hata mesajını yazın.',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.issueDescription,
+                hintText: l10n.issueDescriptionHint,
                 alignLabelWithHint: true,
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Sorun açıklaması zorunludur';
+                  return l10n.descriptionRequired;
                 }
-
                 if (value.trim().length < 12) {
-                  return 'Lütfen sorunu biraz daha detaylandırın';
+                  return l10n.descriptionTooShort;
                 }
-
                 return null;
               },
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 18,
-                  color: Colors.grey.shade600,
-                ),
+                Icon(Icons.info_outline, color: Colors.grey.shade600, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Form gönderildiğinde e-posta uygulamanız açılır ve içerik $_supportEmail adresine hazırlanır.',
+                    l10n.supportFormEmailNotice(_supportEmail),
                     style: TextStyle(
                       color: Colors.grey.shade700,
                       fontSize: 13,
@@ -595,7 +490,7 @@ class _SupportScreenState extends State<SupportScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton.icon(
@@ -609,23 +504,11 @@ class _SupportScreenState extends State<SupportScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(
-                        Icons.send_outlined,
-                        color: Colors.white,
-                      ),
-                label: const Text(
-                  'Sorun Bildir',
-                  style: TextStyle(color: Colors.white),
-                ),
+                    : const Icon(Icons.send_outlined),
+                label: Text(l10n.sendIssue),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  foregroundColor: Colors.white,
                 ),
               ),
             ),
@@ -635,118 +518,120 @@ class _SupportScreenState extends State<SupportScreen> {
     );
   }
 
-  Widget _buildFaqSection() {
-    final faqs = _getFaqItems();
-
-    return _buildSectionCard(
-      title: 'Sıkça Sorulan Sorular',
-      subtitle: 'En çok karşılaşılan konuları buradan inceleyebilirsiniz.',
+  Widget _buildFaqSection(AppLocalizations l10n) {
+    return _SectionCard(
+      title: l10n.frequentlyAskedQuestions,
+      subtitle: l10n.faqSubtitle,
       child: Column(
-        children: [
-          ...faqs.map(
-            (faq) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildFaqTile(faq),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFaqTile(_FaqItem faq) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 4,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        iconColor: Colors.teal,
-        collapsedIconColor: Colors.black45,
-        title: Text(
-          faq.question,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              faq.answer,
-              style: const TextStyle(
-                color: Colors.black54,
-                height: 1.45,
+        children: _faqItems(l10n)
+            .map(
+              (faq) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ExpansionTile(
+                    iconColor: Colors.teal,
+                    title: Text(
+                      faq.question,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          faq.answer,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            )
+            .toList(),
       ),
     );
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required String subtitle,
-    required Widget child,
-  }) {
+  List<_FaqItem> _faqItems(AppLocalizations l10n) {
+    if (widget.currentUser.isExpert) {
+      return [
+        _FaqItem(l10n.faqExpertPatientQuestion, l10n.faqExpertPatientAnswer),
+        _FaqItem(l10n.faqExpertResultsQuestion, l10n.faqExpertResultsAnswer),
+        _FaqItem(l10n.faqExpertPhotoQuestion, l10n.faqExpertPhotoAnswer),
+        _FaqItem(l10n.faqExpertApprovalQuestion, l10n.faqExpertApprovalAnswer),
+      ];
+    }
+    if (widget.currentUser.isOptiYouTeam) {
+      return [
+        _FaqItem(l10n.faqTeamMissingQuestion, l10n.faqTeamMissingAnswer),
+        _FaqItem(l10n.faqTeamReportQuestion, l10n.faqTeamReportAnswer),
+        _FaqItem(l10n.faqTeamQrQuestion, l10n.faqTeamQrAnswer),
+        _FaqItem(l10n.faqTeamSystemQuestion, l10n.faqTeamSystemAnswer),
+      ];
+    }
+    return [
+      _FaqItem(l10n.faqResultsQuestion, l10n.faqResultsAnswer),
+      _FaqItem(l10n.faqOrderQuestion, l10n.faqOrderAnswer),
+      _FaqItem(l10n.faqUsageQuestion, l10n.faqUsageAnswer),
+      _FaqItem(l10n.faqContactQuestion, l10n.faqContactAnswer),
+    ];
+  }
+}
+
+class _SupportCard extends StatelessWidget {
+  final Widget child;
+
+  const _SupportCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 6,
-            offset: Offset(0, 2),
-            color: Colors.black12,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
+      child: child,
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SupportCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.support_agent_outlined,
-                  color: Colors.teal,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              height: 1.35,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, height: 1.35),
           ),
           const SizedBox(height: 18),
           child,
@@ -754,104 +639,11 @@ class _SupportScreenState extends State<SupportScreen> {
       ),
     );
   }
-
-  List<_FaqItem> _getFaqItems() {
-    if (widget.currentUser.isExpert) {
-      return const [
-        _FaqItem(
-          question: 'Yeni kullanıcı kaydı nasıl oluşturulur?',
-          answer:
-              'Uzman panelinde kullanıcılar bölümünden yeni kullanıcı kaydı oluşturabilirsiniz. Kayıt sırasında e-posta girilirse KVKK ve sözleşme onay bağlantısı kullanıcıya gönderilir.',
-        ),
-        _FaqItem(
-          question: 'Ölçüm sonuçları ne zaman görüntülenebilir?',
-          answer:
-              'Klinik / antropometrik bilgiler, 3D scan ve plantar basınç adımları tamamlandıktan sonra analiz sonuçları görüntülenebilir.',
-        ),
-        _FaqItem(
-          question: 'Referans iç taban fotoğrafı nasıl çekilmeli?',
-          answer:
-              'İç taban fotoğrafı üstten, net ve ölçek referansı görünür şekilde çekilmelidir. A4 kağıt veya 1 TL gibi ölçü referansları kullanılabilir.',
-        ),
-        _FaqItem(
-          question: 'Tasarım formu tamamlanmadan ölçüm onaylanabilir mi?',
-          answer:
-              'Ölçüm onayı için önceki tüm zorunlu adımların tamamlanması gerekir. Eksik adım varsa sistem onaylamaya izin vermez.',
-        ),
-      ];
-    }
-
-    if (widget.currentUser.isCustomer) {
-      return const [
-        _FaqItem(
-          question: 'Ölçüm sonuçlarımı nereden görebilirim?',
-          answer:
-              'Hesabınıza giriş yaptıktan sonra analiz sonuçları bölümünden size ait ölçüm sonuçlarını görüntüleyebilirsiniz.',
-        ),
-        _FaqItem(
-          question: 'Sipariş durumumu nasıl takip ederim?',
-          answer:
-              'Siparişler bölümünden üretim, paketleme ve teslimat durumunu takip edebilirsiniz.',
-        ),
-        _FaqItem(
-          question: 'Ürünümü kullanırken nelere dikkat etmeliyim?',
-          answer:
-              'İlk kullanımda ürünü kademeli şekilde kullanmanız ve rahatsızlık hissederseniz destek ekibiyle iletişime geçmeniz önerilir.',
-        ),
-        _FaqItem(
-          question: 'Destek ekibine nasıl ulaşırım?',
-          answer:
-              'Bu sayfadaki telefon veya e-posta seçeneklerini kullanarak Optiyou destek ekibine ulaşabilirsiniz.',
-        ),
-      ];
-    }
-
-    if (widget.currentUser.isOptiYouTeam) {
-      return const [
-        _FaqItem(
-          question: 'Operasyon sürecindeki eksik bilgiler nereden kontrol edilir?',
-          answer:
-              'Operasyon ve sipariş detay ekranlarında klinik, kullanıcı, ölçüm ve üretim adımlarına ait bilgiler kontrol edilebilir.',
-        ),
-        _FaqItem(
-          question: 'Klinik veya uzman kaynaklı sorunlar nasıl bildirilir?',
-          answer:
-              'Sorun bildir formu üzerinden ilgili rol, ekran ve hata detaylarını yazarak destek kaydı oluşturabilirsiniz.',
-        ),
-        _FaqItem(
-          question: 'QR veya sonuç erişim bağlantısı çalışmazsa ne yapılmalı?',
-          answer:
-              'Önce oturumun onaylandığını ve kullanıcı invite bağlantısının geçerli olduğunu kontrol edin. Sorun devam ederse destek ekibine bildirin.',
-        ),
-        _FaqItem(
-          question: 'Sistemsel hata bildiriminde hangi bilgiler gerekli?',
-          answer:
-              'Hatanın oluştuğu ekran, kullanıcı rolü, işlem adımı, hata mesajı ve mümkünse ekran görüntüsü paylaşılmalıdır.',
-        ),
-      ];
-    }
-
-    return const [
-      _FaqItem(
-        question: 'Destek ekibine nasıl ulaşırım?',
-        answer:
-            'Telefon veya e-posta seçeneklerini kullanarak Optiyou destek ekibine ulaşabilirsiniz.',
-      ),
-      _FaqItem(
-        question: 'Sorun bildirimi nasıl yapılır?',
-        answer:
-            'Sorun bildir formunu doldurarak destek ekibine detaylı açıklama gönderebilirsiniz.',
-      ),
-    ];
-  }
 }
 
 class _FaqItem {
   final String question;
   final String answer;
 
-  const _FaqItem({
-    required this.question,
-    required this.answer,
-  });
+  const _FaqItem(this.question, this.answer);
 }

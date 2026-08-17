@@ -1,15 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   final String initialEmail;
 
-  const ForgotPasswordScreen({
-    super.key,
-    this.initialEmail = '',
-  });
+  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -27,9 +26,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   void initState() {
     super.initState();
 
-    _emailController = TextEditingController(
-      text: widget.initialEmail,
-    );
+    _emailController = TextEditingController(text: widget.initialEmail);
   }
 
   @override
@@ -57,17 +54,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     if (email.isEmpty) return false;
 
-    return RegExp(
-      r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-    ).hasMatch(email);
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
   }
 
   Future<void> _sendResetEmail() async {
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
 
     if (!_isValidEmail(email)) {
       setState(() {
-        _errorMessage = 'Lütfen geçerli bir e-posta adresi girin.';
+        _errorMessage = l10n.enterValidEmail;
         _isSent = false;
       });
       return;
@@ -116,16 +112,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   String _localizeAuthError(String message) {
+    final l10n = AppLocalizations.of(context);
     final lower = message.toLowerCase();
 
     if (lower.contains('email rate limit') ||
         lower.contains('rate limit') ||
         lower.contains('too many requests')) {
-      return 'Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.';
+      return l10n.tooManyAttempts;
     }
 
     if (lower.contains('invalid email')) {
-      return 'E-posta adresi geçerli değil.';
+      return l10n.enterValidEmail;
     }
 
     return message;
@@ -133,12 +130,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Şifremi Unuttum'),
+        title: Text(l10n.forgotPasswordTitle),
         foregroundColor: Colors.black87,
         backgroundColor: Colors.white,
         elevation: 0.6,
+        actions: const [LanguageSelector(), SizedBox(width: 12)],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -151,10 +150,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: Colors.grey.shade300),
               boxShadow: const [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                ),
+                BoxShadow(color: Colors.black12, blurRadius: 10),
               ],
             ),
             child: Column(
@@ -170,21 +166,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'Şifre Sıfırlama',
-                  style: TextStyle(
+                Text(
+                  l10n.passwordReset,
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Hesabınıza bağlı e-posta adresini girin. Size şifrenizi yenilemeniz için bir bağlantı göndereceğiz.',
+                  l10n.passwordResetDescription,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 TextField(
@@ -192,7 +185,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   enabled: !_isLoading,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    labelText: 'E-posta',
+                    labelText: l10n.email,
                     hintText: 'ornek@eposta.com',
                     errorText: _errorMessage,
                     prefixIcon: const Icon(Icons.email_outlined),
@@ -220,9 +213,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     decoration: BoxDecoration(
                       color: Colors.green.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.green.withOpacity(0.25),
-                      ),
+                      border: Border.all(color: Colors.green.withOpacity(0.25)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,7 +226,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Şifre sıfırlama bağlantısı gönderildi. Lütfen e-posta kutunuzu kontrol edin.',
+                            l10n.resetLinkSent,
                             style: TextStyle(
                               color: Colors.green.shade800,
                               height: 1.35,
@@ -261,11 +252,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                           )
                         : const Icon(Icons.send_outlined),
-                    label: Text(
-                      _isLoading
-                          ? 'Gönderiliyor...'
-                          : 'Sıfırlama Bağlantısı Gönder',
-                    ),
+                    label: Text(_isLoading ? l10n.sending : l10n.sendResetLink),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                       foregroundColor: Colors.white,
@@ -287,10 +274,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           Navigator.pop(context);
                         },
                   icon: const Icon(Icons.arrow_back, size: 18),
-                  label: const Text('Giriş ekranına dön'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.teal,
-                  ),
+                  label: Text(l10n.backToLogin),
+                  style: TextButton.styleFrom(foregroundColor: Colors.teal),
                 ),
               ],
             ),

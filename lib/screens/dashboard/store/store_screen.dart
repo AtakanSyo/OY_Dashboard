@@ -1,260 +1,312 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
+import 'package:oy_site/models/customer_analysis_result_model.dart';
+import 'package:oy_site/models/store_measurement_summary_model.dart';
 import 'package:oy_site/models/store_product_model.dart';
 import 'package:oy_site/screens/dashboard/store/store_product_detail_screen.dart';
-import 'package:oy_site/models/store_measurement_summary_model.dart';
 
-class StoreScreen extends StatelessWidget {
-  final String currentUserEmail;
-
-  const StoreScreen({
-    super.key,
-    required this.currentUserEmail,
-  });
+class StoreScreen extends StatefulWidget {
+  const StoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final measurement = StoreMeasurementSummary(
-      sessionCode: 'SES-2026-0408',
-      analysisDate: DateTime(2026, 4, 8),
-      locationLabel: 'OptiYou İzmir',
-      shortMessage:
-          'Bu sayfadaki ürünler son ölçüm verilerinize göre hazırlanacaktır.',
-    );
+  State<StoreScreen> createState() => _StoreScreenState();
+}
 
-    final products = <StoreProduct>[
-      const StoreProduct(
+class _StoreScreenState extends State<StoreScreen> {
+  final SupabaseAnalysisRepository _analysisRepository =
+      SupabaseAnalysisRepository();
+
+  StoreMeasurementSummary? _latestMeasurement;
+  bool _isLoadingMeasurement = true;
+  bool _measurementLoadFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLatestMeasurement();
+  }
+
+  Future<void> _loadLatestMeasurement() async {
+    setState(() {
+      _isLoadingMeasurement = true;
+      _measurementLoadFailed = false;
+    });
+    try {
+      final analysis = await _analysisRepository
+          .getLatestAnalysisForCurrentCustomer();
+      if (!mounted) return;
+      setState(() {
+        _latestMeasurement = _measurementFromAnalysis(analysis);
+        _isLoadingMeasurement = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _latestMeasurement = null;
+        _isLoadingMeasurement = false;
+        _measurementLoadFailed = true;
+      });
+    }
+  }
+
+  StoreMeasurementSummary? _measurementFromAnalysis(
+    CustomerAnalysisResult? analysis,
+  ) {
+    if (analysis == null) return null;
+    return StoreMeasurementSummary(
+      sessionId: analysis.sessionId,
+      sessionCode: analysis.sessionCode,
+      analysisDate: analysis.analysisDate,
+      locationLabel: analysis.locationLabel,
+      shortMessage: '',
+    );
+  }
+
+  List<StoreProduct> _buildProducts(AppLocalizations l10n) {
+    String price(double amount) {
+      final formatted = NumberFormat.currency(
+        locale: Localizations.localeOf(context).toLanguageTag(),
+        symbol: '',
+        decimalDigits: 0,
+      ).format(amount).trim();
+      return '$formatted TRY';
+    }
+
+    return [
+      StoreProduct(
         id: 'custom-insole',
-        title: 'Kişisel İç Tabanlık',
-        shortDescription:
-            'Günlük kullanım için kişiye özel destek ve konfor sağlar.',
-        fullDescription:
-            'Kişisel İç Tabanlık, son ölçüm verilerinize göre ayağınıza özel olarak tasarlanır. Günlük kullanımda basınç dağılımını iyileştirmeye, konforu artırmaya ve ayak yapınıza uygun destek sunmaya yardımcı olur.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'Uzun süre ayakta kalan, günlük konforunu artırmak isteyen ve kişisel destek ihtiyacı bulunan kullanıcılar için uygundur.',
-        whyRecommended:
-            'Son ölçümünüzde kemer desteği ihtiyacı ve yük dağılımında dengesizlik görüldüğü için bu ürün önerilmektedir.',
-        priceLabel: '4.000 TL',
+        title: l10n.customInsole,
+        shortDescription: l10n.customInsoleDescription,
+        fullDescription: l10n.customInsoleFullDescription,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.customInsoleUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(4000),
         icon: Icons.accessibility_new,
         imagePath: 'assets/images/products/custom_insole.png',
-        isAddOn: false,
-        canBePurchasedAlone: true,
       ),
-      const StoreProduct(
+      StoreProduct(
         id: 'sport-insole',
-        title: 'Spor İç Tabanlığı',
-        shortDescription:
-            'Hareketli yaşam ve spor kullanımı için dinamik destek sunar.',
-        fullDescription:
-            'Spor İç Tabanlığı, yürüyüş, antrenman ve aktif kullanım için destekleyici yapı sunar. Ayağın yük dağılımını daha dengeli hale getirmeye yardımcı olurken hareket sırasında konforun korunmasını hedefler.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'Daha aktif yaşam tarzına sahip, spor yapan veya gün içinde daha yüksek hareket yoğunluğuna sahip kullanıcılar için uygundur.',
-        whyRecommended:
-            'Son ölçümünüzde hareket sırasında destek ihtiyacı öngörüldüğü için spor kullanımı için bu ürün önerilmektedir.',
-        priceLabel: '4.500 TL',
+        title: l10n.sportsInsoleTitle,
+        shortDescription: l10n.sportsInsoleShort,
+        fullDescription: l10n.sportsInsoleFull,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.sportsInsoleUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(4500),
         icon: Icons.directions_run,
         imagePath: 'assets/images/products/sport_insole.png',
-        isAddOn: false,
-        canBePurchasedAlone: true,
       ),
-
-      // Yan ürünler
-      const StoreProduct(
+      StoreProduct(
         id: 'heel-pad',
-        title: 'Topuk Pedi',
-        shortDescription:
-            'Topuk bölgesindeki yükü azaltmaya yardımcı tamamlayıcı ürün.',
-        fullDescription:
-            'Topuk Pedi, topuk bölgesinde konforu artırmak ve yük dağılımını desteklemek amacıyla kullanılan yardımcı bir üründür.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'Topuk bölgesinde hassasiyet yaşayan veya ek yastılama ihtiyacı olan kullanıcılar için uygundur.',
-        whyRecommended:
-            'Ana ürün kullanımını desteklemek ve topuk rahatlığını artırmak için sepete eklenebilir.',
-        priceLabel: '350 TL',
+        title: l10n.heelPadTitle,
+        shortDescription: l10n.heelPadShort,
+        fullDescription: l10n.heelPadFull,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.heelPadUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(350),
         icon: Icons.radio_button_checked,
         imagePath: 'assets/images/addons/heel_pad.png',
         isAddOn: true,
-        canBePurchasedAlone: true,
       ),
-      const StoreProduct(
+      StoreProduct(
         id: 'met-pad',
-        title: 'Metatarsal Destek Pedi',
-        shortDescription:
-            'Ön ayak bölgesine ek rahatlık ve destek sağlayan yan ürün.',
-        fullDescription:
-            'Metatarsal Destek Pedi, özellikle ön ayak bölgesinde basınç hissedilen durumlarda konfor desteği sağlar.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'Ön ayak bölgesinde yük artışı hisseden veya ek destek isteyen kullanıcılar için uygundur.',
-        whyRecommended:
-            'Özellikle spor ve günlük kullanımda tamamlayıcı destek amacıyla önerilir.',
-        priceLabel: '420 TL',
+        title: l10n.metPadTitle,
+        shortDescription: l10n.metPadShort,
+        fullDescription: l10n.metPadFull,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.metPadUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(420),
         icon: Icons.blur_circular,
         imagePath: 'assets/images/addons/met_pad.png',
         isAddOn: true,
-        canBePurchasedAlone: true,
       ),
-      const StoreProduct(
+      StoreProduct(
         id: 'cleaning-spray',
-        title: 'Temizleme Spreyi',
-        shortDescription:
-            'İç tabanlık ve yardımcı ürünlerin bakımı için pratik çözüm.',
-        fullDescription:
-            'Temizleme Spreyi, ürünlerinizi daha hijyenik ve uzun ömürlü kullanmanıza yardımcı olur.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'Ürün bakımını düzenli yapmak isteyen tüm kullanıcılar için uygundur.',
-        whyRecommended:
-            'Ürünün kullanım ömrünü korumaya yardımcı tamamlayıcı bir bakım ürünüdür.',
-        priceLabel: '250 TL',
+        title: l10n.cleaningSprayTitle,
+        shortDescription: l10n.cleaningSprayShort,
+        fullDescription: l10n.cleaningSprayFull,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.cleaningSprayUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(250),
         icon: Icons.cleaning_services_outlined,
         imagePath: 'assets/images/addons/cleaning_spray.png',
         isAddOn: true,
-        canBePurchasedAlone: true,
       ),
-      const StoreProduct(
+      StoreProduct(
         id: 'carry-case',
-        title: 'Taşıma Kılıfı',
-        shortDescription:
-            'İç tabanlık ürünlerinizi korumak ve taşımak için kompakt kılıf.',
-        fullDescription:
-            'Taşıma Kılıfı, ürünlerinizi çanta içinde koruyarak daha düzenli ve güvenli taşımanıza yardımcı olur.',
-        usageTitle: 'Kimler için uygun?',
-        usageDescription:
-            'İç tabanlıklarını yanında taşıyan ve ürünlerini korumak isteyen kullanıcılar için uygundur.',
-        whyRecommended:
-            'Ana ürün kullanımını tamamlayan pratik bir yardımcı üründür.',
-        priceLabel: '300 TL',
+        title: l10n.carryCaseTitle,
+        shortDescription: l10n.carryCaseShort,
+        fullDescription: l10n.carryCaseFull,
+        usageTitle: l10n.whoSuitable,
+        usageDescription: l10n.carryCaseUsage,
+        whyRecommended: l10n.storeRecommendationDisclaimer,
+        priceLabel: price(300),
         icon: Icons.inventory_2_outlined,
         imagePath: 'assets/images/addons/carry_case.png',
         isAddOn: true,
-        canBePurchasedAlone: true,
       ),
     ];
+  }
 
-    final mainProducts = products.where((p) => !p.isAddOn).toList();
-    final addOnProducts = products.where((p) => p.isAddOn).toList();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mağaza'),
-        backgroundColor: Colors.teal,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                buildMeasurementCard(
-                  measurement: measurement,
-                  compact: true,
-                ),
-                const SizedBox(height: 24),
-                _buildSectionTitle(
-                  title: 'Ana Ürünler',
-                  subtitle:
-                      'Aşağıdaki ürünler son ölçüm verilerinize göre hazırlanır.',
-                ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 18,
-                  runSpacing: 18,
-                  children: mainProducts.map((product) {
-                    return StoreProductCard(
-                      product: product,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StoreProductDetailScreen(
-                              product: product,
-                              measurement: measurement,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 32),
-                _buildSectionTitle(
-                  title: 'Yan Ürünler',
-                  subtitle:
-                      'Siparişinize ekleyebileceğiniz tamamlayıcı ürünler.',
-                ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: addOnProducts.map((product) {
-                    return AddOnProductCard(
-                      product: product,
-                      onAddToCart: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.title} sepete eklendi.'),
-                          ),
-                        );
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
+  void _openProduct(StoreProduct product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StoreProductDetailScreen(
+          product: product,
+          measurement: _latestMeasurement,
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle({
-    required String title,
-    required String subtitle,
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final products = _buildProducts(l10n);
+    final mainProducts = products.where((product) => !product.isAddOn).toList();
+    final addOns = products.where((product) => product.isAddOn).toList();
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final pagePadding = constraints.maxWidth < 650 ? 16.0 : 24.0;
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(pagePadding),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.store,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.storeIntro,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildMeasurementArea(l10n),
+                    const SizedBox(height: 28),
+                    _SectionHeading(
+                      title: l10n.mainProducts,
+                      subtitle: l10n.mainProductsSubtitle,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProductWrap(mainProducts, isAddOn: false),
+                    const SizedBox(height: 30),
+                    _SectionHeading(
+                      title: l10n.accessoryProducts,
+                      subtitle: l10n.accessoryProductsSubtitle,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProductWrap(addOns, isAddOn: true),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMeasurementArea(AppLocalizations l10n) {
+    if (_isLoadingMeasurement) {
+      return const SizedBox(
+        height: 150,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_measurementLoadFailed) {
+      return _MessageCard(
+        icon: Icons.sync_problem_outlined,
+        title: l10n.genericError,
+        description: l10n.noLinkedMeasurementDescription,
+        action: OutlinedButton.icon(
+          onPressed: _loadLatestMeasurement,
+          icon: const Icon(Icons.refresh),
+          label: Text(l10n.retry),
+        ),
+      );
+    }
+    if (_latestMeasurement == null) {
+      return _MessageCard(
+        icon: Icons.fact_check_outlined,
+        title: l10n.noLinkedMeasurementTitle,
+        description: l10n.noLinkedMeasurementDescription,
+      );
+    }
+    return buildMeasurementCard(
+      context: context,
+      measurement: _latestMeasurement!,
+      compact: true,
+    );
+  }
+
+  Widget _buildProductWrap(
+    List<StoreProduct> products, {
+    required bool isAddOn,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          style: TextStyle(color: Colors.grey[700]),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final targetWidth = isAddOn ? 250.0 : 360.0;
+        final columns = (constraints.maxWidth / targetWidth).floor().clamp(
+          1,
+          4,
+        );
+        final spacing = 16.0;
+        final width =
+            (constraints.maxWidth - (columns - 1) * spacing) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: products.map((product) {
+            return StoreProductCard(
+              width: width,
+              product: product,
+              onTap: () => _openProduct(product),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
 
 Widget buildMeasurementCard({
+  required BuildContext context,
   required StoreMeasurementSummary measurement,
   required bool compact,
 }) {
+  final l10n = AppLocalizations.of(context);
+  final formattedDate = DateFormat.yMMMd(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(measurement.analysisDate.toLocal());
+  final location = measurement.locationLabel.trim().isEmpty
+      ? l10n.locationNotSpecified
+      : measurement.locationLabel;
+
   return Container(
-    width: compact ? 420 : double.infinity,
+    width: compact ? 520 : double.infinity,
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: const [
-        BoxShadow(
-          color: Colors.black12,
-          blurRadius: 8,
-        ),
-      ],
-      border: Border.all(
-        color: Colors.teal.withOpacity(0.12),
-      ),
+      border: Border.all(color: Colors.teal.withValues(alpha: 0.16)),
+      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,17 +315,14 @@ Widget buildMeasurementCard({
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: Colors.teal.withOpacity(0.12),
-              child: const Icon(
-                Icons.fact_check_outlined,
-                color: Colors.teal,
-              ),
+              backgroundColor: Colors.teal.withValues(alpha: 0.12),
+              child: const Icon(Icons.fact_check_outlined, color: Colors.teal),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Son Ölçüm',
-                style: TextStyle(
+                l10n.latestMeasurement,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -282,44 +331,16 @@ Widget buildMeasurementCard({
           ],
         ),
         const SizedBox(height: 14),
-        buildMeasurementKeyValueRow('Session', measurement.sessionCode),
-        buildMeasurementKeyValueRow('Tarih', measurement.formattedDate),
-        buildMeasurementKeyValueRow('Yer', measurement.locationLabel),
-        const SizedBox(height: 10),
+        _MeasurementRow(
+          label: l10n.sessionLabel,
+          value: measurement.sessionCode,
+        ),
+        _MeasurementRow(label: l10n.dateLabel, value: formattedDate),
+        _MeasurementRow(label: l10n.locationLabel, value: location),
+        const SizedBox(height: 8),
         Text(
-          measurement.shortMessage,
-          style: TextStyle(
-            color: Colors.grey[700],
-            height: 1.4,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget buildMeasurementKeyValueRow(String label, String value) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 68,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          l10n.linkedMeasurementMessage,
+          style: TextStyle(color: Colors.grey.shade700, height: 1.4),
         ),
       ],
     ),
@@ -327,199 +348,192 @@ Widget buildMeasurementKeyValueRow(String label, String value) {
 }
 
 class StoreProductCard extends StatelessWidget {
+  final double width;
   final StoreProduct product;
   final VoidCallback onTap;
 
   const StoreProductCard({
     super.key,
+    required this.width,
     required this.product,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 330,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
+    final l10n = AppLocalizations.of(context);
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: Colors.white,
+        elevation: 1,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.grey.shade100,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.asset(
-                          product.imagePath,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey.shade200,
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'Görsel yok',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
+                AspectRatio(
+                  aspectRatio: product.isAddOn ? 1.8 : 2.1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      color: Colors.grey.shade100,
+                      child: Image.asset(
+                        product.imagePath,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            Center(child: Text(l10n.imageUnavailable)),
                       ),
                     ),
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.white,
-                        child: Icon(
-                          product.icon,
-                          size: 14,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  product.title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  product.shortDescription,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.priceLabel,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
                           color: Colors.teal,
                         ),
                       ),
                     ),
+                    const Icon(Icons.chevron_right, color: Colors.black45),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              product.title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              product.shortDescription,
-              style: TextStyle(
-                color: Colors.grey[700],
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              product.priceLabel,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Colors.teal,
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Row(
-              children: [
-                Spacer(),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.black38,
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class AddOnProductCard extends StatelessWidget {
-  final StoreProduct product;
-  final VoidCallback onAddToCart;
+class _SectionHeading extends StatelessWidget {
+  final String title;
+  final String subtitle;
 
-  const AddOnProductCard({
-    super.key,
-    required this.product,
-    required this.onAddToCart,
+  const _SectionHeading({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 6),
+        Text(subtitle, style: TextStyle(color: Colors.grey.shade700)),
+      ],
+    );
+  }
+}
+
+class _MeasurementRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MeasurementRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 82,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget? action;
+
+  const _MessageCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.action,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 230,
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade300),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6),
-        ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: double.infinity,
-              height: 120,
-              color: Colors.grey.shade100,
-              alignment: Alignment.center,
-              child: Image.asset(
-                product.imagePath,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text('Görsel yok'),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            product.title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            product.shortDescription,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 13,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            product.priceLabel,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onAddToCart,
-              icon: const Icon(Icons.add_shopping_cart_outlined),
-              label: const Text('Sepete Ekle'),
+          Icon(icon, color: Colors.teal, size: 30),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                ),
+                if (action != null) ...[const SizedBox(height: 12), action!],
+              ],
             ),
           ),
         ],

@@ -93,7 +93,14 @@ class LegacyDocTextExtractor {
       return;
     }
 
-    if (tokens.isEmpty || tokens.last != value) {
+    final repeatedMeasurement =
+        tokens.isNotEmpty &&
+        tokens.last == value &&
+        RegExp(r'^-?\d+(?:[.,]\d+)?$').hasMatch(value);
+
+    // Sol ve sağ ölçümler aynı olduğunda Word akışında aynı sayı art arda
+    // gelebilir. Bunlar yinelenen metin değil, iki ayrı tablo hücresidir.
+    if (tokens.isEmpty || tokens.last != value || repeatedMeasurement) {
       tokens.add(value);
     }
   }

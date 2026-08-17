@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_customer_home_repository.dart';
+import 'package:intl/intl.dart';
+import 'package:oy_site/data/repositories/supabase_customer_home_repository.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_home_model.dart';
+import 'package:oy_site/models/order_model.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final AppUser currentUser;
   final ValueChanged<int> onNavigate;
+  final CustomerHomeRepository? repository;
 
   const CustomerHomeScreen({
     super.key,
     required this.currentUser,
     required this.onNavigate,
+    this.repository,
   });
 
   @override
@@ -19,7 +24,7 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   static const _teal = Colors.teal;
-  final _repository = MockCustomerHomeRepository();
+  late final CustomerHomeRepository _repository;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -28,6 +33,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _repository = widget.repository ?? SupabaseCustomerHomeRepository();
     _load();
   }
 
@@ -49,26 +55,65 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Ana sayfa bilgileri yüklenemedi.';
+        _errorMessage = AppLocalizations.of(context).homeLoadError;
         _isLoading = false;
       });
     }
   }
 
   String _formatDate(DateTime? date) {
-    if (date == null) return 'Belirtilmedi';
-    return '${date.day.toString().padLeft(2, '0')}.'
-        '${date.month.toString().padLeft(2, '0')}.${date.year}';
+    if (date == null) return AppLocalizations.of(context).notSpecified;
+    return DateFormat.yMMMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(date.toLocal());
   }
 
   String _formatPrice(double price) {
-    final value = price.toStringAsFixed(0);
-    final buffer = StringBuffer();
-    for (var i = 0; i < value.length; i++) {
-      if (i > 0 && (value.length - i) % 3 == 0) buffer.write('.');
-      buffer.write(value[i]);
+    return NumberFormat.currency(
+      locale: Localizations.localeOf(context).toLanguageTag(),
+      symbol: '₺',
+      decimalDigits: 0,
+    ).format(price);
+  }
+
+  String _orderStatusLabel(String status, AppLocalizations l10n) {
+    switch (status) {
+      case OrderStatuses.pending:
+        return l10n.pendingStatus;
+      case OrderStatuses.designing:
+        return l10n.designingStatus;
+      case OrderStatuses.production:
+        return l10n.productionStatus;
+      case OrderStatuses.shipped:
+        return l10n.shippedStatus;
+      case OrderStatuses.delivered:
+        return l10n.deliveredStatus;
+      case OrderStatuses.cancelled:
+        return l10n.cancelledStatus;
+      default:
+        return status;
     }
-    return '${buffer.toString()} TL';
+  }
+
+  String _productLabel(String productType, AppLocalizations l10n) {
+    switch (productType) {
+      case 'insole':
+        return l10n.insoleProduct;
+      case 'sports_insole':
+        return l10n.sportsInsoleProduct;
+      case 'sandal':
+        return l10n.sandalProduct;
+      case 'heel_pad':
+        return l10n.heelPadTitle;
+      case 'met_pad':
+        return l10n.metPadTitle;
+      case 'cleaning_spray':
+        return l10n.cleaningSprayTitle;
+      case 'carry_case':
+        return l10n.carryCaseTitle;
+      default:
+        return productType;
+    }
   }
 
   @override
@@ -78,26 +123,34 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _teal))
           : _errorMessage != null
-              ? _buildErrorState()
-              : _buildPage(_data!),
+          ? _buildErrorState()
+          : _buildPage(_data!),
     );
   }
 
   Widget _buildErrorState() {
+    final l10n = AppLocalizations.of(context);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.cloud_off_outlined, size: 48, color: Colors.grey.shade500),
-          const SizedBox(height: 12),
-          Text(_errorMessage!),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Tekrar dene'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              size: 48,
+              color: Colors.grey.shade500,
+            ),
+            const SizedBox(height: 12),
+            Text(_errorMessage!, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n.retry),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -124,6 +177,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHero(data, constraints.maxWidth),
+                    if (data.analysisLoadFailed || data.ordersLoadFailed) ...[
+                      const SizedBox(height: 16),
+                      _buildPartialDataBanner(),
+                    ],
                     const SizedBox(height: 20),
                     _buildQuickCards(data),
                     const SizedBox(height: 20),
@@ -131,7 +188,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const SizedBox(height: 20),
                     _buildAnalysisCard(data),
                     const SizedBox(height: 20),
-                    _buildProductCard(data, constraints.maxWidth),
+                    _buildProductCard(
+                      data.suggestedProduct,
+                      constraints.maxWidth,
+                    ),
                     const SizedBox(height: 20),
                     _buildSupportBanner(),
                   ],
@@ -145,13 +205,17 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildHero(CustomerHomeData data, double width) {
+    final l10n = AppLocalizations.of(context);
     final compact = width < 850;
+    final firstName =
+        data.patientName.trim().split(' ').firstOrNull ??
+        widget.currentUser.firstName;
     final textContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Merhaba, ${data.patientName.split(' ').first}',
+          l10n.helloUser(firstName),
           style: TextStyle(
             color: Colors.teal.shade900,
             fontSize: compact ? 25 : 31,
@@ -160,9 +224,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Ayak sağlığınızla ilgili değerlendirmelerinizi, önerilerinizi ve siparişlerinizi buradan takip edebilirsiniz.',
+          l10n.customerHomeIntro,
           style: TextStyle(
-            color: Colors.teal.shade900.withOpacity(.78),
+            color: Colors.teal.shade900.withValues(alpha: 0.78),
             fontSize: 16,
             height: 1.45,
           ),
@@ -175,21 +239,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ElevatedButton.icon(
               onPressed: () => widget.onNavigate(1),
               icon: const Icon(Icons.insights_outlined),
-              label: const Text('Değerlendirmemi görüntüle'),
+              label: Text(l10n.viewMyAssessment),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
               ),
             ),
             OutlinedButton.icon(
               onPressed: () => widget.onNavigate(2),
               icon: const Icon(Icons.local_shipping_outlined),
-              label: const Text('Siparişimi takip et'),
+              label: Text(l10n.trackMyOrder),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.teal.shade800,
                 side: BorderSide(color: Colors.teal.shade300),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
               ),
             ),
           ],
@@ -220,9 +290,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   child: SizedBox(
                     height: 220,
                     child: Image.asset(
-                      data.suggestedProductImagePath,
+                      'assets/images/products/personal_insole.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         Icons.health_and_safety_outlined,
                         size: 110,
                         color: Colors.teal.shade200,
@@ -235,14 +305,44 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
+  Widget _buildPartialDataBanner() {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.sync_problem_outlined, color: Colors.orange),
+          const SizedBox(width: 10),
+          Expanded(child: Text(l10n.partialHomeDataWarning)),
+          IconButton(
+            onPressed: _load,
+            tooltip: l10n.retry,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickCards(CustomerHomeData data) {
+    final l10n = AppLocalizations.of(context);
+    final assessment = data.latestAssessment;
+    final order = data.activeOrder;
+    final product = data.suggestedProduct;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth >= 960
             ? (constraints.maxWidth - 32) / 3
             : constraints.maxWidth >= 620
-                ? (constraints.maxWidth - 16) / 2
-                : constraints.maxWidth;
+            ? (constraints.maxWidth - 16) / 2
+            : constraints.maxWidth;
         return Wrap(
           spacing: 16,
           runSpacing: 16,
@@ -250,25 +350,37 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             _quickCard(
               width: cardWidth,
               icon: Icons.fact_check_outlined,
-              title: 'Son değerlendirme',
-              value: data.analysisStatus,
-              detail: _formatDate(data.lastAnalysisDate),
+              title: l10n.latestAssessment,
+              value: data.analysisLoadFailed
+                  ? l10n.dataUnavailable
+                  : assessment == null
+                  ? l10n.noAssessmentYet
+                  : l10n.assessmentReady,
+              detail: assessment == null
+                  ? l10n.notSpecified
+                  : _formatDate(assessment.analysisDate),
               onTap: () => widget.onNavigate(1),
             ),
             _quickCard(
               width: cardWidth,
               icon: Icons.inventory_2_outlined,
-              title: 'Aktif sipariş',
-              value: data.orderStatus,
-              detail: data.orderNo,
+              title: l10n.activeOrder,
+              value: data.ordersLoadFailed
+                  ? l10n.dataUnavailable
+                  : order == null
+                  ? l10n.noActiveOrder
+                  : _orderStatusLabel(order.orderStatus, l10n),
+              detail: order?.orderNo ?? l10n.notSpecified,
               onTap: () => widget.onNavigate(2),
             ),
             _quickCard(
               width: cardWidth,
               icon: Icons.recommend_outlined,
-              title: 'Önerilen ürün',
-              value: data.suggestedProductName,
-              detail: 'Size özel öneri',
+              title: l10n.recommendedProduct,
+              value: product?.name ?? l10n.productNotDetermined,
+              detail: product == null
+                  ? l10n.recommendationPending
+                  : l10n.personalRecommendation,
               onTap: () => widget.onNavigate(3),
             ),
           ],
@@ -315,11 +427,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: TextStyle(color: Colors.grey.shade600)),
+                      Text(
+                        title,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                       const SizedBox(height: 4),
-                      Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 2),
-                      Text(detail, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -336,7 +464,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final order = _buildOrderCard(data);
     final recommendation = _buildRecommendationCard(data);
     if (width < 950) {
-      return Column(children: [order, const SizedBox(height: 20), recommendation]);
+      return Column(
+        children: [order, const SizedBox(height: 20), recommendation],
+      );
     }
     return IntrinsicHeight(
       child: Row(
@@ -351,22 +481,54 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildOrderCard(CustomerHomeData data) {
-    const steps = ['Alındı', 'Tasarım', 'Üretim', 'Kargoda', 'Teslim'];
+    final l10n = AppLocalizations.of(context);
+    final order = data.activeOrder;
+    if (data.ordersLoadFailed) {
+      return _stateCard(
+        icon: Icons.sync_problem_outlined,
+        title: l10n.dataUnavailable,
+        description: l10n.partialHomeDataWarning,
+        actionLabel: l10n.retry,
+        onAction: _load,
+      );
+    }
+    if (order == null) {
+      return _stateCard(
+        icon: Icons.inventory_2_outlined,
+        title: l10n.noActiveOrder,
+        description: l10n.noActiveOrderDescription,
+        actionLabel: l10n.orders,
+        onAction: () => widget.onNavigate(2),
+      );
+    }
+
+    final steps = [
+      l10n.orderReceived,
+      l10n.design,
+      l10n.production,
+      l10n.shipped,
+      l10n.delivered,
+    ];
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(Icons.local_shipping_outlined, 'Sipariş süreci'),
+          _sectionHeader(Icons.local_shipping_outlined, l10n.orderProcess),
           const SizedBox(height: 18),
-          Text(data.productName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(
+            _productLabel(order.productType, l10n),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 5),
-          Text('${data.orderNo}  •  Tahmini teslim: ${_formatDate(data.estimatedDelivery)}',
-              style: TextStyle(color: Colors.grey.shade600)),
+          Text(
+            '${order.orderNo}  •  ${l10n.orderedOn(_formatDate(order.orderedAt))}',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 26),
           LayoutBuilder(
             builder: (context, constraints) => Row(
               children: List.generate(steps.length, (index) {
-                final active = index <= data.orderProgressStep;
+                final active = index <= order.progressStep;
                 return Expanded(
                   child: Row(
                     children: [
@@ -380,18 +542,28 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                                 color: active ? _teal : Colors.grey.shade200,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(active ? Icons.check : Icons.circle,
-                                  size: active ? 17 : 7,
-                                  color: active ? Colors.white : Colors.grey.shade500),
+                              child: Icon(
+                                active ? Icons.check : Icons.circle,
+                                size: active ? 17 : 7,
+                                color: active
+                                    ? Colors.white
+                                    : Colors.grey.shade500,
+                              ),
                             ),
                             const SizedBox(height: 7),
-                            Text(steps[index],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: constraints.maxWidth < 500 ? 10 : 12,
-                                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-                                  color: active ? Colors.teal.shade800 : Colors.grey.shade600,
-                                )),
+                            Text(
+                              steps[index],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: constraints.maxWidth < 500 ? 10 : 12,
+                                fontWeight: active
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: active
+                                    ? Colors.teal.shade800
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -400,7 +572,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           width: constraints.maxWidth < 500 ? 5 : 14,
                           height: 2,
                           margin: const EdgeInsets.only(bottom: 24),
-                          color: index < data.orderProgressStep ? _teal : Colors.grey.shade300,
+                          color: index < order.progressStep
+                              ? _teal
+                              : Colors.grey.shade300,
                         ),
                     ],
                   ),
@@ -414,7 +588,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: TextButton.icon(
               onPressed: () => widget.onNavigate(2),
               icon: const Icon(Icons.arrow_forward, size: 18),
-              label: const Text('Sipariş detayına git'),
+              label: Text(l10n.goToOrderDetails),
             ),
           ),
         ],
@@ -423,60 +597,136 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildRecommendationCard(CustomerHomeData data) {
+    final l10n = AppLocalizations.of(context);
+    final assessment = data.latestAssessment;
+    final note = assessment?.recommendationNote?.trim() ?? '';
+    final title = assessment?.recommendationTitle?.trim() ?? '';
+
     return _card(
       color: Colors.teal.shade50,
       borderColor: Colors.teal.shade100,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(Icons.health_and_safety_outlined, 'Uzmanınızdan öneri'),
+          _sectionHeader(
+            Icons.health_and_safety_outlined,
+            l10n.specialistRecommendation,
+          ),
           const SizedBox(height: 18),
-          Text(data.recommendationNote, style: const TextStyle(fontSize: 15, height: 1.55)),
-          const SizedBox(height: 18),
-          Text('Güncelleme: ${_formatDate(data.recommendationUpdatedAt)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          if (data.analysisLoadFailed)
+            _inlineState(
+              Icons.sync_problem_outlined,
+              l10n.dataUnavailable,
+              l10n.partialHomeDataWarning,
+            )
+          else if (assessment == null || note.isEmpty)
+            _inlineState(
+              Icons.hourglass_empty_outlined,
+              l10n.recommendationPending,
+              l10n.recommendationPendingDescription,
+            )
+          else ...[
+            if (title.isNotEmpty) ...[
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+            ],
+            Text(note, style: const TextStyle(fontSize: 15, height: 1.55)),
+            const SizedBox(height: 18),
+            Text(
+              l10n.updatedOn(_formatDate(assessment.analysisDate)),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildAnalysisCard(CustomerHomeData data) {
+    final l10n = AppLocalizations.of(context);
+    final assessment = data.latestAssessment;
+    if (data.analysisLoadFailed) {
+      return _stateCard(
+        icon: Icons.sync_problem_outlined,
+        title: l10n.dataUnavailable,
+        description: l10n.partialHomeDataWarning,
+        actionLabel: l10n.retry,
+        onAction: _load,
+      );
+    }
+    if (assessment == null) {
+      return _stateCard(
+        icon: Icons.insights_outlined,
+        title: l10n.noAssessmentYet,
+        description: l10n.noAssessmentYetDescription,
+        actionLabel: l10n.checkAgain,
+        onAction: _load,
+      );
+    }
+
+    final summary = assessment.summary.isEmpty
+        ? l10n.assessmentSummaryAvailable
+        : assessment.summary;
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: _sectionHeader(Icons.insights_outlined, 'Son değerlendirmeniz')),
-              Text(_formatDate(data.lastAnalysisDate), style: TextStyle(color: Colors.grey.shade600)),
+              Expanded(
+                child: _sectionHeader(
+                  Icons.insights_outlined,
+                  l10n.yourLatestAssessment,
+                ),
+              ),
+              Text(
+                _formatDate(assessment.analysisDate),
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          Text(data.summary, style: const TextStyle(fontSize: 15, height: 1.5)),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: data.analysisHighlights.map((item) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.teal.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.check_circle_outline, size: 17, color: _teal),
-                const SizedBox(width: 6),
-                Text(item),
-              ]),
-            )).toList(),
-          ),
+          Text(summary, style: const TextStyle(fontSize: 15, height: 1.5)),
+          if (assessment.highlights.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: assessment.highlights
+                  .map(
+                    (item) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline,
+                            size: 17,
+                            color: _teal,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(child: Text(item)),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
           const SizedBox(height: 16),
           Align(
             alignment: Alignment.centerRight,
             child: OutlinedButton.icon(
               onPressed: () => widget.onNavigate(1),
               icon: const Icon(Icons.description_outlined),
-              label: const Text('Detaylı değerlendirmeyi görüntüle'),
+              label: Text(l10n.viewDetailedAssessment),
             ),
           ),
         ],
@@ -484,53 +734,162 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  Widget _buildProductCard(CustomerHomeData data, double width) {
+  Widget _buildProductCard(CustomerHomeProductData? product, double width) {
+    final l10n = AppLocalizations.of(context);
+    if (product == null) {
+      return _stateCard(
+        icon: Icons.recommend_outlined,
+        title: l10n.productNotDetermined,
+        description: l10n.productSelectionPendingDescription,
+        actionLabel: l10n.browseProducts,
+        onAction: () => widget.onNavigate(3),
+      );
+    }
+
     final compact = width < 760;
     final image = Container(
       width: compact ? double.infinity : 290,
       height: 210,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(16)),
-      child: Image.asset(data.suggestedProductImagePath, fit: BoxFit.contain),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Image.asset(
+        product.imagePath,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Center(child: Text(l10n.imageUnavailable)),
+      ),
     );
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(Icons.recommend_outlined, 'Size önerilen ürün'),
+        _sectionHeader(Icons.recommend_outlined, l10n.productRecommendedForYou),
         const SizedBox(height: 14),
-        Text(data.suggestedProductName, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+        Text(
+          product.name,
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 8),
-        Text(data.suggestedProductDescription, style: const TextStyle(height: 1.45)),
+        Text(product.description, style: const TextStyle(height: 1.45)),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(12)),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(Icons.info_outline, color: _teal, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(data.suggestedProductReason)),
-          ]),
+          decoration: BoxDecoration(
+            color: Colors.teal.shade50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, color: _teal, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(product.reason)),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: Text(_formatPrice(data.suggestedProductPrice),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
-          ElevatedButton(
-            onPressed: () => widget.onNavigate(3),
-            style: ElevatedButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.white),
-            child: const Text('Ürünü incele'),
-          ),
-        ]),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _formatPrice(product.price),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => widget.onNavigate(3),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.viewProduct),
+            ),
+          ],
+        ),
       ],
     );
     return _card(
       child: compact
           ? Column(children: [image, const SizedBox(height: 20), details])
-          : Row(children: [image, const SizedBox(width: 28), Expanded(child: details)]),
+          : Row(
+              children: [
+                image,
+                const SizedBox(width: 28),
+                Expanded(child: details),
+              ],
+            ),
+    );
+  }
+
+  Widget _stateCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return _card(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 25,
+            backgroundColor: Colors.teal.withValues(alpha: 0.10),
+            child: Icon(icon, color: _teal),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _inlineState(IconData icon, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: _teal),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 5),
+              Text(description, style: const TextStyle(height: 1.4)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSupportBanner() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
@@ -545,18 +904,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         spacing: 20,
         runSpacing: 12,
         children: [
-          const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.support_agent_outlined, color: _teal, size: 30),
-            SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Bir sorunuz mu var?', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('Destek ekibimiz size yardımcı olabilir.'),
-            ]),
-          ]),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.support_agent_outlined, color: _teal, size: 30),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.haveAQuestion,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(l10n.supportTeamCanHelp),
+                ],
+              ),
+            ],
+          ),
           OutlinedButton.icon(
             onPressed: () => widget.onNavigate(4),
             icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Destek al'),
+            label: Text(l10n.getSupport),
           ),
         ],
       ),
@@ -564,11 +932,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _sectionHeader(IconData icon, String title) {
-    return Row(children: [
-      Icon(icon, color: _teal, size: 23),
-      const SizedBox(width: 9),
-      Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-    ]);
+    return Row(
+      children: [
+        Icon(icon, color: _teal, size: 23),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _card({
@@ -584,7 +959,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor ?? Colors.grey.shade200),
         boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       child: child,

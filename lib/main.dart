@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:oy_site/core/supabase_config.dart';
+import 'package:oy_site/l10n/app_locale_controller.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/payment_result_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,22 +28,29 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  final pressureRepository =
-      AppConfig.useMock ? 'MOCK_REPOSITORY' : 'SUPABASE_REPOSITORY';
+  final localeController = AppLocaleController();
+  await localeController.load();
+
+  final pressureRepository = AppConfig.useMock
+      ? 'MOCK_REPOSITORY'
+      : 'SUPABASE_REPOSITORY';
 
   runApp(
     OYDashboardApp(
       pressureRepository: pressureRepository,
+      localeController: localeController,
     ),
   );
 }
 
 class OYDashboardApp extends StatefulWidget {
   final dynamic pressureRepository;
+  final AppLocaleController localeController;
 
   const OYDashboardApp({
     super.key,
     required this.pressureRepository,
+    required this.localeController,
   });
 
   @override
@@ -58,8 +67,9 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
   void initState() {
     super.initState();
 
-    _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       if (data.event == AuthChangeEvent.passwordRecovery) {
         _openResetPasswordScreen();
       }
@@ -84,14 +94,14 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
 
       navigator
           .push(
-        MaterialPageRoute(
-          builder: (_) => const ResetPasswordScreen(),
-          settings: const RouteSettings(name: '/reset-password'),
-        ),
-      )
+            MaterialPageRoute(
+              builder: (_) => const ResetPasswordScreen(),
+              settings: const RouteSettings(name: '/reset-password'),
+            ),
+          )
           .whenComplete(() {
-        _isResetPasswordScreenOpen = false;
-      });
+            _isResetPasswordScreenOpen = false;
+          });
     });
   }
 
@@ -110,125 +120,139 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
     final isResetPasswordRoute = _isResetPasswordRouteFromUrl();
     final isWelcomeRoute = _isWelcomeRouteFromUrl();
 
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      title: 'OY Dashboard',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
-      home: paymentResult != null
-          ? PaymentResultScreen(
-              success: paymentResult.success,
-              token: paymentResult.token,
-              pressureRepository: widget.pressureRepository,
-            )
-          : isResetPasswordRoute
+    return AppLocaleScope(
+      controller: widget.localeController,
+      child: AnimatedBuilder(
+        animation: widget.localeController,
+        builder: (context, _) => MaterialApp(
+          navigatorKey: _navigatorKey,
+          onGenerateTitle: (context) => 'OY Dashboard',
+          debugShowCheckedModeBanner: false,
+          locale: widget.localeController.locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localeResolutionCallback: (locale, supportedLocales) {
+            if (widget.localeController.locale != null) {
+              return widget.localeController.locale;
+            }
+            if (locale?.languageCode == 'en') return const Locale('en');
+            return const Locale('tr');
+          },
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+            useMaterial3: true,
+          ),
+          home: paymentResult != null
+              ? PaymentResultScreen(
+                  success: paymentResult.success,
+                  token: paymentResult.token,
+                  pressureRepository: widget.pressureRepository,
+                )
+              : isResetPasswordRoute
               ? const ResetPasswordScreen()
               : isWelcomeRoute
-                  ? WelcomeQrScreen(
-                      pressureRepository: widget.pressureRepository,
-                      onOpenApp: _openDashboardFromWelcome,
-                    )
-                  : inviteToken != null
-                      ? RegisterScreen(
-                          inviteToken: inviteToken,
-                          pressureRepository: widget.pressureRepository,
-                        )
-                      : legalConsentToken != null
-                          ? LegalConsentScreen(token: legalConsentToken)
-                          : HomeScreen(
-                              pressureRepository: widget.pressureRepository,
-                            ),
-      onGenerateRoute: (settings) {
-        final routeName = settings.name ?? '';
+              ? WelcomeQrScreen(
+                  pressureRepository: widget.pressureRepository,
+                  onOpenApp: _openDashboardFromWelcome,
+                )
+              : inviteToken != null
+              ? RegisterScreen(
+                  inviteToken: inviteToken,
+                  pressureRepository: widget.pressureRepository,
+                )
+              : legalConsentToken != null
+              ? LegalConsentScreen(token: legalConsentToken)
+              : HomeScreen(pressureRepository: widget.pressureRepository),
+          onGenerateRoute: (settings) {
+            final routeName = settings.name ?? '';
 
-        if (routeName.startsWith('/welcome')) {
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => WelcomeQrScreen(
-              pressureRepository: widget.pressureRepository,
-              onOpenApp: _openDashboardFromWelcome,
-            ),
-          );
-        }
+            if (routeName.startsWith('/welcome')) {
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => WelcomeQrScreen(
+                  pressureRepository: widget.pressureRepository,
+                  onOpenApp: _openDashboardFromWelcome,
+                ),
+              );
+            }
 
-        if (routeName.startsWith('/payment-result')) {
-          final uri = Uri.parse(routeName);
-          final status = (uri.queryParameters['status'] ?? '').toLowerCase();
-          final token = uri.queryParameters['token'];
+            if (routeName.startsWith('/payment-result')) {
+              final uri = Uri.parse(routeName);
+              final status = (uri.queryParameters['status'] ?? '')
+                  .toLowerCase();
+              final token = uri.queryParameters['token'];
 
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => PaymentResultScreen(
-              success: status == 'success',
-              token: token,
-              pressureRepository: widget.pressureRepository,
-            ),
-          );
-        }
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => PaymentResultScreen(
+                  success: status == 'success',
+                  token: token,
+                  pressureRepository: widget.pressureRepository,
+                ),
+              );
+            }
 
-        if (routeName.startsWith('/register')) {
-          final uri = Uri.parse(routeName);
-          final inviteToken = uri.queryParameters['invite'];
+            if (routeName.startsWith('/register')) {
+              final uri = Uri.parse(routeName);
+              final inviteToken = uri.queryParameters['invite'];
 
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => RegisterScreen(
-              inviteToken: inviteToken,
-              pressureRepository: widget.pressureRepository,
-            ),
-          );
-        }
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => RegisterScreen(
+                  inviteToken: inviteToken,
+                  pressureRepository: widget.pressureRepository,
+                ),
+              );
+            }
 
-        if (routeName.startsWith('/legal-consent')) {
-          final uri = Uri.parse(routeName);
-          final token = uri.queryParameters['token'] ?? '';
+            if (routeName.startsWith('/legal-consent')) {
+              final uri = Uri.parse(routeName);
+              final token = uri.queryParameters['token'] ?? '';
 
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => LegalConsentScreen(token: token),
-          );
-        }
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => LegalConsentScreen(token: token),
+              );
+            }
 
-        if (routeName.startsWith('/reset-password')) {
-          return MaterialPageRoute(
-            settings: const RouteSettings(name: '/reset-password'),
-            builder: (_) => const ResetPasswordScreen(),
-          );
-        }
+            if (routeName.startsWith('/reset-password')) {
+              return MaterialPageRoute(
+                settings: const RouteSettings(name: '/reset-password'),
+                builder: (_) => const ResetPasswordScreen(),
+              );
+            }
 
-        if (routeName.startsWith('/login')) {
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => LoginScreen(
-              pressureRepository: widget.pressureRepository,
-            ),
-          );
-        }
+            if (routeName.startsWith('/login')) {
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) =>
+                    LoginScreen(pressureRepository: widget.pressureRepository),
+              );
+            }
 
-        if (routeName == '/dashboard' || routeName.startsWith('/dashboard')) {
-          final currentUser = _currentUserFromRouteArguments(
-            settings.arguments,
-          );
+            if (routeName == '/dashboard' ||
+                routeName.startsWith('/dashboard')) {
+              final currentUser = _currentUserFromRouteArguments(
+                settings.arguments,
+              );
 
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => DashboardScreen(
-              currentUser: currentUser,
-              pressureRepository: widget.pressureRepository,
-            ),
-          );
-        }
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => DashboardScreen(
+                  currentUser: currentUser,
+                  pressureRepository: widget.pressureRepository,
+                ),
+              );
+            }
 
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => HomeScreen(
-            pressureRepository: widget.pressureRepository,
-          ),
-        );
-      },
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) =>
+                  HomeScreen(pressureRepository: widget.pressureRepository),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -248,7 +272,8 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
         return AppUser.fromMap(directCurrentUser);
       }
 
-      if (arguments.containsKey('email') || arguments.containsKey('role_code')) {
+      if (arguments.containsKey('email') ||
+          arguments.containsKey('role_code')) {
         return AppUser.fromMap(arguments);
       }
     }
@@ -340,10 +365,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
       final success = status == 'success';
       final token = directUri.queryParameters['token'];
 
-      return _PaymentResultRouteData(
-        success: success,
-        token: token,
-      );
+      return _PaymentResultRouteData(success: success, token: token);
     }
 
     final fragmentUri = _fragmentUriFromBase();
@@ -356,10 +378,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
     final success = status == 'success';
     final token = fragmentUri.queryParameters['token'];
 
-    return _PaymentResultRouteData(
-      success: success,
-      token: token,
-    );
+    return _PaymentResultRouteData(success: success, token: token);
   }
 
   Uri? _fragmentUriFromBase() {
@@ -377,8 +396,5 @@ class _PaymentResultRouteData {
   final bool success;
   final String? token;
 
-  const _PaymentResultRouteData({
-    required this.success,
-    required this.token,
-  });
+  const _PaymentResultRouteData({required this.success, required this.token});
 }

@@ -16,6 +16,7 @@ import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/models/order_operation_file_model.dart';
 import 'package:oy_site/models/order_operation_state_model.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
+import 'package:oy_site/screens/dashboard/operations/optiyou_measurement_review_screen.dart';
 import 'package:oy_site/screens/dashboard/orthotics/orthotic_design_form_screen.dart';
 import 'package:oy_site/screens/dashboard/analysis/session_analysis_results_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,11 +27,13 @@ import 'package:qr_flutter/qr_flutter.dart';
 class OptiYouOrderDetailScreen extends StatefulWidget {
   final AppUser currentUser;
   final OptiYouOrderOperationItem operationItem;
+  final dynamic pressureRepository;
 
   const OptiYouOrderDetailScreen({
     super.key,
     required this.currentUser,
     required this.operationItem,
+    this.pressureRepository,
   });
 
   @override
@@ -480,6 +483,29 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openSessionInputs() async {
+    final session = await _ensureSessionLoaded();
+
+    if (session?.sessionId == null || session!.expertUserId <= 0) {
+      _showMessage('Bu siparişe bağlı ölçüm oturumu okunamadı.');
+      return;
+    }
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OptiYouMeasurementReviewScreen(
+          currentUser: widget.currentUser,
+          session: session,
+          pressureRepository: widget.pressureRepository,
+        ),
+      ),
+    );
+
+    if (mounted) await _loadOperationData();
   }
 
   Future<void> _openClinicalInfo() async {
@@ -2081,6 +2107,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 icon: Icons.assignment_outlined,
                 label: 'Tasarım Formunu Görüntüle',
                 onPressed: _openDesignForm,
+              ),
+              _buildActionButton(
+                icon: Icons.fact_check_outlined,
+                label: 'Oturum Girdilerini İncele',
+                onPressed: _openSessionInputs,
               ),
               _buildActionButton(
                 icon: Icons.analytics_outlined,

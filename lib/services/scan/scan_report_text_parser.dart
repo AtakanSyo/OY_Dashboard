@@ -5,6 +5,62 @@ class ScanReportTextParser {
 
   ParsedScanReport parse(String rawText) {
     final text = _normalize(rawText);
+    final leftFootWidth = _extractPairDouble(
+      text,
+      'Foot width',
+      isLeft: true,
+    );
+    final rightFootWidth = _extractPairDouble(
+      text,
+      'Foot width',
+      isLeft: false,
+    );
+    final leftArchOutsideWidth = _extractPairDouble(
+      text,
+      'Arch outside width',
+      isLeft: true,
+    );
+    final rightArchOutsideWidth = _extractPairDouble(
+      text,
+      'Arch outside width',
+      isLeft: false,
+    );
+    final leftHalluxAngle = _extractPairDoubleForLabels(
+      text,
+      const [
+        'Hallux angle',
+        'Hallux valgus angle',
+        'Hallux deviation angle',
+        'Hallux abductus angle',
+        'Hallux valgus degree',
+        'Thumb angle',
+      ],
+      isLeft: true,
+    );
+    final rightHalluxAngle = _extractPairDoubleForLabels(
+      text,
+      const [
+        'Hallux angle',
+        'Hallux valgus angle',
+        'Hallux deviation angle',
+        'Hallux abductus angle',
+        'Hallux valgus degree',
+        'Thumb angle',
+      ],
+      isLeft: false,
+    );
+    final leftHalluxType = _extractNamedTypeForLabels(
+          text,
+          const ['Hallux Type', 'Hallux valgus Type'],
+          isLeft: true,
+        ) ??
+        _deriveHalluxType(leftHalluxAngle);
+    final rightHalluxType = _extractNamedTypeForLabels(
+          text,
+          const ['Hallux Type', 'Hallux valgus Type'],
+          isLeft: false,
+        ) ??
+        _deriveHalluxType(rightHalluxAngle);
 
     return ParsedScanReport(
       reportNo: _extractSingleValue(text, 'No.'),
@@ -92,8 +148,8 @@ class ScanReportTextParser {
         isLeft: false,
       ),
 
-      leftFootWidth: _extractPairDouble(text, 'Foot width', isLeft: true),
-      rightFootWidth: _extractPairDouble(text, 'Foot width', isLeft: false),
+      leftFootWidth: leftFootWidth,
+      rightFootWidth: rightFootWidth,
 
       leftSlantWidth: _extractPairDouble(text, 'Slant width', isLeft: true),
       rightSlantWidth: _extractPairDouble(text, 'Slant width', isLeft: false),
@@ -101,16 +157,8 @@ class ScanReportTextParser {
       leftToeWidth: _extractPairDouble(text, 'Toe width', isLeft: true),
       rightToeWidth: _extractPairDouble(text, 'Toe width', isLeft: false),
 
-      leftArchOutsideWidth: _extractPairDouble(
-        text,
-        'Arch outside width',
-        isLeft: true,
-      ),
-      rightArchOutsideWidth: _extractPairDouble(
-        text,
-        'Arch outside width',
-        isLeft: false,
-      ),
+      leftArchOutsideWidth: leftArchOutsideWidth,
+      rightArchOutsideWidth: rightArchOutsideWidth,
 
       leftFootFlankWidth: _extractPairDouble(
         text,
@@ -170,8 +218,8 @@ class ScanReportTextParser {
         isLeft: false,
       ),
 
-      leftHalluxAngle: _extractPairDouble(text, 'Hallux angle', isLeft: true),
-      rightHalluxAngle: _extractPairDouble(text, 'Hallux angle', isLeft: false),
+      leftHalluxAngle: leftHalluxAngle,
+      rightHalluxAngle: rightHalluxAngle,
 
       leftPronatorAngle: _extractPairDouble(
         text,
@@ -207,15 +255,13 @@ class ScanReportTextParser {
       leftArchIndex: _extractArchIndex(text, isLeft: true),
       rightArchIndex: _extractArchIndex(text, isLeft: false),
 
-      leftArchWidthIndex: _extractArchWidthIndex(text, isLeft: true),
-      rightArchWidthIndex: _extractArchWidthIndex(text, isLeft: false),
+      leftArchWidthIndex: _extractArchWidthIndex(text, isLeft: true) ??
+          _calculateIndex(leftArchOutsideWidth, leftFootWidth),
+      rightArchWidthIndex: _extractArchWidthIndex(text, isLeft: false) ??
+          _calculateIndex(rightArchOutsideWidth, rightFootWidth),
 
-      leftHalluxType:
-          _extractNamedType(text, 'Hallux Type', isLeft: true) ??
-          _extractNamedType(text, 'Hallgux Type', isLeft: true),
-      rightHalluxType:
-          _extractNamedType(text, 'Hallux Type', isLeft: false) ??
-          _extractNamedType(text, 'Hallgux Type', isLeft: false),
+      leftHalluxType: leftHalluxType,
+      rightHalluxType: rightHalluxType,
 
       leftHeelType: _extractNamedType(text, 'Heel type', isLeft: true),
       rightHeelType: _extractNamedType(text, 'Heel type', isLeft: false),
@@ -233,7 +279,7 @@ class ScanReportTextParser {
         .replaceAll('：', ':')
         .replaceAll('（', '(')
         .replaceAll('）', ')')
-        .replaceAll('°', '°')
+        .replaceAll(RegExp(r'[−–—]'), '-')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
@@ -281,7 +327,9 @@ class ScanReportTextParser {
       // Foot length 250.8 248.8
       // Knee angle 0.6 -2.3
       RegExp(
-        '$escapedLabel\\s+($_numberPattern)\\s+($_numberPattern)',
+        '$escapedLabel\\s+($_numberPattern)'
+        r'(?:\s*(?:°|mm|%))?\s+'
+        '($_numberPattern)(?:\\s*(?:°|mm|%))?',
         caseSensitive: false,
       ),
 
@@ -290,7 +338,9 @@ class ScanReportTextParser {
       // 2.4 Hallux angle(°) 1.1
       // 0.6 Knee angle(°) 2.3
       RegExp(
-        '($_numberPattern)\\s+$escapedLabel\\s+($_numberPattern)',
+        '($_numberPattern)(?:\\s*(?:°|mm|%))?\\s+'
+        '$escapedLabel\\s+'
+        '($_numberPattern)(?:\\s*(?:°|mm|%))?',
         caseSensitive: false,
       ),
     ];
@@ -371,26 +421,172 @@ class ScanReportTextParser {
   }
 
   double? _extractArchWidthIndex(String text, {required bool isLeft}) {
-    final patterns = <RegExp>[
-      RegExp(
-        '($_numberPattern)\\s+Arch\\s+width\\s+Index\\s+($_numberPattern)',
-        caseSensitive: false,
-      ),
-      RegExp(
-        '($_numberPattern)\\s+Arch\\s+Width\\s+Index\\s+($_numberPattern)',
-        caseSensitive: false,
-      ),
+    const labels = [
+      'Arch width Index',
+      'Arch width ratio',
+      'Arch breadth Index',
+      'Arch width factor',
     ];
+
+    final patterns = <RegExp>[];
+
+    for (final label in labels) {
+      final escapedLabel = _labelPattern(label);
+      patterns.addAll([
+        RegExp(
+          '$escapedLabel\\s+($_numberPattern)\\s*%?\\s+'
+          '($_numberPattern)\\s*%?',
+          caseSensitive: false,
+        ),
+        RegExp(
+          '($_numberPattern)\\s*%?\\s+$escapedLabel\\s+'
+          '($_numberPattern)\\s*%?',
+          caseSensitive: false,
+        ),
+      ]);
+    }
 
     for (final pattern in patterns) {
       final match = pattern.firstMatch(text);
       if (match == null) continue;
 
       final raw = isLeft ? match.group(1) : match.group(2);
-      return _toDouble(raw);
+      final value = _toDouble(raw);
+      if (value == null) return null;
+      final isPercent = match.group(0)?.contains('%') ?? false;
+      return isPercent || value.abs() > 10 ? value / 100 : value;
     }
 
     return null;
+  }
+
+  double? _extractPairDoubleForLabels(
+    String text,
+    List<String> labels, {
+    required bool isLeft,
+  }) {
+    for (final label in labels) {
+      final value = _extractPairDouble(text, label, isLeft: isLeft);
+      if (value != null) return value;
+    }
+
+    for (final label in labels) {
+      final value = _extractPairDoubleNearLabel(
+        text,
+        label,
+        isLeft: isLeft,
+      );
+      if (value != null) return value;
+    }
+    return null;
+  }
+
+  double? _extractPairDoubleNearLabel(
+    String text,
+    String label, {
+    required bool isLeft,
+  }) {
+    final labelMatches = RegExp(
+      _labelPattern(label),
+      caseSensitive: false,
+    ).allMatches(text);
+
+    for (final labelMatch in labelMatches) {
+      final value = _extractPairDoubleAroundMatch(
+        text,
+        labelMatch,
+        isLeft: isLeft,
+      );
+      if (value != null) return value;
+    }
+
+    return null;
+  }
+
+  double? _extractPairDoubleAroundMatch(
+    String text,
+    RegExpMatch labelMatch, {
+    required bool isLeft,
+  }) {
+
+    final beforeStart = (labelMatch.start - 120).clamp(0, text.length);
+    final afterEnd = (labelMatch.end + 180).clamp(0, text.length);
+    final before = text.substring(beforeStart, labelMatch.start);
+    var after = text.substring(labelMatch.end, afterEnd);
+
+    final sectionEnd = RegExp(
+      r'\b(?:Pronator\s+angle|Knee\s+angle|Shoe\s+size|Evaluation criteria|Normal\s*:|Schematic|Item description|Service demand|Recommendation)\b',
+      caseSensitive: false,
+    ).firstMatch(after);
+    if (sectionEnd != null) {
+      after = after.substring(0, sectionEnd.start);
+    }
+
+    final numberExpression = RegExp(_numberPattern);
+    final beforeNumbers = numberExpression.allMatches(before).toList();
+    final afterNumbers = numberExpression.allMatches(after).toList();
+
+    if (beforeNumbers.isNotEmpty && afterNumbers.isNotEmpty) {
+      final beforeMatch = beforeNumbers.last;
+      final afterMatch = afterNumbers.first;
+      final beforeDistance = before.length - beforeMatch.end;
+      final afterDistance = afterMatch.start;
+
+      if (beforeDistance <= 45 && afterDistance <= 65) {
+        final raw = isLeft ? beforeMatch.group(0) : afterMatch.group(0);
+        return _toDouble(raw);
+      }
+    }
+
+    if (afterNumbers.length >= 2 && afterNumbers[1].start <= 120) {
+      final raw = isLeft ? afterNumbers[0].group(0) : afterNumbers[1].group(0);
+      return _toDouble(raw);
+    }
+
+    // Eski DOC çıkarıcısının önceki sürümü, eşit sol/sağ değerleri tek tokena
+    // indiriyordu. Bir sonraki ölçüm başlığına kadar yalnızca tek değer varsa
+    // rapor tablosundaki iki hücrenin aynı değeri taşıdığını kabul ederek eski
+    // kayıtları yeniden yükleme gerektirmeden kurtar.
+    if (afterNumbers.length == 1 && afterNumbers.first.start <= 65) {
+      return _toDouble(afterNumbers.first.group(0));
+    }
+
+    if (afterNumbers.isEmpty && beforeNumbers.isNotEmpty) {
+      final beforeMatch = beforeNumbers.last;
+      if (before.length - beforeMatch.end <= 45) {
+        return _toDouble(beforeMatch.group(0));
+      }
+    }
+
+    return null;
+  }
+
+  String? _extractNamedTypeForLabels(
+    String text,
+    List<String> labels, {
+    required bool isLeft,
+  }) {
+    for (final label in labels) {
+      final value = _extractNamedType(text, label, isLeft: isLeft);
+      if (value != null) return value;
+    }
+    return null;
+  }
+
+  double? _calculateIndex(double? numerator, double? denominator) {
+    if (numerator == null || denominator == null || denominator == 0) {
+      return null;
+    }
+    return numerator / denominator;
+  }
+
+  String? _deriveHalluxType(double? angle) {
+    if (angle == null) return null;
+    final magnitude = angle.abs();
+    if (magnitude < 10) return 'Normal Hallux';
+    if (magnitude < 20) return 'Mild';
+    if (magnitude < 30) return 'Moderate';
+    return 'Severe';
   }
 
   String? _extractNamedType(String text, String label, {required bool isLeft}) {
@@ -490,5 +686,5 @@ class ScanReportTextParser {
     return double.tryParse(value.replaceAll(',', '.').trim());
   }
 
-  String get _numberPattern => r'-?\d+(?:\.\d+)?';
+  String get _numberPattern => r'[-+]?\d+(?:[.,]\d+)?';
 }

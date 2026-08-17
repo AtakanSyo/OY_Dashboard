@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/screens/auth/forgot_password_screen.dart';
 import 'package:oy_site/screens/auth/register_screen.dart';
 import 'package:oy_site/screens/home_screen.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:oy_site/screens/dashboard/shell/dashboard_screen.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 
 class LoginScreen extends StatefulWidget {
   final dynamic pressureRepository;
 
-  const LoginScreen({
-    super.key,
-    required this.pressureRepository,
-  });
+  const LoginScreen({super.key, required this.pressureRepository});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -28,16 +27,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> _login() async {
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen e-posta girin.');
+      setState(() => _errorMessage = l10n.enterEmail);
       return;
     }
 
     if (password.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen şifrenizi girin.');
+      setState(() => _errorMessage = l10n.enterPassword);
       return;
     }
 
@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _errorMessage = _localizeAuthError(e.message));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _errorMessage = 'Bir hata oluştu. Lütfen tekrar deneyin.');
+      setState(() => _errorMessage = l10n.genericError);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -81,27 +81,27 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ForgotPasswordScreen(
-          initialEmail: _emailController.text.trim(),
-        ),
+        builder: (_) =>
+            ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
       ),
     );
   }
 
   String _localizeAuthError(String message) {
+    final l10n = AppLocalizations.of(context);
     final lower = message.toLowerCase();
 
     if (lower.contains('invalid login') ||
         lower.contains('invalid credentials')) {
-      return 'E-posta veya şifre hatalı.';
+      return l10n.invalidCredentials;
     }
 
     if (lower.contains('email not confirmed')) {
-      return 'E-posta adresiniz doğrulanmamış.';
+      return l10n.emailNotConfirmed;
     }
 
     if (lower.contains('too many requests')) {
-      return 'Çok fazla deneme yaptınız. Lütfen bekleyin.';
+      return l10n.tooManyAttempts;
     }
 
     return message;
@@ -116,7 +116,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: const [LanguageSelector(), SizedBox(width: 12)],
+      ),
       body: Center(
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -124,9 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Giriş Yap',
-                style: TextStyle(
+              Text(
+                l10n.login,
+                style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                 ),
@@ -137,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 enabled: !_isLoading,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'E-posta',
+                  labelText: l10n.email,
                   hintText: 'ornek@eposta.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -155,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 enabled: !_isLoading,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'Şifre',
+                  labelText: l10n.password,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -197,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Şifremi unuttum'),
+                  child: Text(l10n.forgotPassword),
                 ),
               ),
               const SizedBox(height: 16),
@@ -224,9 +231,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Giriş Yap',
-                          style: TextStyle(
+                      : Text(
+                          l10n.login,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                           ),
@@ -238,31 +245,29 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _isLoading
                     ? null
                     : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
-                          ),
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterScreen(),
                         ),
-                child: const Text('Hesabın yok mu? Kayıt Ol'),
+                      ),
+                child: Text(l10n.noAccount),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: _isLoading
                     ? null
                     : () => Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HomeScreen(
-                              pressureRepository: widget.pressureRepository,
-                            ),
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => HomeScreen(
+                            pressureRepository: widget.pressureRepository,
                           ),
-                          (_) => false,
                         ),
+                        (_) => false,
+                      ),
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Ana Sayfa'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.teal,
-                ),
+                label: Text(l10n.home),
+                style: TextButton.styleFrom(foregroundColor: Colors.teal),
               ),
             ],
           ),

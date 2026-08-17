@@ -4,17 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/measurement_session.dart';
 import 'package:oy_site/screens/dashboard/analysis/session_analysis_results_screen.dart';
+import 'package:oy_site/screens/dashboard/sessions/session_detail_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class OptiYouMeasurementReviewScreen extends StatefulWidget {
   final AppUser currentUser;
   final MeasurementSession session;
+  final dynamic pressureRepository;
 
   const OptiYouMeasurementReviewScreen({
     super.key,
     required this.currentUser,
     required this.session,
+    this.pressureRepository,
   });
 
   @override
@@ -40,12 +43,14 @@ class _OptiYouMeasurementReviewScreenState
   List<Map<String, dynamic>> _referencePhotos = [];
 
   late int _currentClinicId;
+  late MeasurementSession _currentSession;
 
-  MeasurementSession get session => widget.session;
+  MeasurementSession get session => _currentSession;
 
   @override
   void initState() {
     super.initState();
+    _currentSession = widget.session;
     _currentClinicId = widget.session.clinicId;
     _loadReviewData();
   }
@@ -65,7 +70,26 @@ class _OptiYouMeasurementReviewScreenState
 
       final freshSessionResponse = await _client
           .from('measurement_sessions')
-          .select('id, clinic_id')
+          .select('''
+            id,
+            clinic_id,
+            patient_id,
+            expert_user_id,
+            assigned_optityou_user_id,
+            session_code,
+            session_date,
+            session_time,
+            status,
+            has_3d_scan,
+            has_plantar_csv,
+            has_insole_photo,
+            order_created,
+            clinical_info_completed,
+            design_form_completed,
+            completed_at,
+            created_at,
+            updated_at
+          ''')
           .eq('id', sessionId)
           .maybeSingle();
 
@@ -73,8 +97,29 @@ class _OptiYouMeasurementReviewScreenState
           ? null
           : Map<String, dynamic>.from(freshSessionResponse as Map);
 
+      if (freshSessionRow == null) {
+        throw Exception(
+          'Oturum kaydı bu kullanıcı için okunamıyor. Sipariş ve oturum '
+          'atamasını kontrol edin.',
+        );
+      }
+
+      final hasSessionAccess = await _client.rpc(
+        'can_current_user_access_session',
+        params: {'p_session_id': sessionId},
+      );
+
+      if (hasSessionAccess != true) {
+        throw Exception(
+          'Bu oturum OptiYou ekibi erişimine açık değil. '
+          'Ölçüm havuzu veya sipariş atamasını kontrol edin.',
+        );
+      }
+
+      final freshSession = MeasurementSession.fromMap(freshSessionRow);
+
       final freshClinicId =
-          _asInt(freshSessionRow?['clinic_id']) ?? _currentClinicId;
+          _asInt(freshSessionRow['clinic_id']) ?? _currentClinicId;
 
       _currentClinicId = freshClinicId;
 
@@ -124,6 +169,7 @@ class _OptiYouMeasurementReviewScreenState
       if (!mounted) return;
 
       setState(() {
+        _currentSession = freshSession;
         _patient = results[0] as Map<String, dynamic>?;
         _clinic = results[1] as Map<String, dynamic>?;
         _expert = results[2] as Map<String, dynamic>?;
@@ -221,6 +267,27 @@ class _OptiYouMeasurementReviewScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _openSessionEditor() async {
+    final sessionOwner = widget.currentUser.copyWith(
+      userId: session.expertUserId,
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SessionDetailScreen(
+          currentUser: sessionOwner,
+          session: session,
+          pressureRepository: widget.pressureRepository,
+        ),
+      ),
+    );
+
+    if (mounted) {
+      await _loadReviewData();
+    }
   }
 
   Future<List<Map<String, dynamic>>> _fetchClinics() async {
@@ -1303,6 +1370,15 @@ class _OptiYouMeasurementReviewScreenState
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _openSessionEditor,
+              icon: const Icon(Icons.edit_note_outlined),
+              label: const Text('Eksik Bilgileri Tamamla / Düzenle'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: _openClinicEditDialog,
               icon: const Icon(Icons.local_hospital_outlined),
@@ -1976,6 +2052,14 @@ class _OptiYouMeasurementReviewScreenState
         title: const Text('Ölçüm İnceleme'),
         backgroundColor: Colors.teal,
         actions: [
+          TextButton.icon(
+            onPressed: _openSessionEditor,
+            icon: const Icon(Icons.edit_note_outlined, color: Colors.white),
+            label: const Text(
+              'Düzenle',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
           TextButton.icon(
             onPressed: _openAnalysisResults,
             icon: const Icon(Icons.analytics_outlined, color: Colors.white),

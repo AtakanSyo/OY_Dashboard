@@ -80,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
-          StoreScreen(currentUserEmail: widget.currentUser.email),
+          const StoreScreen(),
           SupportScreen(currentUser: widget.currentUser),
           CustomerProfileScreen(currentUser: widget.currentUser),
         ];
@@ -101,9 +101,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           OptiyouMeasurementPoolScreen(
             currentUser: widget.currentUser,
             pressureRepository: widget.pressureRepository,
-
           ),
-          OptiYouOperationsBoardScreen(currentUser: widget.currentUser),
+          OptiYouOperationsBoardScreen(
+            currentUser: widget.currentUser,
+            pressureRepository: widget.pressureRepository,
+          ),
           OrdersScreen(currentUser: widget.currentUser),
           SupportScreen(currentUser: widget.currentUser),
           ProfileScreen(currentUser: widget.currentUser),
@@ -161,10 +163,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Topbar(
                     currentUser: widget.currentUser,
+                    onProfileTap: () => _onItemSelected(pages.length - 1),
                   ),
-                  Expanded(
-                    child: pages[_selectedIndex],
-                  ),
+                  Expanded(child: pages[_selectedIndex]),
                 ],
               ),
             ),

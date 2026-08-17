@@ -204,7 +204,9 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             '3D scan dosyaları ve analiz verileri kaydediliyor. Lütfen bekleyin.';
       });
 
-      await _saveScanDataToSupabase();
+      final scanDataSaved = await _saveScanDataToSupabase();
+
+      if (!scanDataSaved) return;
 
       if (parsedReport != null) {
         await _saveParsedReportAsAnalysisResult();
@@ -246,27 +248,27 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     );
   }
 
-  Future<void> _saveScanDataToSupabase() async {
+  Future<bool> _saveScanDataToSupabase() async {
     final sessionId = widget.sessionId;
     final patientId = widget.patientId;
     final expertUserId = widget.expertUserId;
 
     if (sessionId == null || patientId == null || expertUserId == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _saveMessage =
             '3D scan verileri geçici olarak hazırlandı. Henüz kaydedilmedi.';
       });
-      return;
+      return false;
     }
 
     if (_parsedReport == null && _scanAssets == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _saveMessage =
             'Kaydedilecek 3D scan raporu veya dosya varlığı bulunamadı.';
       });
-      return;
+      return false;
     }
 
     try {
@@ -280,19 +282,21 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         detectedPdfPath: _detectedPdfPath,
       );
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
       setState(() {
         _saveMessage = '3D scan verileri kaydedildi.';
       });
+      return true;
     } catch (e) {
       debugPrint('3D scan kayıt hatası: $e');
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
       setState(() {
         _saveMessage = '3D scan verileri kaydedilemedi: $e';
       });
+      return false;
     }
   }
 

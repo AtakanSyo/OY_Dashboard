@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 
 class AnalysisComparisonValue {
   final String label;
@@ -46,7 +47,7 @@ class _ComparisonValueRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 680) {
-          return _buildNarrow();
+          return _buildNarrow(context);
         }
         return _buildWide();
       },
@@ -83,7 +84,8 @@ class _ComparisonValueRow extends StatelessWidget {
     );
   }
 
-  Widget _buildNarrow() {
+  Widget _buildNarrow(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -98,7 +100,7 @@ class _ComparisonValueRow extends StatelessWidget {
           SizedBox(
             width: 82,
             child: _LabeledValue(
-              label: 'Sol',
+              label: l10n.left,
               value: value.leftValue,
               color: Colors.teal,
               compact: true,
@@ -108,7 +110,7 @@ class _ComparisonValueRow extends StatelessWidget {
           SizedBox(
             width: 82,
             child: _LabeledValue(
-              label: 'Sağ',
+              label: l10n.right,
               value: value.rightValue,
               color: Colors.indigo,
               compact: true,
@@ -339,16 +341,16 @@ class AnalysisFindingComparisonPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _visualResults(),
+          _visualResults(context),
         ],
       ),
     );
   }
 
-  Widget _visualResults() {
+  Widget _visualResults(BuildContext context) {
     return Column(
       children: [
-        _images(),
+        _images(context),
         if (data.assessments.isNotEmpty) ...[
           const SizedBox(height: 10),
           ...data.assessments.map(
@@ -366,7 +368,8 @@ class AnalysisFindingComparisonPanel extends StatelessWidget {
     );
   }
 
-  Widget _images() {
+  Widget _images(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (data.images.isEmpty) {
       return Container(
         height: 150,
@@ -377,7 +380,7 @@ class AnalysisFindingComparisonPanel extends StatelessWidget {
           border: Border.all(color: Colors.grey.shade300),
         ),
         child: Text(
-          'Görsel bulunmuyor',
+          l10n.imageNotFound,
           style: TextStyle(color: Colors.grey.shade600),
         ),
       );
@@ -403,14 +406,14 @@ class AnalysisFindingComparisonPanel extends StatelessWidget {
                       Expanded(
                         child: imageBuilder(
                           image.leftUrl,
-                          '${image.title} - Sol Ayak',
+                          '${image.title} - ${l10n.leftFoot}',
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: imageBuilder(
                           image.rightUrl,
-                          '${image.title} - Sağ Ayak',
+                          '${image.title} - ${l10n.rightFoot}',
                         ),
                       ),
                     ],
@@ -440,6 +443,7 @@ class _AssessmentHeatBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
@@ -460,7 +464,7 @@ class _AssessmentHeatBar extends StatelessWidget {
             children: [
               Expanded(
                 child: _HeatBarSide(
-                  side: 'Sol',
+                  side: l10n.left,
                   label: data.leftLabel,
                   position: data.leftPosition,
                   color: Colors.teal,
@@ -469,7 +473,7 @@ class _AssessmentHeatBar extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _HeatBarSide(
-                  side: 'Sağ',
+                  side: l10n.right,
                   label: data.rightLabel,
                   position: data.rightPosition,
                   color: Colors.indigo,

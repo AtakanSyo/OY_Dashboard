@@ -1,41 +1,67 @@
 class CustomerHomeData {
   final String patientName;
-  final DateTime lastAnalysisDate;
-  final String analysisStatus;
-  final String summary;
-  final List<String> analysisHighlights;
-  final String recommendationNote;
-  final DateTime recommendationUpdatedAt;
-
-  final String orderNo;
-  final String orderStatus;
-  final int orderProgressStep;
-  final String productName;
-  final DateTime? estimatedDelivery;
-
-  final String suggestedProductName;
-  final String suggestedProductDescription;
-  final String suggestedProductReason;
-  final double suggestedProductPrice;
-  final String suggestedProductImagePath;
+  final CustomerHomeAssessmentData? latestAssessment;
+  final CustomerHomeOrderData? activeOrder;
+  final CustomerHomeProductData? suggestedProduct;
+  final bool analysisLoadFailed;
+  final bool ordersLoadFailed;
 
   const CustomerHomeData({
     required this.patientName,
-    required this.lastAnalysisDate,
-    required this.analysisStatus,
+    this.latestAssessment,
+    this.activeOrder,
+    this.suggestedProduct,
+    this.analysisLoadFailed = false,
+    this.ordersLoadFailed = false,
+  });
+}
+
+class CustomerHomeAssessmentData {
+  final String sessionCode;
+  final DateTime analysisDate;
+  final String summary;
+  final List<String> highlights;
+  final String? recommendationTitle;
+  final String? recommendationNote;
+
+  const CustomerHomeAssessmentData({
+    required this.sessionCode,
+    required this.analysisDate,
     required this.summary,
-    required this.analysisHighlights,
-    required this.recommendationNote,
-    required this.recommendationUpdatedAt,
+    this.highlights = const [],
+    this.recommendationTitle,
+    this.recommendationNote,
+  });
+}
+
+class CustomerHomeOrderData {
+  final String orderNo;
+  final String orderStatus;
+  final String productType;
+  final DateTime orderedAt;
+  final int progressStep;
+
+  const CustomerHomeOrderData({
     required this.orderNo,
     required this.orderStatus,
-    required this.orderProgressStep,
-    required this.productName,
-    required this.estimatedDelivery,
-    required this.suggestedProductName,
-    required this.suggestedProductDescription,
-    required this.suggestedProductReason,
-    required this.suggestedProductPrice,
-    required this.suggestedProductImagePath,
+    required this.productType,
+    required this.orderedAt,
+    required this.progressStep,
+  });
+}
+
+class CustomerHomeProductData {
+  final String name;
+  final String description;
+  final String reason;
+  final double price;
+  final String imagePath;
+
+  const CustomerHomeProductData({
+    required this.name,
+    required this.description,
+    required this.reason,
+    required this.price,
+    required this.imagePath,
   });
 }

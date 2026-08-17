@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:oy_site/data/repositories/supabase_order_repository.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/order_model.dart';
 import 'package:oy_site/screens/dashboard/orders/order_detail_screen.dart';
@@ -7,10 +9,7 @@ import 'package:oy_site/screens/dashboard/orders/order_detail_screen.dart';
 class OrdersScreen extends StatefulWidget {
   final AppUser currentUser;
 
-  const OrdersScreen({
-    super.key,
-    required this.currentUser,
-  });
+  const OrdersScreen({super.key, required this.currentUser});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -22,7 +21,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   List<OrderModel> _allOrders = [];
   List<OrderModel> _filteredOrders = [];
-
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -45,89 +43,114 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
 
     try {
-      final userId = widget.currentUser.userId;
-
-      if (userId == null) {
-        throw Exception('Kullanıcı ID bulunamadı.');
-      }
-
       final orders = widget.currentUser.isCustomer
-          ? await _orderRepository.getOrdersByUser(userId: userId)
-          : await _orderRepository.getOrdersByExpert(expertUserId: userId);
+          ? await _orderRepository.getOrdersForCurrentCustomer()
+          : await _loadExpertOrders();
 
       if (!mounted) return;
-
       setState(() {
         _allOrders = orders;
-        _filteredOrders = orders;
         _isLoading = false;
       });
-    } catch (e) {
+      _filterOrders(_searchController.text);
+    } catch (error) {
       if (!mounted) return;
-
       setState(() {
-        _errorMessage = 'Siparişler yüklenirken hata oluştu: $e';
+        _errorMessage = AppLocalizations.of(
+          context,
+        ).ordersLoadError(error.toString());
         _isLoading = false;
       });
     }
   }
 
+  Future<List<OrderModel>> _loadExpertOrders() {
+    final userId = widget.currentUser.userId;
+    if (userId == null) {
+      return Future.error(Exception('User ID is missing.'));
+    }
+    return _orderRepository.getOrdersByExpert(expertUserId: userId);
+  }
+
   void _filterOrders(String query) {
     final q = query.trim().toLowerCase();
+    final l10n = AppLocalizations.of(context);
 
     setState(() {
       if (q.isEmpty) {
-        _filteredOrders = _allOrders;
+        _filteredOrders = List<OrderModel>.of(_allOrders);
         return;
       }
 
       _filteredOrders = _allOrders.where((order) {
-        return order.orderNo.toLowerCase().contains(q) ||
-            order.productType.toLowerCase().contains(q) ||
-            order.orderStatus.toLowerCase().contains(q) ||
-            order.currencyCode.toLowerCase().contains(q);
+        final values = [
+          order.orderNo,
+          order.productType,
+          _productLabel(order.productType, l10n),
+          order.orderStatus,
+          _statusLabel(order.orderStatus, l10n),
+          order.currencyCode,
+        ];
+        return values.any((value) => value.toLowerCase().contains(q));
       }).toList();
     });
   }
 
-  String _formatDate(DateTime? date) {
+  String _formatDate(BuildContext context, DateTime? date) {
     if (date == null) return '—';
-    return '${date.day.toString().padLeft(2, '0')}.'
-        '${date.month.toString().padLeft(2, '0')}.'
-        '${date.year}';
+    return DateFormat.yMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(date.toLocal());
   }
 
-  String _formatMoney(double amount, String currencyCode) {
-    return '${amount.toStringAsFixed(2)} $currencyCode';
+  String _formatMoney(
+    BuildContext context,
+    double amount,
+    String currencyCode,
+  ) {
+    final value = NumberFormat.currency(
+      locale: Localizations.localeOf(context).toLanguageTag(),
+      symbol: '',
+      decimalDigits: 2,
+    ).format(amount).trim();
+    return '$value $currencyCode';
   }
 
-  String _productLabel(String productType) {
+  String _productLabel(String productType, AppLocalizations l10n) {
     switch (productType) {
       case 'insole':
-        return 'Tabanlık';
+        return l10n.insoleProduct;
       case 'sports_insole':
-        return 'Spor Tabanlık';
+        return l10n.sportsInsoleProduct;
       case 'sandal':
-        return 'Sandalet';
+        return l10n.sandalProduct;
+      case 'heel_pad':
+        return l10n.heelPadTitle;
+      case 'met_pad':
+        return l10n.metPadTitle;
+      case 'cleaning_spray':
+        return l10n.cleaningSprayTitle;
+      case 'carry_case':
+        return l10n.carryCaseTitle;
       default:
         return productType;
     }
   }
 
-  String _statusLabel(String status) {
+  String _statusLabel(String status, AppLocalizations l10n) {
     switch (status) {
       case OrderStatuses.pending:
-        return 'Beklemede';
+        return l10n.pendingStatus;
       case OrderStatuses.designing:
-        return 'Tasarımda';
+        return l10n.designingStatus;
       case OrderStatuses.production:
-        return 'Üretimde';
+        return l10n.productionStatus;
       case OrderStatuses.shipped:
-        return 'Kargoda';
+        return l10n.shippedStatus;
       case OrderStatuses.delivered:
-        return 'Teslim Edildi';
+        return l10n.deliveredStatus;
       case OrderStatuses.cancelled:
-        return 'İptal';
+        return l10n.cancelledStatus;
       default:
         return status;
     }
@@ -156,70 +179,91 @@ class _OrdersScreenState extends State<OrdersScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderDetailScreen(
-          currentUser: widget.currentUser,
-          order: order,
-        ),
+        builder: (_) =>
+            OrderDetailScreen(currentUser: widget.currentUser, order: order),
       ),
     ).then((_) {
-      if (mounted) {
-        _loadOrders();
-      }
+      if (mounted) _loadOrders();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.currentUser.isCustomer ? 'Siparişlerim' : 'Siparişler',
-        ),
-        backgroundColor: Colors.teal,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.currentUser.isCustomer
-                  ? 'Sipariş geçmişinizi buradan takip edebilirsiniz.'
-                  : 'Sipariş akışını ve üretim durumlarını buradan takip edebilirsin.',
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _searchController,
-              onChanged: _filterOrders,
-              decoration: InputDecoration(
-                hintText: 'Sipariş no, ürün tipi veya durum ile ara',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterOrders('');
-                        },
-                        icon: const Icon(Icons.clear),
+      backgroundColor: Colors.grey.shade50,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth < 700 ? 16.0 : 28.0;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  24,
+                  horizontalPadding,
+                  24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.currentUser.isCustomer
+                          ? l10n.myOrders
+                          : l10n.orders,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.currentUser.isCustomer
+                          ? l10n.customerOrdersIntro
+                          : l10n.orderManagementIntro,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _searchController,
+                      onChanged: _filterOrders,
+                      decoration: InputDecoration(
+                        hintText: l10n.orderSearchHint,
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _filterOrders('');
+                                },
+                                icon: const Icon(Icons.clear),
+                              ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
                       ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(child: _buildContent(l10n)),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: _buildContent(),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(AppLocalizations l10n) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -229,6 +273,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 44),
+            const SizedBox(height: 12),
             Text(
               _errorMessage!,
               textAlign: TextAlign.center,
@@ -238,7 +284,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             OutlinedButton.icon(
               onPressed: _loadOrders,
               icon: const Icon(Icons.refresh),
-              label: const Text('Tekrar Dene'),
+              label: Text(l10n.checkAgain),
             ),
           ],
         ),
@@ -247,10 +293,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     if (_filteredOrders.isEmpty) {
       return Center(
-        child: Text(
-          widget.currentUser.isCustomer
-              ? 'Size ait sipariş bulunamadı.'
-              : 'Kayıtlı sipariş bulunamadı.',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.shopping_bag_outlined,
+              size: 56,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.currentUser.isCustomer
+                  ? l10n.noCustomerOrders
+                  : l10n.noSavedOrders,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
@@ -258,119 +316,138 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return RefreshIndicator(
       onRefresh: _loadOrders,
       child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
         itemCount: _filteredOrders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final order = _filteredOrders[index];
-          final statusColor = _statusColor(order.orderStatus);
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, index) =>
+            _buildOrderCard(_filteredOrders[index], l10n),
+      ),
+    );
+  }
 
-          return InkWell(
-            onTap: () => _openOrderDetail(order),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildOrderCard(OrderModel order, AppLocalizations l10n) {
+    final statusColor = _statusColor(order.orderStatus);
+
+    return Material(
+      color: Colors.white,
+      elevation: 1,
+      shadowColor: Colors.black12,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => _openOrderDetail(order),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   CircleAvatar(
-                    radius: 26,
-                    backgroundColor: statusColor.withOpacity(0.12),
+                    radius: 24,
+                    backgroundColor: statusColor.withValues(alpha: 0.12),
                     child: Icon(
-                      Icons.shopping_bag,
+                      Icons.shopping_bag_outlined,
                       color: statusColor,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              order.orderNo,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                _statusLabel(order.orderStatus),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
                         Text(
-                          'Ürün: ${_productLabel(order.productType)}',
-                          style: TextStyle(color: Colors.grey[800]),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Net Tutar: ${_formatMoney(order.netAmount, order.currencyCode)}',
+                          order.orderNo,
                           style: const TextStyle(
-                            fontWeight: FontWeight.w600,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            _buildInfoChip(
-                              Icons.calendar_today,
-                              'Sipariş: ${_formatDate(order.orderedAt)}',
-                            ),
-                            _buildInfoChip(
-                              Icons.local_shipping_outlined,
-                              'Kargo: ${_formatDate(order.shippedAt)}',
-                            ),
-                            _buildInfoChip(
-                              Icons.home_outlined,
-                              'Teslim: ${_formatDate(order.deliveredAt)}',
-                            ),
-                          ],
+                        _buildStatusChip(
+                          _statusLabel(order.orderStatus, l10n),
+                          statusColor,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    onPressed: () => _openOrderDetail(order),
-                    icon: const Icon(Icons.arrow_forward_ios),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 24,
+                runSpacing: 8,
+                children: [
+                  _buildLabelValue(
+                    l10n.productLabel,
+                    _productLabel(order.productType, l10n),
+                  ),
+                  _buildLabelValue(
+                    l10n.netAmountLabel,
+                    _formatMoney(context, order.netAmount, order.currencyCode),
                   ),
                 ],
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _buildInfoChip(
+                    Icons.calendar_today_outlined,
+                    l10n.orderedChip(_formatDate(context, order.orderedAt)),
+                  ),
+                  _buildInfoChip(
+                    Icons.local_shipping_outlined,
+                    l10n.shippedChip(_formatDate(context, order.shippedAt)),
+                  ),
+                  _buildInfoChip(
+                    Icons.home_outlined,
+                    l10n.deliveredChip(_formatDate(context, order.deliveredAt)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabelValue(String label, String value) {
+    return RichText(
+      text: TextSpan(
+        style: DefaultTextStyle.of(context).style,
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
@@ -387,10 +464,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           Icon(icon, size: 16, color: Colors.teal),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 13),
-          ),
+          Text(text, style: const TextStyle(fontSize: 13)),
         ],
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
 import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/legal/legal_document_registry.dart';
@@ -12,11 +14,7 @@ class RegisterScreen extends StatefulWidget {
   final String? inviteToken;
   final dynamic pressureRepository;
 
-  const RegisterScreen({
-    super.key,
-    this.inviteToken,
-    this.pressureRepository,
-  });
+  const RegisterScreen({super.key, this.inviteToken, this.pressureRepository});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -156,6 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    final l10n = AppLocalizations.of(context);
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final email = _emailController.text.trim();
@@ -170,34 +169,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (firstName.isEmpty || lastName.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen adınızı ve soyadınızı girin.');
+      setState(() => _errorMessage = l10n.enterFirstAndLastName);
       return;
     }
 
     if (_selectedRoleCode == null) {
-      setState(() => _errorMessage = 'Lütfen kullanıcı tipini seçin.');
+      setState(() => _errorMessage = l10n.selectUserType);
       return;
     }
 
     if (email.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen e-posta girin.');
+      setState(() => _errorMessage = l10n.enterEmail);
       return;
     }
 
     if (password.length < 6) {
-      setState(() => _errorMessage = 'Şifre en az 6 karakter olmalıdır.');
+      setState(() => _errorMessage = l10n.passwordMinSix);
       return;
     }
 
     if (password != confirm) {
-      setState(() => _errorMessage = 'Şifreler eşleşmiyor.');
+      setState(() => _errorMessage = l10n.passwordsDoNotMatch);
       return;
     }
 
     if (!_acceptedMembershipAgreement) {
       setState(() {
-        _errorMessage =
-            'Devam etmek için Üyelik Sözleşmesi kabul edilmelidir.';
+        _errorMessage = 'Devam etmek için Üyelik Sözleşmesi kabul edilmelidir.';
       });
       return;
     }
@@ -262,6 +260,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String _localizeAuthError(String message) {
+    final l10n = AppLocalizations.of(context);
     final lower = message.toLowerCase();
 
     if (lower.contains('already registered') ||
@@ -275,7 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (lower.contains('password should be')) {
-      return 'Şifre en az 6 karakter olmalıdır.';
+      return l10n.passwordMinSix;
     }
 
     return message;
@@ -355,8 +354,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    final parsedToken =
-                        _extractInviteTokenFromText(controller.text);
+                    final parsedToken = _extractInviteTokenFromText(
+                      controller.text,
+                    );
 
                     if (parsedToken == null) {
                       setLocalState(() {
@@ -429,9 +429,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return InputDecorator(
       decoration: InputDecoration(
         labelText: 'Kullanıcı Tipi',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 10,
@@ -508,30 +506,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => LoginScreen(
-            pressureRepository: widget.pressureRepository,
-          ),
+          builder: (_) =>
+              LoginScreen(pressureRepository: widget.pressureRepository),
         ),
       );
       return;
     }
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/',
-      (route) => false,
-    );
+    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
   void _showLegalDocument(String code) {
     final document = LegalDocumentRegistry.findByCode(code);
 
     if (document == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Belge bulunamadı.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Belge bulunamadı.')));
       return;
     }
 
@@ -658,16 +649,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_isLoadingInvite) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
+      return Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          actions: [LanguageSelector(), SizedBox(width: 12)],
         ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_inviteInvalid) {
       return Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          actions: const [LanguageSelector(), SizedBox(width: 12)],
+        ),
         body: Center(
           child: Container(
             padding: const EdgeInsets.all(24),
@@ -675,15 +673,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red,
-                ),
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
                 const SizedBox(height: 16),
-                const Text(
-                  'Davet Bağlantısı Geçersiz',
-                  style: TextStyle(
+                Text(
+                  l10n.invalidInvitation,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -692,17 +686,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Text(
                   _inviteError ?? 'Bu davet bağlantısı kullanılamıyor.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: _goToLogin,
-                    child: const Text('Giriş Ekranına Dön'),
+                    child: Text(l10n.backToLogin),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -725,6 +716,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: const [LanguageSelector(), SizedBox(width: 12)],
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: Container(
@@ -738,6 +735,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildSuccessView() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -756,8 +754,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _requiresManualApproval(_selectedRoleCode)
               ? 'Kayıt başvurunuz alındı. Optiyou ekibi hesabınızı onayladıktan sonra giriş yapabilirsiniz.'
               : _hasInvite
-                  ? 'Hesabınız oluşturuldu ve ölçüm kaydınız hesabınızla ilişkilendirildi. Giriş yaptıktan sonra ölçüm sonuçlarınızı görüntüleyebilirsiniz.'
-                  : 'Hesabınızı etkinleştirmek için ${_emailController.text.trim()} adresine gönderilen onay e-postasındaki bağlantıya tıklayın.',
+              ? 'Hesabınız oluşturuldu ve ölçüm kaydınız hesabınızla ilişkilendirildi. Giriş yaptıktan sonra ölçüm sonuçlarınızı görüntüleyebilirsiniz.'
+              : 'Hesabınızı etkinleştirmek için ${_emailController.text.trim()} adresine gönderilen onay e-postasındaki bağlantıya tıklayın.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey[700]),
         ),
@@ -772,7 +770,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Giriş Ekranına Dön'),
+            child: Text(l10n.backToLogin),
           ),
         ),
       ],
@@ -791,9 +789,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       decoration: BoxDecoration(
         color: Colors.teal.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.teal.withOpacity(0.20),
-        ),
+        border: Border.all(color: Colors.teal.withOpacity(0.20)),
       ),
       child: Row(
         children: [
@@ -804,10 +800,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               inviteEmail.isEmpty
                   ? 'Davet bağlantısı doğrulandı. Bu kayıt müşteri hesabı olarak oluşturulacak ve ölçüm kaydı hesabınıza bağlanacak.'
                   : 'Davet bağlantısı doğrulandı. E-posta otomatik dolduruldu: $inviteEmail',
-              style: TextStyle(
-                color: Colors.teal[900],
-                height: 1.35,
-              ),
+              style: TextStyle(color: Colors.teal[900], height: 1.35),
             ),
           ),
         ],
@@ -816,15 +809,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildForm() {
+    final l10n = AppLocalizations.of(context);
     final inviteEmailLocked =
         _hasInvite && (_invite?.email ?? '').trim().isNotEmpty;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Kayıt Ol',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        Text(
+          l10n.register,
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 18),
         if (!_hasInvite) ...[
@@ -833,7 +827,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: OutlinedButton.icon(
               onPressed: _isLoading ? null : _showInviteLinkDialog,
               icon: const Icon(Icons.link),
-              label: const Text('Davet Bağlantısı ile Kaydol'),
+              label: Text(l10n.registerWithInvitation),
             ),
           ),
           const SizedBox(height: 16),
@@ -847,7 +841,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 enabled: !_isLoading,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
-                  labelText: 'Ad',
+                  labelText: l10n.firstName,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -866,7 +860,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 enabled: !_isLoading,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
-                  labelText: 'Soyad',
+                  labelText: l10n.lastName,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -888,11 +882,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           enabled: !_isLoading && !inviteEmailLocked,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
-            labelText: 'E-posta',
+            labelText: l10n.email,
             hintText: 'ornek@eposta.com',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onChanged: (_) {
             if (_errorMessage != null) {
@@ -906,10 +898,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           enabled: !_isLoading,
           obscureText: _obscurePassword,
           decoration: InputDecoration(
-            labelText: 'Şifre',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            labelText: l10n.password,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -933,10 +923,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           enabled: !_isLoading,
           obscureText: _obscureConfirm,
           decoration: InputDecoration(
-            labelText: 'Şifre Tekrar',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            labelText: l10n.passwordAgain,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             errorText: _errorMessage,
             suffixIcon: IconButton(
               icon: Icon(
@@ -979,16 +967,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       strokeWidth: 2,
                     ),
                   )
-                : const Text(
-                    'Kayıt Ol',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                : Text(
+                    l10n.register,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
           ),
         ),
         const SizedBox(height: 16),
         TextButton(
           onPressed: _isLoading ? null : _goToLogin,
-          child: const Text('Zaten hesabın var mı? Giriş Yap'),
+          child: Text(l10n.alreadyHaveAccount),
         ),
       ],
     );

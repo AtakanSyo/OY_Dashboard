@@ -10,10 +10,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OptiYouOperationsBoardScreen extends StatefulWidget {
   final AppUser currentUser;
+  final dynamic pressureRepository;
 
   const OptiYouOperationsBoardScreen({
     super.key,
     required this.currentUser,
+    required this.pressureRepository,
   });
 
   @override
@@ -87,10 +89,12 @@ class _OptiYouOperationsBoardScreenState
           orderId: orderId,
         );
 
-        final patientName = relatedLabels.patientNames[order.patientId] ??
+        final patientName =
+            relatedLabels.patientNames[order.patientId] ??
             'Kullanıcı #${order.patientId}';
 
-        final expertName = relatedLabels.expertNames[order.expertUserId] ??
+        final expertName =
+            relatedLabels.expertNames[order.expertUserId] ??
             'Uzman #${order.expertUserId}';
 
         final clinicName = order.clinicId > 0
@@ -103,7 +107,8 @@ class _OptiYouOperationsBoardScreenState
           expertName: expertName,
           clinicName: clinicName,
           priorityLabel: 'Orta',
-          currentColumnCode: state?.boardColumnCode ??
+          currentColumnCode:
+              state?.boardColumnCode ??
               OptiYouOperationColumnCodes.designWaiting,
           hasMissingData: false,
           missingDataSummary: '',
@@ -141,8 +146,7 @@ class _OptiYouOperationsBoardScreenState
       if (!mounted) return;
 
       setState(() {
-        _errorMessage =
-            'Operasyon board verileri yüklenirken hata oluştu: $e';
+        _errorMessage = 'Operasyon board verileri yüklenirken hata oluştu: $e';
         _isLoading = false;
       });
     }
@@ -181,9 +185,7 @@ class _OptiYouOperationsBoardScreenState
             .inFilter('id', patientIds);
 
         final rows = (response as List<dynamic>)
-            .map(
-              (item) => Map<String, dynamic>.from(item as Map),
-            )
+            .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
 
         for (final row in rows) {
@@ -199,8 +201,8 @@ class _OptiYouOperationsBoardScreenState
           patientNames[id] = fullName.isNotEmpty
               ? fullName
               : patientCode.isNotEmpty
-                  ? patientCode
-                  : 'Kullanıcı #$id';
+              ? patientCode
+              : 'Kullanıcı #$id';
         }
       } catch (e) {
         debugPrint('Kullanıcı bilgileri okunamadı: $e');
@@ -215,20 +217,16 @@ class _OptiYouOperationsBoardScreenState
             .inFilter('id', clinicIds);
 
         final rows = (response as List<dynamic>)
-            .map(
-              (item) => Map<String, dynamic>.from(item as Map),
-            )
+            .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
 
         for (final row in rows) {
           final id = _asInt(row['id']);
           if (id == null) continue;
 
-          final clinicName =
-              (row['clinic_name'] ?? '').toString().trim();
+          final clinicName = (row['clinic_name'] ?? '').toString().trim();
 
-          final clinicCode =
-              (row['clinic_code'] ?? '').toString().trim();
+          final clinicCode = (row['clinic_code'] ?? '').toString().trim();
 
           if (clinicName.isNotEmpty && clinicCode.isNotEmpty) {
             clinicNames[id] = '$clinicName ($clinicCode)';
@@ -256,9 +254,7 @@ class _OptiYouOperationsBoardScreenState
             .inFilter('user_id', expertUserIds);
 
         final rows = (response as List<dynamic>)
-            .map(
-              (item) => Map<String, dynamic>.from(item as Map),
-            )
+            .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
 
         for (final row in rows) {
@@ -275,10 +271,10 @@ class _OptiYouOperationsBoardScreenState
           expertNames[id] = fullName.isNotEmpty
               ? fullName
               : username.isNotEmpty && !username.contains('@')
-                  ? username
-                  : email.isNotEmpty
-                      ? email
-                      : 'Uzman #$id';
+              ? username
+              : email.isNotEmpty
+              ? email
+              : 'Uzman #$id';
         }
       } catch (e) {
         debugPrint('Uzman bilgileri okunamadı: $e');
@@ -307,9 +303,7 @@ class _OptiYouOperationsBoardScreenState
     }).toList();
   }
 
-  List<OptiYouOrderOperationItem> _filterArchivedItems(
-    String query,
-  ) {
+  List<OptiYouOrderOperationItem> _filterArchivedItems(String query) {
     final q = query.trim().toLowerCase();
 
     if (q.isEmpty) {
@@ -321,10 +315,7 @@ class _OptiYouOperationsBoardScreenState
     }).toList();
   }
 
-  bool _matchesQuery(
-    OptiYouOrderOperationItem item,
-    String normalizedQuery,
-  ) {
+  bool _matchesQuery(OptiYouOrderOperationItem item, String normalizedQuery) {
     return item.order.orderNo.toLowerCase().contains(normalizedQuery) ||
         item.patientName.toLowerCase().contains(normalizedQuery) ||
         item.expertName.toLowerCase().contains(normalizedQuery) ||
@@ -340,13 +331,9 @@ class _OptiYouOperationsBoardScreenState
     });
   }
 
-  List<OptiYouOrderOperationItem> _itemsForColumn(
-    String columnCode,
-  ) {
+  List<OptiYouOrderOperationItem> _itemsForColumn(String columnCode) {
     return _filteredItems
-        .where(
-          (item) => item.currentColumnCode == columnCode,
-        )
+        .where((item) => item.currentColumnCode == columnCode)
         .toList();
   }
 
@@ -381,10 +368,7 @@ class _OptiYouOperationsBoardScreenState
 
       setState(() {
         _allItems[index] = updatedItem;
-        _filteredItems = _filterActiveItems(
-          _allItems,
-          _searchController.text,
-        );
+        _filteredItems = _filterActiveItems(_allItems, _searchController.text);
       });
     } catch (e) {
       if (!mounted) return;
@@ -398,75 +382,50 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  int _columnIndexOfItem(
-    OptiYouOrderOperationItem item,
-  ) {
+  int _columnIndexOfItem(OptiYouOrderOperationItem item) {
     return OptiYouOperationColumnCodes.all.indexWhere(
       (column) => column.code == item.currentColumnCode,
     );
   }
 
-  bool _canMoveLeft(
-    OptiYouOrderOperationItem item,
-  ) {
+  bool _canMoveLeft(OptiYouOrderOperationItem item) {
     return _columnIndexOfItem(item) > 0;
   }
 
-  bool _canMoveRight(
-    OptiYouOrderOperationItem item,
-  ) {
+  bool _canMoveRight(OptiYouOrderOperationItem item) {
     final index = _columnIndexOfItem(item);
 
-    return index >= 0 &&
-        index < OptiYouOperationColumnCodes.all.length - 1;
+    return index >= 0 && index < OptiYouOperationColumnCodes.all.length - 1;
   }
 
-  bool _isCompletedItem(
-    OptiYouOrderOperationItem item,
-  ) {
-    return item.currentColumnCode ==
-        OptiYouOperationColumnCodes.completed;
+  bool _isCompletedItem(OptiYouOrderOperationItem item) {
+    return item.currentColumnCode == OptiYouOperationColumnCodes.completed;
   }
 
-  void _moveLeft(
-    OptiYouOrderOperationItem item,
-  ) {
+  void _moveLeft(OptiYouOrderOperationItem item) {
     final currentIndex = _columnIndexOfItem(item);
 
     if (currentIndex <= 0) return;
 
-    final previousColumn =
-        OptiYouOperationColumnCodes.all[currentIndex - 1];
+    final previousColumn = OptiYouOperationColumnCodes.all[currentIndex - 1];
 
-    _moveItemToColumn(
-      item,
-      previousColumn.code,
-    );
+    _moveItemToColumn(item, previousColumn.code);
   }
 
-  void _moveRight(
-    OptiYouOrderOperationItem item,
-  ) {
+  void _moveRight(OptiYouOrderOperationItem item) {
     final currentIndex = _columnIndexOfItem(item);
 
     if (currentIndex < 0 ||
-        currentIndex >=
-            OptiYouOperationColumnCodes.all.length - 1) {
+        currentIndex >= OptiYouOperationColumnCodes.all.length - 1) {
       return;
     }
 
-    final nextColumn =
-        OptiYouOperationColumnCodes.all[currentIndex + 1];
+    final nextColumn = OptiYouOperationColumnCodes.all[currentIndex + 1];
 
-    _moveItemToColumn(
-      item,
-      nextColumn.code,
-    );
+    _moveItemToColumn(item, nextColumn.code);
   }
 
-  Future<void> _confirmArchiveItem(
-    OptiYouOrderOperationItem item,
-  ) async {
+  Future<void> _confirmArchiveItem(OptiYouOrderOperationItem item) async {
     if (_isArchiving) return;
 
     final confirmed = await showDialog<bool>(
@@ -507,16 +466,11 @@ class _OptiYouOperationsBoardScreenState
     await _archiveItem(item);
   }
 
-  Future<void> _archiveItem(
-    OptiYouOrderOperationItem item,
-  ) async {
+  Future<void> _archiveItem(OptiYouOrderOperationItem item) async {
     final orderId = item.order.orderId;
 
     if (orderId == null) {
-      _showMessage(
-        'Sipariş ID bulunamadı.',
-        backgroundColor: Colors.red,
-      );
+      _showMessage('Sipariş ID bulunamadı.', backgroundColor: Colors.red);
       return;
     }
 
@@ -535,14 +489,9 @@ class _OptiYouOperationsBoardScreenState
       if (!mounted) return;
 
       setState(() {
-        _allItems.removeWhere(
-          (element) => element.order.orderId == orderId,
-        );
+        _allItems.removeWhere((element) => element.order.orderId == orderId);
 
-        _filteredItems = _filterActiveItems(
-          _allItems,
-          _searchController.text,
-        );
+        _filteredItems = _filterActiveItems(_allItems, _searchController.text);
 
         _archivedItems = [
           item.copyWith(
@@ -567,30 +516,20 @@ class _OptiYouOperationsBoardScreenState
         _isArchiving = false;
       });
 
-      _showMessage(
-        'Sipariş arşivlenemedi: $e',
-        backgroundColor: Colors.red,
-      );
+      _showMessage('Sipariş arşivlenemedi: $e', backgroundColor: Colors.red);
     }
   }
 
-  Future<void> _restoreArchivedItem(
-    OptiYouOrderOperationItem item,
-  ) async {
+  Future<void> _restoreArchivedItem(OptiYouOrderOperationItem item) async {
     final orderId = item.order.orderId;
 
     if (orderId == null) {
-      _showMessage(
-        'Sipariş ID bulunamadı.',
-        backgroundColor: Colors.red,
-      );
+      _showMessage('Sipariş ID bulunamadı.', backgroundColor: Colors.red);
       return;
     }
 
     try {
-      await _operationRepository.restoreArchivedOrder(
-        orderId: orderId,
-      );
+      await _operationRepository.restoreArchivedOrder(orderId: orderId);
 
       if (!mounted) return;
 
@@ -604,16 +543,11 @@ class _OptiYouOperationsBoardScreenState
         );
 
         _allItems = [
-          ..._allItems.where(
-            (element) => element.order.orderId != orderId,
-          ),
+          ..._allItems.where((element) => element.order.orderId != orderId),
           restoredItem,
         ];
 
-        _filteredItems = _filterActiveItems(
-          _allItems,
-          _searchController.text,
-        );
+        _filteredItems = _filterActiveItems(_allItems, _searchController.text);
       });
 
       _showMessage(
@@ -683,9 +617,7 @@ class _OptiYouOperationsBoardScreenState
                                 Text(
                                   'Tamamlanan ve aktif operasyon akışından '
                                   'kaldırılan siparişler',
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                  ),
+                                  style: TextStyle(color: Colors.black54),
                                 ),
                               ],
                             ),
@@ -711,15 +643,15 @@ class _OptiYouOperationsBoardScreenState
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon:
                               archiveSearchController.text.trim().isEmpty
-                                  ? null
-                                  : IconButton(
-                                      tooltip: 'Aramayı temizle',
-                                      onPressed: () {
-                                        archiveSearchController.clear();
-                                        dialogSetState(() {});
-                                      },
-                                      icon: const Icon(Icons.clear),
-                                    ),
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Aramayı temizle',
+                                  onPressed: () {
+                                    archiveSearchController.clear();
+                                    dialogSetState(() {});
+                                  },
+                                  icon: const Icon(Icons.clear),
+                                ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -756,7 +688,7 @@ class _OptiYouOperationsBoardScreenState
                                 archiveSearchController.text.trim().isEmpty
                                     ? 'Arşivlenmiş sipariş bulunmuyor.'
                                     : 'Arama kriterine uygun arşivlenmiş '
-                                        'sipariş bulunamadı.',
+                                          'sipariş bulunamadı.',
                               )
                             : ListView.separated(
                                 itemCount: visibleArchivedItems.length,
@@ -764,8 +696,7 @@ class _OptiYouOperationsBoardScreenState
                                   return const SizedBox(height: 10);
                                 },
                                 itemBuilder: (context, index) {
-                                  final item =
-                                      visibleArchivedItems[index];
+                                  final item = visibleArchivedItems[index];
 
                                   return _buildArchivedOrderRow(
                                     item: item,
@@ -775,10 +706,11 @@ class _OptiYouOperationsBoardScreenState
                                         MaterialPageRoute(
                                           builder: (_) =>
                                               OptiYouOrderDetailScreen(
-                                            currentUser:
-                                                widget.currentUser,
-                                            operationItem: item,
-                                          ),
+                                                currentUser: widget.currentUser,
+                                                operationItem: item,
+                                                pressureRepository:
+                                                    widget.pressureRepository,
+                                              ),
                                         ),
                                       );
 
@@ -793,8 +725,8 @@ class _OptiYouOperationsBoardScreenState
                                     onRestore: () async {
                                       final shouldRestore =
                                           await _confirmRestoreArchivedItem(
-                                        item,
-                                      );
+                                            item,
+                                          );
 
                                       if (!shouldRestore) return;
 
@@ -868,9 +800,7 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Row(
         children: [
@@ -904,19 +834,14 @@ class _OptiYouOperationsBoardScreenState
                   item.patientName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   item.clinicName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
               ],
             ),
@@ -929,36 +854,25 @@ class _OptiYouOperationsBoardScreenState
               children: [
                 Text(
                   _productLabel(order.productType),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   'Uzman: ${item.expertName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   'Tarih: ${_formatDate(order.orderedAt)}',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          _buildTinyChip(
-            _statusLabel(order.orderStatus),
-            statusColor,
-          ),
+          _buildTinyChip(_statusLabel(order.orderStatus), statusColor),
           const SizedBox(width: 12),
           IconButton(
             tooltip: 'Sipariş detayını aç',
@@ -968,10 +882,7 @@ class _OptiYouOperationsBoardScreenState
           const SizedBox(width: 4),
           OutlinedButton.icon(
             onPressed: onRestore,
-            icon: const Icon(
-              Icons.unarchive_outlined,
-              size: 18,
-            ),
+            icon: const Icon(Icons.unarchive_outlined, size: 18),
             label: const Text('Geri Al'),
           ),
         ],
@@ -979,9 +890,7 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  Widget _buildArchiveEmptyState(
-    String message,
-  ) {
+  Widget _buildArchiveEmptyState(String message) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -997,10 +906,7 @@ class _OptiYouOperationsBoardScreenState
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 15,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
             ),
           ],
         ),
@@ -1008,9 +914,7 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  String _formatDate(
-    DateTime? date,
-  ) {
+  String _formatDate(DateTime? date) {
     if (date == null) return '—';
 
     return '${date.day.toString().padLeft(2, '0')}.'
@@ -1018,9 +922,7 @@ class _OptiYouOperationsBoardScreenState
         '${date.year}';
   }
 
-  String _productLabel(
-    String productType,
-  ) {
+  String _productLabel(String productType) {
     switch (productType) {
       case 'insole':
         return 'Tabanlık';
@@ -1033,9 +935,7 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  String _statusLabel(
-    String status,
-  ) {
+  String _statusLabel(String status) {
     switch (status) {
       case OrderStatuses.pending:
         return 'Beklemede';
@@ -1054,9 +954,7 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  Color _statusColor(
-    String status,
-  ) {
+  Color _statusColor(String status) {
     switch (status) {
       case OrderStatuses.pending:
         return Colors.orange;
@@ -1075,9 +973,7 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  Color _priorityColor(
-    String priority,
-  ) {
+  Color _priorityColor(String priority) {
     switch (priority.toLowerCase()) {
       case 'yüksek':
         return Colors.red;
@@ -1090,23 +986,15 @@ class _OptiYouOperationsBoardScreenState
     }
   }
 
-  void _showMessage(
-    String message, {
-    Color? backgroundColor,
-  }) {
+  void _showMessage(String message, {Color? backgroundColor}) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
-      ),
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
     );
   }
 
-  static int? _asInt(
-    dynamic value,
-  ) {
+  static int? _asInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -1137,17 +1025,16 @@ class _OptiYouOperationsBoardScreenState
                       hintText:
                           'Sipariş no, kullanıcı, uzman, klinik veya ürün ile ara',
                       prefixIcon: const Icon(Icons.search),
-                      suffixIcon:
-                          _searchController.text.trim().isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Aramayı temizle',
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _applySearch('');
-                                  },
-                                  icon: const Icon(Icons.clear),
-                                ),
+                      suffixIcon: _searchController.text.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Aramayı temizle',
+                              onPressed: () {
+                                _searchController.clear();
+                                _applySearch('');
+                              },
+                              icon: const Icon(Icons.clear),
+                            ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1163,22 +1050,16 @@ class _OptiYouOperationsBoardScreenState
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
-              child: _buildBoard(columns),
-            ),
+            Expanded(child: _buildBoard(columns)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBoard(
-    List<OptiYouOperationColumn> columns,
-  ) {
+  Widget _buildBoard(List<OptiYouOperationColumn> columns) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorMessage != null) {
@@ -1188,18 +1069,12 @@ class _OptiYouOperationsBoardScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Colors.red,
-              ),
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
               const SizedBox(height: 12),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.red,
-                ),
+                style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 14),
               OutlinedButton.icon(
@@ -1233,10 +1108,7 @@ class _OptiYouOperationsBoardScreenState
                 return Container(
                   width: 320,
                   margin: const EdgeInsets.only(right: 16),
-                  child: _buildColumn(
-                    column,
-                    items,
-                  ),
+                  child: _buildColumn(column, items),
                 );
               }),
               _buildArchivePanel(),
@@ -1255,9 +1127,7 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
         children: [
@@ -1269,11 +1139,7 @@ class _OptiYouOperationsBoardScreenState
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.shade300,
-                ),
-              ),
+              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1288,10 +1154,7 @@ class _OptiYouOperationsBoardScreenState
                 const SizedBox(height: 4),
                 Text(
                   '${items.length} sipariş',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 11),
                 ),
               ],
             ),
@@ -1302,25 +1165,21 @@ class _OptiYouOperationsBoardScreenState
                 ? Center(
                     child: Text(
                       'Sipariş yok',
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                      ),
+                      style: TextStyle(color: Colors.grey.shade500),
                     ),
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.all(10),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 0.6,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.6,
+                        ),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
-                      return _buildOrderCard(
-                        items[index],
-                      );
+                      return _buildOrderCard(items[index]);
                     },
                   ),
           ),
@@ -1339,9 +1198,7 @@ class _OptiYouOperationsBoardScreenState
       decoration: BoxDecoration(
         color: Colors.blueGrey.withOpacity(0.07),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.blueGrey.withOpacity(0.28),
-        ),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.28)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1349,17 +1206,13 @@ class _OptiYouOperationsBoardScreenState
           onTap: _openArchiveDialog,
           borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 18,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Badge(
                   isLabelVisible: count > 0,
-                  label: Text(
-                    count.toString(),
-                  ),
+                  label: Text(count.toString()),
                   child: Icon(
                     Icons.inventory_2_outlined,
                     size: 82,
@@ -1369,10 +1222,7 @@ class _OptiYouOperationsBoardScreenState
                 const SizedBox(height: 18),
                 const Text(
                   'Arşiv',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 7),
                 Text(
@@ -1395,10 +1245,7 @@ class _OptiYouOperationsBoardScreenState
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
                   onPressed: _openArchiveDialog,
-                  icon: const Icon(
-                    Icons.visibility_outlined,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
                   label: const Text('Arşivi Gör'),
                 ),
               ],
@@ -1409,9 +1256,7 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  Widget _buildOrderCard(
-    OptiYouOrderOperationItem item,
-  ) {
+  Widget _buildOrderCard(OptiYouOrderOperationItem item) {
     final order = item.order;
     final statusColor = _statusColor(order.orderStatus);
     final priorityColor = _priorityColor(item.priorityLabel);
@@ -1424,6 +1269,7 @@ class _OptiYouOperationsBoardScreenState
             builder: (_) => OptiYouOrderDetailScreen(
               currentUser: widget.currentUser,
               operationItem: item,
+              pressureRepository: widget.pressureRepository,
             ),
           ),
         );
@@ -1461,12 +1307,7 @@ class _OptiYouOperationsBoardScreenState
               ? Colors.green.withOpacity(0.25)
               : Colors.grey.shade200,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1475,24 +1316,15 @@ class _OptiYouOperationsBoardScreenState
             order.orderNo,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 4,
             runSpacing: 4,
             children: [
-              _buildTinyChip(
-                _productLabel(order.productType),
-                Colors.teal,
-              ),
-              _buildTinyChip(
-                _statusLabel(order.orderStatus),
-                statusColor,
-              ),
+              _buildTinyChip(_productLabel(order.productType), Colors.teal),
+              _buildTinyChip(_statusLabel(order.orderStatus), statusColor),
             ],
           ),
           const SizedBox(height: 8),
@@ -1502,24 +1334,15 @@ class _OptiYouOperationsBoardScreenState
             fontWeight: FontWeight.w600,
           ),
           const SizedBox(height: 4),
-          _buildInfoText(
-            label: 'Uzman',
-            value: item.expertName,
-          ),
+          _buildInfoText(label: 'Uzman', value: item.expertName),
           const SizedBox(height: 4),
-          _buildInfoText(
-            label: 'Klinik',
-            value: item.clinicName,
-          ),
+          _buildInfoText(label: 'Klinik', value: item.clinicName),
           const SizedBox(height: 4),
           Text(
             'Tarih: ${_formatDate(order.orderedAt)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 10.5,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 10.5),
           ),
           const Spacer(),
           Align(
@@ -1541,8 +1364,7 @@ class _OptiYouOperationsBoardScreenState
                   icon: isCompleted
                       ? Icons.archive_outlined
                       : Icons.chevron_right,
-                  enabled:
-                      (isCompleted || canMoveRight) && !_isArchiving,
+                  enabled: (isCompleted || canMoveRight) && !_isArchiving,
                   tooltip: isCompleted
                       ? 'Siparişi arşivle'
                       : 'Sonraki adıma taşı',
@@ -1551,10 +1373,10 @@ class _OptiYouOperationsBoardScreenState
                           _confirmArchiveItem(item);
                         }
                       : canMoveRight
-                          ? () {
-                              _moveRight(item);
-                            }
-                          : null,
+                      ? () {
+                          _moveRight(item);
+                        }
+                      : null,
                 ),
               ],
             ),
@@ -1581,21 +1403,13 @@ class _OptiYouOperationsBoardScreenState
     );
   }
 
-  Widget _buildTinyChip(
-    String label,
-    Color color,
-  ) {
+  Widget _buildTinyChip(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.24),
-        ),
+        border: Border.all(color: color.withOpacity(0.24)),
       ),
       child: Text(
         label,
@@ -1615,9 +1429,7 @@ class _OptiYouOperationsBoardScreenState
     String? tooltip,
   }) {
     final button = Material(
-      color: enabled
-          ? Colors.grey.shade100
-          : Colors.transparent,
+      color: enabled ? Colors.grey.shade100 : Colors.transparent,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: enabled ? onTap : null,
@@ -1628,9 +1440,7 @@ class _OptiYouOperationsBoardScreenState
           child: Icon(
             icon,
             size: 15,
-            color: enabled
-                ? Colors.grey.shade800
-                : Colors.grey.shade400,
+            color: enabled ? Colors.grey.shade800 : Colors.grey.shade400,
           ),
         ),
       ),
@@ -1640,10 +1450,7 @@ class _OptiYouOperationsBoardScreenState
       return button;
     }
 
-    return Tooltip(
-      message: tooltip,
-      child: button,
-    );
+    return Tooltip(message: tooltip, child: button);
   }
 }
 

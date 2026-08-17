@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:oy_site/data/repositories/supabase_session_pressure_repository.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/data/repositories/supabase_session_scan_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
@@ -11,6 +13,9 @@ import 'package:oy_site/models/parsed_scan_report.dart';
 import 'package:oy_site/models/session_pressure_recording_model.dart';
 import 'package:oy_site/screens/dashboard/analysis/widgets/analysis_comparison_widgets.dart';
 import 'package:oy_site/services/report/analysis_pdf_report_service.dart';
+import 'package:oy_site/services/scan/scan_report_text_parser.dart';
+import 'package:oy_site/services/analysis/hallux_heat_position_mapper.dart';
+import 'package:oy_site/services/analysis/arch_width_coefficient_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AnalysisResultsView extends StatefulWidget {
@@ -32,6 +37,8 @@ class AnalysisResultsView extends StatefulWidget {
 }
 
 class _AnalysisResultsViewState extends State<AnalysisResultsView> {
+  bool get _isEnglish => Localizations.localeOf(context).languageCode == 'en';
+
   SupabaseClient get _client => Supabase.instance.client;
 
   final SupabaseSessionPressureRepository _pressureRepository =
@@ -85,7 +92,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   String get _displayPageTitle {
-    return 'Değerlendirme Sonuçları';
+    return AppLocalizations.of(context).assessmentResults;
   }
 
   @override
@@ -156,11 +163,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         sessionId: sessionId,
       );
       if (!mounted || _selectedResult?.sessionId != sessionId) return;
-      final parsed = stored?.toParsedScanReport();
+      final storedParsed = stored?.toParsedScanReport();
+      final rawText = stored?.rawText?.trim();
+      final reparsed = rawText == null || rawText.isEmpty
+          ? null
+          : const ScanReportTextParser().parse(rawText);
+      final parsed = ParsedScanReport.merge(
+        preferred: storedParsed,
+        fallback: reparsed,
+      );
       setState(() {
-        _sessionScanReport = parsed?.hasAnyCoreMeasurement == true
-            ? parsed
-            : null;
+        _sessionScanReport = parsed.hasAnyCoreMeasurement ? parsed : null;
       });
     } catch (e) {
       debugPrint('Oturum tarama raporu yüklenemedi: $e');
@@ -191,7 +204,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       setState(() {
         _evaluationVisualUrls.clear();
         _evaluationVisualBytes.clear();
-        _evaluationVisualsError = 'Bu değerlendirme için oturum ID bulunamadı.';
+        _evaluationVisualsError = AppLocalizations.of(context).sessionIdMissing;
         _isLoadingEvaluationVisuals = false;
       });
 
@@ -305,9 +318,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         _isLoadingEvaluationVisuals = false;
 
         if (urls.isEmpty) {
-          _evaluationVisualsError =
-              'Bu oturum için kullanılabilir değerlendirme '
-              'görseli bulunamadı.';
+          _evaluationVisualsError = AppLocalizations.of(
+            context,
+          ).assessmentImagesUnavailable;
         }
       });
 
@@ -324,7 +337,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingEvaluationVisuals = false;
-        _evaluationVisualsError = 'Değerlendirme görselleri yüklenemedi: $e';
+        _evaluationVisualsError = AppLocalizations.of(
+          context,
+        ).assessmentImagesLoadError(e.toString());
       });
 
       debugPrint('Değerlendirme görselleri yüklenemedi: $e');
@@ -408,7 +423,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingPressureRecords = false;
-        _pressureRecordsError = 'Basınç ölçüm kayıtları yüklenemedi: $e';
+        _pressureRecordsError = AppLocalizations.of(
+          context,
+        ).pressureRecordingsLoadError(e.toString());
       });
     }
   }
@@ -490,7 +507,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
       setState(() {
         _isLoadingPressureData = false;
-        _pressureDataError = 'Basınç kayıt verisi açılamadı: $e';
+        _pressureDataError = AppLocalizations.of(
+          context,
+        ).pressureDataOpenError(e.toString());
       });
     }
   }
@@ -500,19 +519,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   // ---------------------------------------------------------------------------
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}.'
-        '${date.month.toString().padLeft(2, '0')}.'
-        '${date.year}';
+    return DateFormat.yMMMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(date);
   }
 
   String _formatDateTime(DateTime? date) {
     if (date == null) return '—';
 
-    return '${date.day.toString().padLeft(2, '0')}.'
-        '${date.month.toString().padLeft(2, '0')}.'
-        '${date.year} '
-        '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+    return DateFormat.yMMMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).add_Hm().format(date);
   }
 
   String _formatDuration(int durationMs) {
@@ -525,11 +542,20 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     final milliseconds = duration.inMilliseconds.remainder(1000);
 
     if (minutes > 0) {
-      return '$minutes dk '
-          '${seconds.toString().padLeft(2, '0')} sn';
+      final minuteUnit = Localizations.localeOf(context).languageCode == 'en'
+          ? 'min'
+          : 'dk';
+      final secondUnit = Localizations.localeOf(context).languageCode == 'en'
+          ? 'sec'
+          : 'sn';
+      return '$minutes $minuteUnit '
+          '${seconds.toString().padLeft(2, '0')} $secondUnit';
     }
 
-    return '$seconds.${milliseconds ~/ 100} sn';
+    final secondUnit = Localizations.localeOf(context).languageCode == 'en'
+        ? 'sec'
+        : 'sn';
+    return '$seconds.${milliseconds ~/ 100} $secondUnit';
   }
 
   String _formatMillimeter(double? value) {
@@ -554,24 +580,40 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
   String _translateAssessmentText(String value) {
     var translated = value;
-    const replacements = <String, String>{
-      'Severe Flat': 'İleri Düzey Düz Taban',
-      'Moderate Flat': 'Orta Düzey Düz Taban',
-      'Mild Flat': 'Hafif Düz Taban',
-      'Flat Foot': 'Düz Taban',
-      'High Arch': 'Yüksek Ark',
-      'Normal Arch': 'Normal Ark',
-      'Normal Hallgux': 'Normal Halluks',
-      'Normal Hallux': 'Normal Halluks',
-      'Normal Heel': 'Normal Topuk',
-      'Neutral': 'Nötr',
-      'Severity': 'İleri Düzey',
-      'Severe': 'İleri Düzey',
-      'Moderate': 'Orta Düzey',
-      'Mild': 'Hafif',
-      'Flat': 'Düz Taban',
-      'Normal': 'Normal',
-    };
+    final english = Localizations.localeOf(context).languageCode == 'en';
+    final replacements = english
+        ? const <String, String>{
+            'İleri Düzey Düz Taban': 'Severe Flat Foot',
+            'Orta Düzey Düz Taban': 'Moderate Flat Foot',
+            'Hafif Düz Taban': 'Mild Flat Foot',
+            'Düz Taban': 'Flat Foot',
+            'Yüksek Ark': 'High Arch',
+            'Normal Ark': 'Normal Arch',
+            'Normal Halluks': 'Normal Hallux',
+            'Normal Topuk': 'Normal Heel',
+            'Nötr': 'Neutral',
+            'İleri Düzey': 'Severe',
+            'Orta Düzey': 'Moderate',
+            'Hafif': 'Mild',
+          }
+        : const <String, String>{
+            'Severe Flat': 'İleri Düzey Düz Taban',
+            'Moderate Flat': 'Orta Düzey Düz Taban',
+            'Mild Flat': 'Hafif Düz Taban',
+            'Flat Foot': 'Düz Taban',
+            'High Arch': 'Yüksek Ark',
+            'Normal Arch': 'Normal Ark',
+            'Normal Hallgux': 'Normal Halluks',
+            'Normal Hallux': 'Normal Halluks',
+            'Normal Heel': 'Normal Topuk',
+            'Neutral': 'Nötr',
+            'Severity': 'İleri Düzey',
+            'Severe': 'İleri Düzey',
+            'Moderate': 'Orta Düzey',
+            'Mild': 'Hafif',
+            'Flat': 'Düz Taban',
+            'Normal': 'Normal',
+          };
     for (final entry in replacements.entries) {
       translated = translated.replaceAll(
         RegExp(RegExp.escape(entry.key), caseSensitive: false),
@@ -582,12 +624,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   String _archAssessmentLabel(double? value) {
-    if (value == null) return 'Veri bulunmuyor';
-    if (value < 0.21) return 'Yüksek Ark';
-    if (value <= 0.26) return 'Normal Ark';
-    if (value <= 0.28) return 'Hafif Düz Taban';
-    if (value <= 0.30) return 'Orta Düzey Düz Taban';
-    return 'İleri Düzey Düz Taban';
+    final l10n = AppLocalizations.of(context);
+    if (value == null) return l10n.noData;
+    if (value < 0.21) return l10n.highArch;
+    if (value <= 0.26) return l10n.normalArch;
+    if (value <= 0.28) return l10n.mildFlatFoot;
+    if (value <= 0.30) return l10n.moderateFlatFoot;
+    return l10n.severeFlatFoot;
   }
 
   double? _archHeatPosition(double? value) {
@@ -602,8 +645,27 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   double? _archWidthHeatPosition(double? value) {
-    if (value == null) return null;
-    return (value / 0.70).clamp(0.0, 1.0);
+    return ArchWidthCoefficientMapper.resolve(value)?.position;
+  }
+
+  String _archWidthAssessmentLabel(double? value) {
+    final l10n = AppLocalizations.of(context);
+    final assessment = ArchWidthCoefficientMapper.resolve(value);
+    if (assessment == null) return l10n.noData;
+
+    return switch (assessment.type) {
+      ArchWidthCoefficientType.severeHighArch =>
+        '${l10n.severe} ${l10n.highArch}',
+      ArchWidthCoefficientType.moderateHighArch =>
+        '${l10n.moderate} ${l10n.highArch}',
+      ArchWidthCoefficientType.mildHighArch =>
+        '${l10n.mild} ${l10n.highArch}',
+      ArchWidthCoefficientType.normalType4 ||
+      ArchWidthCoefficientType.normalType5 => l10n.normalArch,
+      ArchWidthCoefficientType.mildFlatFoot => l10n.mildFlatFoot,
+      ArchWidthCoefficientType.moderateFlatFoot => l10n.moderateFlatFoot,
+      ArchWidthCoefficientType.severeFlatFoot => l10n.severeFlatFoot,
+    };
   }
 
   String _assessmentWithValue(String assessment, String value) {
@@ -617,17 +679,47 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     required double moderate,
     required double severe,
   }) {
-    if (value == null) return 'Veri bulunmuyor';
+    final l10n = AppLocalizations.of(context);
+    if (value == null) return l10n.noData;
     final magnitude = value.abs();
-    if (magnitude < mild) return 'Normal';
-    if (magnitude < moderate) return 'Hafif';
-    if (magnitude < severe) return 'Orta Düzey';
-    return 'İleri Düzey';
+    if (magnitude < mild) return l10n.normal;
+    if (magnitude < moderate) return l10n.mild;
+    if (magnitude < severe) return l10n.moderate;
+    return l10n.severe;
+  }
+
+  String _halluxAssessmentLabel(String? reportType, double? angle) {
+    final normalizedType = (reportType ?? '').trim();
+    if (normalizedType.isNotEmpty) {
+      return _translateAssessmentText(normalizedType);
+    }
+    return _angleAssessmentLabel(
+      angle,
+      mild: 10,
+      moderate: 20,
+      severe: 30,
+    );
   }
 
   double? _angleHeatPosition(double? value, double severeThreshold) {
     if (value == null) return null;
     return (0.5 + (value / severeThreshold) * 0.5).clamp(0.0, 1.0);
+  }
+
+  AnalysisPdfPressureSnapshot? _pdfPressureSnapshot() {
+    final data = _selectedPressureData;
+    if (data == null || data.frames.isEmpty) return null;
+
+    final frameIndex = _selectedPressureFrameIndex
+        .clamp(0, data.frames.length - 1)
+        .toInt();
+    return AnalysisPdfPressureSnapshot(
+      matrix: data.frames[frameIndex].matrix,
+      maxVisualValue: data.maxVisualValue,
+      threshold: data.threshold,
+      weightKg: data.weightKg,
+      cellAreaCm2: data.cellAreaCm2,
+    );
   }
 
   Future<void> _saveSelectedResultAsPdf() async {
@@ -645,16 +737,22 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         imageUrls: Map<String, String>.from(_evaluationVisualUrls),
         imageBytes: Map<String, Uint8List>.from(_evaluationVisualBytes),
         reportOverride: _reportFor(result),
+        pressureSnapshot: _pdfPressureSnapshot(),
+        languageCode: Localizations.localeOf(context).languageCode,
       );
 
       if (!mounted || !saved) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('PDF raporu kaydedildi.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).pdfSaved)),
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF raporu oluşturulamadı: $error')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).pdfCreateError(error.toString()),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -672,25 +770,26 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   @override
   Widget build(BuildContext context) {
     final selected = _selectedResult;
+    final l10n = AppLocalizations.of(context);
 
     if (widget.results.isEmpty || selected == null) {
-      return const Center(child: Text('Değerlendirme sonucu bulunamadı.'));
+      return Center(child: Text(l10n.assessmentNotFound));
     }
 
     if (_isInitialPageLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 42,
               height: 42,
               child: CircularProgressIndicator(strokeWidth: 4),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
-              'Değerlendirme verileri hazırlanıyor...',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              l10n.preparingAssessment,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -708,8 +807,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               _buildHeader(selected),
               const SizedBox(height: 18),
               _buildSectionCard(
-                title: 'Ölçüm Geçmişi',
-                subtitle: 'Görüntülemek istediğiniz ölçüm oturumunu seçin.',
+                title: l10n.measurementHistoryTitle,
+                subtitle: l10n.selectMeasurementSession,
                 child: _buildSessionCards(),
               ),
               const SizedBox(height: 18),
@@ -732,6 +831,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildHeader(CustomerAnalysisResult result) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -766,9 +866,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                label: Text(
-                  _isExportingPdf ? 'PDF hazırlanıyor...' : 'PDF Kaydet',
-                ),
+                label: Text(_isExportingPdf ? l10n.preparingPdf : l10n.savePdf),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.teal.shade800,
                   side: BorderSide(color: Colors.teal.shade300),
@@ -788,8 +886,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
               ),
               const SizedBox(height: 7),
               Text(
-                '3D anatomik ölçümler, görsel incelemeler ve '
-                'plantar basınç ölçüm sonuçları.',
+                l10n.assessmentIntro,
                 style: TextStyle(color: Colors.grey.shade700, height: 1.4),
               ),
             ],
@@ -817,7 +914,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 _headerMetaRow(
                   Icons.location_on_outlined,
                   result.locationLabel.trim().isEmpty
-                      ? 'Konum belirtilmedi'
+                      ? l10n.locationNotSpecified
                       : result.locationLabel,
                 ),
               ],
@@ -965,104 +1062,105 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildAnatomicalMeasurementsSection(CustomerAnalysisResult result) {
+    final l10n = AppLocalizations.of(context);
     final report = _reportFor(result);
 
     if (report == null) {
       return _buildExpandableSectionCard(
-        title: 'Anatomik Ölçümler',
-        subtitle: 'Sol ve sağ ayak için 3D tarama değerleri.',
+        title: l10n.anatomicalMeasurements,
+        subtitle: l10n.anatomicalMeasurementsSubtitle,
         icon: Icons.straighten_outlined,
         initiallyExpanded: false,
         child: _emptyInformationState(
           icon: Icons.straighten_outlined,
-          message: 'Bu ölçüm için ayrıştırılmış 3D tarama raporu bulunmuyor.',
+          message: l10n.noParsedScanReport,
         ),
       );
     }
 
     final measurements = <AnalysisComparisonValue>[
       AnalysisComparisonValue(
-        label: 'Ayak Uzunluğu',
+        label: l10n.footLength,
         leftValue: _formatMillimeter(report.leftFootLength),
         rightValue: _formatMillimeter(report.rightFootLength),
         icon: Icons.straighten,
-        description: 'Topuk ile en uzun parmak arasındaki mesafe.',
+        description: l10n.footLengthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Taban Uzunluğu',
+        label: l10n.soleLength,
         leftValue: _formatMillimeter(report.leftSoleLength),
         rightValue: _formatMillimeter(report.rightSoleLength),
         icon: Icons.linear_scale,
-        description: 'Ayak tabanının anatomik temas uzunluğu.',
+        description: l10n.soleLengthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Ayak Genişliği',
+        label: l10n.footWidth,
         leftValue: _formatMillimeter(report.leftFootWidth),
         rightValue: _formatMillimeter(report.rightFootWidth),
         icon: Icons.swap_horiz,
-        description: 'Ön ayaktaki en geniş anatomik mesafe.',
+        description: l10n.footWidthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Parmak Önü Genişliği',
+        label: l10n.forefootWidth,
         leftValue: _formatMillimeter(report.leftToeWidth),
         rightValue: _formatMillimeter(report.rightToeWidth),
         icon: Icons.compare_arrows,
-        description: 'Parmak kökleri seviyesindeki genişlik.',
+        description: l10n.forefootWidthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Ark Uzunluğu',
+        label: l10n.archLength,
         leftValue: _formatMillimeter(report.leftArchLength),
         rightValue: _formatMillimeter(report.rightArchLength),
         icon: Icons.architecture,
-        description: 'Medial longitudinal ark uzunluğu.',
+        description: l10n.archLengthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Ark Yüksekliği',
+        label: l10n.archHeight,
         leftValue: _formatMillimeter(report.leftArchHeight),
         rightValue: _formatMillimeter(report.rightArchHeight),
         icon: Icons.height,
-        description: 'Ayak kemerinin maksimum yüksekliği.',
+        description: l10n.archHeightDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Dış Ark Genişliği',
+        label: l10n.outerArchWidth,
         leftValue: _formatMillimeter(report.leftArchOutsideWidth),
         rightValue: _formatMillimeter(report.rightArchOutsideWidth),
         icon: Icons.open_in_full,
-        description: 'Ark bölgesinin dış genişlik ölçümü.',
+        description: l10n.outerArchWidthDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Topuk Genişliği',
+        label: l10n.heelWidth,
         leftValue: _formatMillimeter(report.leftTotalHeelWidth),
         rightValue: _formatMillimeter(report.rightTotalHeelWidth),
         icon: Icons.horizontal_rule,
-        description: 'Topuk bölgesinin toplam genişliği.',
+        description: l10n.heelWidthDescription,
       ),
       AnalysisComparisonValue(
-        label: '1. Metatars Uzunluğu',
+        label: l10n.firstMetatarsalLength,
         leftValue: _formatMillimeter(report.leftFirstMetaLength),
         rightValue: _formatMillimeter(report.rightFirstMetaLength),
         icon: Icons.looks_one_outlined,
-        description: 'Birinci metatarsal anatomik uzunluğu.',
+        description: l10n.firstMetatarsalDescription,
       ),
       AnalysisComparisonValue(
-        label: '5. Metatars Uzunluğu',
+        label: l10n.fifthMetatarsalLength,
         leftValue: _formatMillimeter(report.leftFifthMetaLength),
         rightValue: _formatMillimeter(report.rightFifthMetaLength),
         icon: Icons.filter_5,
-        description: 'Beşinci metatarsal anatomik uzunluğu.',
+        description: l10n.fifthMetatarsalDescription,
       ),
       AnalysisComparisonValue(
-        label: 'Metatars Eklem Yüksekliği',
+        label: l10n.metatarsalJointHeight,
         leftValue: _formatMillimeter(report.leftFirstMetaJointHeight),
         rightValue: _formatMillimeter(report.rightFirstMetaJointHeight),
         icon: Icons.vertical_align_top,
-        description: 'Birinci metatars eklem bölgesindeki yükseklik.',
+        description: l10n.metatarsalJointDescription,
       ),
     ];
 
     return _buildExpandableSectionCard(
-      title: 'Anatomik Ölçümler',
-      subtitle: '3D taramadan alınan anatomik ölçüm değerleri.',
+      title: l10n.anatomicalMeasurements,
+      subtitle: l10n.anatomicalMeasurementsSubtitle,
       icon: Icons.straighten_outlined,
       initiallyExpanded: false,
       child: AnalysisComparisonTable(values: measurements),
@@ -1073,35 +1171,40 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildEvaluationFindingsSection(CustomerAnalysisResult result) {
+    final l10n = AppLocalizations.of(context);
     final report = _reportFor(result);
     final leftFoot = result.leftFoot;
     final rightFoot = result.rightFoot;
 
     final findings = <AnalysisFindingComparisonData>[
       AnalysisFindingComparisonData(
-        title: 'Ark ve Kemer Yapısı',
-        subtitle: 'Ayak kemeri yüksekliği, genişliği ve yüzey formu.',
+        title: l10n.archStructure,
+        subtitle: l10n.archStructureSubtitle,
         icon: Icons.architecture_outlined,
-        leftDescription: leftFoot.archSupportNeed.trim().isNotEmpty
+        leftDescription: _isEnglish
+            ? _archAssessmentLabel(report?.leftArchIndex)
+            : leftFoot.archSupportNeed.trim().isNotEmpty
             ? leftFoot.archSupportNeed
             : _safeText(
                 report?.recommendationText,
-                fallback: 'Sol ark yapısına ilişkin açıklama bulunmuyor.',
+                fallback: l10n.leftArchDescriptionUnavailable,
               ),
-        rightDescription: rightFoot.archSupportNeed.trim().isNotEmpty
+        rightDescription: _isEnglish
+            ? _archAssessmentLabel(report?.rightArchIndex)
+            : rightFoot.archSupportNeed.trim().isNotEmpty
             ? rightFoot.archSupportNeed
             : _safeText(
                 report?.recommendationText,
-                fallback: 'Sağ ark yapısına ilişkin açıklama bulunmuyor.',
+                fallback: l10n.rightArchDescriptionUnavailable,
               ),
         images: [
           AnalysisFindingImage(
-            title: 'Ark Yükseklik Haritası',
+            title: l10n.archHeightMap,
             leftUrl: _evaluationVisualUrls['arch_left_image'],
             rightUrl: _evaluationVisualUrls['arch_right_image'],
             assessments: [
               AnalysisAssessmentData(
-                title: 'Ark İndeksi',
+                title: l10n.archIndex,
                 leftLabel: _assessmentWithValue(
                   _archAssessmentLabel(report?.leftArchIndex),
                   _formatDecimal(report?.leftArchIndex),
@@ -1116,14 +1219,20 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             ],
           ),
           AnalysisFindingImage(
-            title: 'Ark Kesit Görüntüsü',
+            title: l10n.archSectionImage,
             leftUrl: _evaluationVisualUrls['arch_section_left'],
             rightUrl: _evaluationVisualUrls['arch_section_right'],
             assessments: [
               AnalysisAssessmentData(
-                title: 'Ark Genişlik İndeksi',
-                leftLabel: _formatDecimal(report?.leftArchWidthIndex),
-                rightLabel: _formatDecimal(report?.rightArchWidthIndex),
+                title: l10n.archWidthIndex,
+                leftLabel: _assessmentWithValue(
+                  _archWidthAssessmentLabel(report?.leftArchWidthIndex),
+                  _formatDecimal(report?.leftArchWidthIndex),
+                ),
+                rightLabel: _assessmentWithValue(
+                  _archWidthAssessmentLabel(report?.rightArchWidthIndex),
+                  _formatDecimal(report?.rightArchWidthIndex),
+                ),
                 leftPosition: _archWidthHeatPosition(
                   report?.leftArchWidthIndex,
                 ),
@@ -1136,7 +1245,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ],
         metrics: [
           AnalysisComparisonValue(
-            label: 'Ark Yüksekliği',
+            label: l10n.archHeight,
             leftValue: _formatMillimeter(report?.leftArchHeight),
             rightValue: _formatMillimeter(report?.rightArchHeight),
             icon: Icons.height,
@@ -1144,56 +1253,62 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ],
       ),
       AnalysisFindingComparisonData(
-        title: 'Ayak Formu ve Başparmak Hizalanması',
-        subtitle: 'Ön ayak formu ve halluks açısının iki taraflı görünümü.',
+        title: l10n.footFormHallux,
+        subtitle: l10n.footFormHalluxSubtitle,
         icon: Icons.accessibility_new_outlined,
-        leftDescription: leftFoot.mainFinding.trim().isNotEmpty
+        leftDescription: _isEnglish
+            ? _halluxDescription(report?.leftHalluxAngle)
+            : leftFoot.mainFinding.trim().isNotEmpty
             ? leftFoot.mainFinding
             : _halluxDescription(report?.leftHalluxAngle),
-        rightDescription: rightFoot.mainFinding.trim().isNotEmpty
+        rightDescription: _isEnglish
+            ? _halluxDescription(report?.rightHalluxAngle)
+            : rightFoot.mainFinding.trim().isNotEmpty
             ? rightFoot.mainFinding
             : _halluxDescription(report?.rightHalluxAngle),
         images: [
           AnalysisFindingImage(
-            title: 'Ayak Görüntüsü',
+            title: l10n.footImage,
             leftUrl: _evaluationVisualUrls['foot_2d_left'],
             rightUrl: _evaluationVisualUrls['foot_2d_right'],
             assessments: [
               AnalysisAssessmentData(
-                title: 'Halluks Açısı ve Tipi',
+                title: l10n.halluxAngleType,
                 leftLabel: _assessmentWithValue(
-                  _angleAssessmentLabel(
+                  _halluxAssessmentLabel(
+                    report?.leftHalluxType,
                     report?.leftHalluxAngle,
-                    mild: 10,
-                    moderate: 20,
-                    severe: 30,
                   ),
                   _formatDegree(report?.leftHalluxAngle),
                 ),
                 rightLabel: _assessmentWithValue(
-                  _angleAssessmentLabel(
+                  _halluxAssessmentLabel(
+                    report?.rightHalluxType,
                     report?.rightHalluxAngle,
-                    mild: 10,
-                    moderate: 20,
-                    severe: 30,
                   ),
                   _formatDegree(report?.rightHalluxAngle),
                 ),
-                leftPosition: _angleHeatPosition(report?.leftHalluxAngle, 30),
-                rightPosition: _angleHeatPosition(report?.rightHalluxAngle, 30),
+                leftPosition: HalluxHeatPositionMapper.resolve(
+                  angle: report?.leftHalluxAngle,
+                  type: report?.leftHalluxType,
+                ),
+                rightPosition: HalluxHeatPositionMapper.resolve(
+                  angle: report?.rightHalluxAngle,
+                  type: report?.rightHalluxType,
+                ),
               ),
             ],
           ),
         ],
         metrics: [
           AnalysisComparisonValue(
-            label: 'Ayak Genişliği',
+            label: l10n.footWidth,
             leftValue: _formatMillimeter(report?.leftFootWidth),
             rightValue: _formatMillimeter(report?.rightFootWidth),
             icon: Icons.swap_horiz,
           ),
           AnalysisComparisonValue(
-            label: 'Parmak Genişliği',
+            label: l10n.toeWidth,
             leftValue: _formatMillimeter(report?.leftToeWidth),
             rightValue: _formatMillimeter(report?.rightToeWidth),
             icon: Icons.compare_arrows,
@@ -1201,23 +1316,27 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ],
       ),
       AnalysisFindingComparisonData(
-        title: 'Arka Ayak ve Pronasyon',
-        subtitle: 'Topuk-bilek, pronasyon ve diz hizalanması.',
+        title: l10n.rearfootPronation,
+        subtitle: l10n.rearfootPronationSubtitle,
         icon: Icons.rotate_90_degrees_ccw,
-        leftDescription: leftFoot.balanceSummary.trim().isNotEmpty
+        leftDescription: _isEnglish
+            ? _pronationDescription(report?.leftPronatorAngle)
+            : leftFoot.balanceSummary.trim().isNotEmpty
             ? leftFoot.balanceSummary
             : _pronationDescription(report?.leftPronatorAngle),
-        rightDescription: rightFoot.balanceSummary.trim().isNotEmpty
+        rightDescription: _isEnglish
+            ? _pronationDescription(report?.rightPronatorAngle)
+            : rightFoot.balanceSummary.trim().isNotEmpty
             ? rightFoot.balanceSummary
             : _pronationDescription(report?.rightPronatorAngle),
         images: [
           AnalysisFindingImage(
-            title: 'Ayak-Bilek Hizalanması',
+            title: l10n.ankleAlignment,
             leftUrl: _evaluationVisualUrls['pronator_left'],
             rightUrl: _evaluationVisualUrls['pronator_right'],
             assessments: [
               AnalysisAssessmentData(
-                title: 'Pronasyon Açısı ve Topuk Tipi',
+                title: l10n.pronationAngleHeelType,
                 leftLabel: _assessmentWithValue(
                   _angleAssessmentLabel(
                     report?.leftPronatorAngle,
@@ -1243,7 +1362,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 ),
               ),
               AnalysisAssessmentData(
-                title: 'Diz Açısı ve Hizalanması',
+                title: l10n.kneeAngleAlignment,
                 leftLabel: _assessmentWithValue(
                   _angleAssessmentLabel(
                     report?.leftKneeAngle,
@@ -1273,9 +1392,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     ];
 
     return _buildSectionCard(
-      title: 'Değerlendirme Bulguları ve Görseller',
-      subtitle:
-          'Sol ve sağ ayak açıklamaları, görselleri ve değerleri birlikte gösterilir.',
+      title: l10n.findingsAndImages,
+      subtitle: l10n.findingsAndImagesSubtitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1283,7 +1401,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             const LinearProgressIndicator(),
             const SizedBox(height: 14),
             Text(
-              'Görseller Supabase Storage üzerinden yükleniyor...',
+              l10n.loadingImages,
               style: TextStyle(color: Colors.grey.shade700),
             ),
             const SizedBox(height: 14),
@@ -1347,9 +1465,10 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildProductSection() {
+    final l10n = AppLocalizations.of(context);
     return _buildSectionCard(
-      title: 'Ürün Değerlendirmesi',
-      subtitle: 'Değerlendirme sonucuna göre önerilen ürün.',
+      title: l10n.productAssessment,
+      subtitle: l10n.productAssessmentSubtitle,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(18),
@@ -1358,20 +1477,27 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           borderRadius: BorderRadius.circular(13),
           border: Border.all(color: Colors.teal.withValues(alpha: 0.18)),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.design_services_outlined, color: Colors.teal, size: 24),
-            SizedBox(width: 12),
+            const Icon(
+              Icons.design_services_outlined,
+              color: Colors.teal,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Size Önerilen Ürün',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    l10n.productRecommended,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
                   ),
-                  SizedBox(height: 5),
-                  Text('Ürün belirlenmedi.'),
+                  const SizedBox(height: 5),
+                  Text(l10n.productNotDetermined),
                 ],
               ),
             ),
@@ -1382,12 +1508,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildComparisonImage(String? source, String title) {
+    final l10n = AppLocalizations.of(context);
     final aspectRatio = _evaluationImageAspectRatio(title);
     final normalized = (source ?? '').trim();
     if (normalized.isEmpty) {
       return AspectRatio(
         aspectRatio: aspectRatio,
-        child: _imageUnavailableState('Görsel bulunamadı.'),
+        child: _imageUnavailableState(l10n.imageNotFound),
       );
     }
 
@@ -1396,7 +1523,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       child: _evaluationImageTile(
         title: title,
         source: normalized,
-        fit: title.toLowerCase().contains('ark yükseklik')
+        fit:
+            (title.toLowerCase().contains('ark yükseklik') ||
+                title.toLowerCase().contains('arch height'))
             ? BoxFit.cover
             : BoxFit.contain,
       ),
@@ -1405,9 +1534,18 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
 
   double _evaluationImageAspectRatio(String title) {
     final normalized = title.toLowerCase();
-    if (normalized.contains('ark kesit')) return 1.9;
-    if (normalized.contains('ark yükseklik')) return 0.58;
-    if (normalized.contains('ayak-bilek')) return 1.15;
+    if (normalized.contains('ark kesit') ||
+        normalized.contains('cross-section')) {
+      return 1.9;
+    }
+    if (normalized.contains('ark yükseklik') ||
+        normalized.contains('arch height')) {
+      return 0.58;
+    }
+    if (normalized.contains('ayak-bilek') ||
+        normalized.contains('foot-ankle')) {
+      return 1.15;
+    }
     return 0.68;
   }
 
@@ -1466,8 +1604,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildNetworkImage(String source, {BoxFit fit = BoxFit.contain}) {
+    final l10n = AppLocalizations.of(context);
     if (source.trim().isEmpty) {
-      return _imageUnavailableState('Görsel yolu bulunamadı.');
+      return _imageUnavailableState(l10n.imagePathNotFound);
     }
 
     return Container(
@@ -1492,7 +1631,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             '$error',
           );
 
-          return _imageUnavailableState('Görsel dosyası açılamadı.');
+          return _imageUnavailableState(l10n.imageCouldNotOpen);
         },
       ),
     );
@@ -1526,6 +1665,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   void _openImagePreview(String title, String source) {
+    final l10n = AppLocalizations.of(context);
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1550,7 +1690,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Kapat',
+                        tooltip: l10n.close,
                         onPressed: () {
                           Navigator.pop(dialogContext);
                         },
@@ -1578,9 +1718,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                               return const CircularProgressIndicator();
                             },
                             errorBuilder: (context, error, stackTrace) {
-                              return const Padding(
-                                padding: EdgeInsets.all(30),
-                                child: Text('Görsel açılamadı.'),
+                              return Padding(
+                                padding: const EdgeInsets.all(30),
+                                child: Text(l10n.imageCouldNotOpen),
                               );
                             },
                           ),
@@ -1598,47 +1738,41 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   String _halluxDescription(double? angle) {
+    final l10n = AppLocalizations.of(context);
     if (angle == null) {
-      return 'Halluks açısına ilişkin değerlendirme '
-          'verisi bulunmuyor.';
+      return l10n.halluxNoData;
     }
 
     final absolute = angle.abs();
 
     if (absolute <= 10) {
-      return 'Başparmak hizalanması normal açı '
-          'aralığında görünüyor.';
+      return l10n.halluxNormal;
     }
 
     if (absolute <= 20) {
-      return 'Başparmak açısında hafif düzeyde '
-          'hizalanma değişimi görülüyor.';
+      return l10n.halluxMild;
     }
 
-    return 'Başparmak açısında belirgin hizalanma '
-        'değişimi görülüyor.';
+    return l10n.halluxMarked;
   }
 
   String _pronationDescription(double? angle) {
+    final l10n = AppLocalizations.of(context);
     if (angle == null) {
-      return 'Pronasyon açısına ilişkin değerlendirme '
-          'verisi bulunmuyor.';
+      return l10n.pronationNoData;
     }
 
     final absolute = angle.abs();
 
     if (absolute <= 4) {
-      return 'Arka ayak hizalanması normal açı '
-          'aralığında görünüyor.';
+      return l10n.pronationNormal;
     }
 
     if (absolute <= 8) {
-      return 'Arka ayakta hafif pronasyon veya '
-          'supinasyon eğilimi görülüyor.';
+      return l10n.pronationMild;
     }
 
-    return 'Arka ayak hizalanmasında belirgin açı '
-        'değişimi görülüyor.';
+    return l10n.pronationMarked;
   }
 
   // ---------------------------------------------------------------------------
@@ -1646,9 +1780,10 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildPressureMeasurementsSection() {
+    final l10n = AppLocalizations.of(context);
     return _buildSectionCard(
-      title: 'Plantar Basınç Ölçümleri',
-      subtitle: 'Seçili oturum sırasında kaydedilen basınç ölçüm kayıtları.',
+      title: l10n.plantarPressureMeasurements,
+      subtitle: l10n.plantarPressureSubtitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1665,9 +1800,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           else if (_pressureRecordings.isEmpty)
             _emptyInformationState(
               icon: Icons.speed_outlined,
-              message:
-                  'Bu oturum için kayıtlı plantar basınç '
-                  'ölçümü bulunmuyor.',
+              message: l10n.noPressureRecordings,
             )
           else ...[
             _buildPressureRecordingSelector(),
@@ -1680,6 +1813,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildPressureRecordingSelector() {
+    final l10n = AppLocalizations.of(context);
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -1735,7 +1869,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${recording.frameCount} kare • '
+                  '${l10n.framesRecorded(recording.frameCount)} • '
                   '${_formatDuration(recording.durationMs)}',
                   style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                 ),
@@ -1748,12 +1882,13 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   }
 
   Widget _buildSelectedPressureRecording() {
+    final l10n = AppLocalizations.of(context);
     final recording = _selectedPressureRecording;
 
     if (recording == null) {
       return _emptyInformationState(
         icon: Icons.touch_app_outlined,
-        message: 'Görüntülemek için bir basınç kaydı seçin.',
+        message: l10n.selectPressureRecording,
       );
     }
 
@@ -1835,6 +1970,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     required int frameIndex,
     required _PressureFrameStats stats,
   }) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
@@ -1848,14 +1984,17 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Basınç Isı Haritası',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  l10n.pressureHeatmap,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               Text(
-                'Kare ${frameIndex + 1}/${data.frames.length}',
+                l10n.frameCounter(frameIndex + 1, data.frames.length),
                 style: TextStyle(
                   color: Colors.grey.shade700,
                   fontWeight: FontWeight.w600,
@@ -1894,6 +2033,8 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                             _selectedPressurePoint?.pressureKpa,
                         selectedForceNewton:
                             _selectedPressurePoint?.forceNewton,
+                        physicalValueUnavailableLabel:
+                            l10n.physicalValueUnavailable,
                       ),
                       child: const SizedBox.expand(),
                     ),
@@ -1926,6 +2067,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     required _PressureRecordingData data,
     required _PressureFrameStats stats,
   }) {
+    final l10n = AppLocalizations.of(context);
     final totalLoad = stats.totalLoad;
 
     final leftPercent = totalLoad <= 0 ? 0.0 : stats.leftLoad / totalLoad * 100;
@@ -1951,32 +2093,32 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Yük Dağılımı',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Text(
+            l10n.loadDistribution,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           if (data.weightKg != null) ...[
             const SizedBox(height: 13),
             _pressureMetricTile(
-              'Kilo',
+              l10n.weight,
               '${data.weightKg!.toStringAsFixed(1)} kg',
               Icons.monitor_weight_outlined,
             ),
           ],
           const SizedBox(height: 17),
           _percentageDistribution(
-            title: 'Sol / Sağ Yük Dağılımı',
-            firstLabel: 'Sol',
+            title: l10n.leftRightLoad,
+            firstLabel: l10n.left,
             firstValue: leftPercent,
-            secondLabel: 'Sağ',
+            secondLabel: l10n.right,
             secondValue: rightPercent,
           ),
           const SizedBox(height: 15),
           _percentageDistribution(
-            title: 'Ön Ayak / Topuk Dağılımı',
-            firstLabel: 'Ön Ayak',
+            title: l10n.forefootHeelLoad,
+            firstLabel: l10n.forefoot,
             firstValue: forefootPercent,
-            secondLabel: 'Topuk',
+            secondLabel: l10n.heel,
             secondValue: heelPercent,
           ),
         ],
@@ -2120,6 +2262,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
   Widget _buildPressureSummaryWithoutFrames(
     SessionPressureRecordingModel recording,
   ) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(17),
@@ -2141,22 +2284,22 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
             runSpacing: 10,
             children: [
               _pressureMetricTile(
-                'Kare Sayısı',
+                l10n.frameCount,
                 '${recording.frameCount}',
                 Icons.filter_frames,
               ),
               _pressureMetricTile(
-                'Süre',
+                l10n.duration,
                 _formatDuration(recording.durationMs),
                 Icons.timer_outlined,
               ),
               _pressureMetricTile(
-                'Maksimum Ham Değer',
+                l10n.maximumRawValue,
                 recording.maxPressure?.toStringAsFixed(1) ?? '—',
                 Icons.trending_up,
               ),
               _pressureMetricTile(
-                'Ortalama Ham Değer',
+                l10n.averageRawValue,
                 recording.avgPressure?.toStringAsFixed(2) ?? '—',
                 Icons.analytics_outlined,
               ),
@@ -2365,6 +2508,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     String message, {
     required VoidCallback onRetry,
   }) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -2391,7 +2535,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
           OutlinedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
-            label: const Text('Tekrar Dene'),
+            label: Text(l10n.retry),
           ),
         ],
       ),
@@ -2422,6 +2566,7 @@ class _PressureHeatmapPainter extends CustomPainter {
   final int? selectedCol;
   final double? selectedPressureKpa;
   final double? selectedForceNewton;
+  final String physicalValueUnavailableLabel;
 
   const _PressureHeatmapPainter({
     required this.matrix,
@@ -2433,6 +2578,7 @@ class _PressureHeatmapPainter extends CustomPainter {
     required this.selectedCol,
     required this.selectedPressureKpa,
     required this.selectedForceNewton,
+    required this.physicalValueUnavailableLabel,
   });
 
   @override
@@ -2549,7 +2695,7 @@ class _PressureHeatmapPainter extends CustomPainter {
       );
 
       final label = selectedPressureKpa == null || selectedForceNewton == null
-          ? 'Fiziksel değer hesaplanamadı'
+          ? physicalValueUnavailableLabel
           : '${selectedPressureKpa!.toStringAsFixed(1)} kPa  •  '
                 '${selectedForceNewton!.toStringAsFixed(2)} N';
       final textPainter = TextPainter(
@@ -2643,7 +2789,9 @@ class _PressureHeatmapPainter extends CustomPainter {
         oldDelegate.selectedRow != selectedRow ||
         oldDelegate.selectedCol != selectedCol ||
         oldDelegate.selectedPressureKpa != selectedPressureKpa ||
-        oldDelegate.selectedForceNewton != selectedForceNewton;
+        oldDelegate.selectedForceNewton != selectedForceNewton ||
+        oldDelegate.physicalValueUnavailableLabel !=
+            physicalValueUnavailableLabel;
   }
 }
 

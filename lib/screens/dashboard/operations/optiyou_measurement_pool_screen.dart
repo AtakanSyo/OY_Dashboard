@@ -430,6 +430,7 @@ class _OptiyouMeasurementPoolScreenState
         builder: (_) => OptiYouMeasurementReviewScreen(
           currentUser: widget.currentUser,
           session: session.toMeasurementSession(),
+          pressureRepository: widget.pressureRepository,
         ),
       ),
     );

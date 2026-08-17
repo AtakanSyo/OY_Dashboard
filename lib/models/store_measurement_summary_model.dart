@@ -1,10 +1,12 @@
 class StoreMeasurementSummary {
+  final int? sessionId;
   final String sessionCode;
   final DateTime analysisDate;
   final String locationLabel;
   final String shortMessage;
 
   const StoreMeasurementSummary({
+    this.sessionId,
     required this.sessionCode,
     required this.analysisDate,
     required this.locationLabel,
