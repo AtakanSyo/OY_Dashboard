@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../theme/site_responsive.dart';
 import '../theme/site_tokens.dart';
@@ -38,7 +39,8 @@ class HeroVideoSection extends StatefulWidget {
 }
 
 class _HeroVideoSectionState extends State<HeroVideoSection> {
-  VideoPlayerController? _controller;
+  Player? _player;
+  VideoController? _videoController;
 
   bool _ready = false;
   bool _setupDone = false;
@@ -51,27 +53,30 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
 
     if (!_shouldPlayVideo) return;
 
-    final controller = VideoPlayerController.asset(widget.videoAsset);
-    _controller = controller;
+    _start();
+  }
 
-    controller
-        .initialize()
-        .then((_) async {
-          if (!mounted) return;
-          await controller.setLooping(true);
-          await controller.setVolume(0);
-          await controller.play();
-          if (!mounted) return;
-          setState(() => _ready = true);
-        })
-        .catchError((Object error) {
-          // Poster zaten görünür durumda; onunla devam edilir. Hata yine de
-          // loglanır: platformda video eklentisi yoksa sessizce poster'a
-          // düşmek, sorunu fark etmeyi zorlaştırıyor.
-          debugPrint('HERO_VIDEO: başlatılamadı ($error) — poster gösteriliyor');
-          if (!mounted) return;
-          setState(() => _ready = false);
-        });
+  Future<void> _start() async {
+    try {
+      // Player/VideoController kurulumu da try içinde: media_kit hazır
+      // değilse (ör. widget testleri) bölüm sessizce poster'a düşer.
+      final player = Player();
+      _player = player;
+      _videoController = VideoController(player);
+
+      await player.setVolume(0);
+      await player.setPlaylistMode(PlaylistMode.loop);
+      await player.open(Media('asset:///${widget.videoAsset}'));
+
+      if (!mounted) return;
+      setState(() => _ready = true);
+    } catch (error) {
+      // Poster zaten görünür durumda; onunla devam edilir. Hata yine de
+      // loglanır: sessizce poster'a düşmek sorunu fark etmeyi zorlaştırıyor.
+      debugPrint('HERO_VIDEO: başlatılamadı ($error) — poster gösteriliyor');
+      if (!mounted) return;
+      setState(() => _ready = false);
+    }
   }
 
   bool get _shouldPlayVideo {
@@ -82,7 +87,7 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _player?.dispose();
     super.dispose();
   }
 
@@ -106,7 +111,7 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
   @override
   Widget build(BuildContext context) {
     final device = context.device;
-    final controller = _controller;
+    final controller = _videoController;
     final showVideo = _ready && controller != null;
 
     return ConstrainedBox(
@@ -124,14 +129,13 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
             if (showVideo)
               Positioned.fill(
                 child: ExcludeSemantics(
-                  child: FittedBox(
+                  // media_kit'in Video widget'ı ölçeklemeyi kendi yapar;
+                  // ayrıca FittedBox/SizedBox sarmalayıcısına gerek yok.
+                  child: Video(
+                    controller: controller,
                     fit: BoxFit.cover,
-                    clipBehavior: Clip.hardEdge,
-                    child: SizedBox(
-                      width: controller.value.size.width,
-                      height: controller.value.size.height,
-                      child: VideoPlayer(controller),
-                    ),
+                    controls: NoVideoControls,
+                    fill: Colors.transparent,
                   ),
                 ),
               ),
