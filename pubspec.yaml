@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   
   flutter_libserialport: ^0.6.0 # Windows için destek
 
@@ -30,10 +32,12 @@ dependencies:
   desktop_drop: any
   supabase_flutter: ^2.9.0
   syncfusion_flutter_pdf: ^24.1.41
+  image: ^4.8.0
   url_launcher: ^6.3.1
   qr_flutter: ^4.1.0
   archive: ^4.0.9
-  video_player: ^2.11.1
+  video_player: ^2.13.0
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +45,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     # Site tipografisi (Montserrat + Public Sans) uygulamayla birlikte gelir;
@@ -53,7 +58,12 @@ flutter:
     - assets/images/products/
     - assets/images/addons/
     - assets/images/analysis/
+    - assets/images/systems/
     - assets/images/orthotic_design/
+    - assets/images/dml/
+    - assets/images/dml/catalog/
+    - assets/images/dml/methods/
+    - assets/images/dml/services/
     - assets/mock_data/
     - assets/scans/
     - assets/Results1.csv
@@ -62,3 +72,4 @@ flutter:
     - assets/products.csv
     - assets/images/
     - assets/heatmaps/
+    - assets/fonts/

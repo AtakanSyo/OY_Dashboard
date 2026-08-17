@@ -1,19 +1,20 @@
-﻿// KORUNMUŞ REFERANS: bu dosya, OPTIYOU Superspec oncesi tek sayfalik landing
-// icerigidir. Yeni public site lib/site/ altindadir. Menu sayfalarinin
+﻿// KORUNMUS REFERANS: bu dosya, OPTIYOU Superspec oncesi tek sayfalik landing
+// icerigidir (origin/main uzerindeki en son hali; coklu dil, dil secici ve
+// DML girisi dahil). Yeni public site lib/site/ altindadir. Menu sayfalarinin
 // icerigi doldurulurken buradaki bolumler kaynak olarak kullanilabilir.
 // Uygulamada hicbir yerden referans verilmez; silinebilir (git gecmisinde durur).
 
 import 'package:flutter/material.dart';
+import 'package:oy_site/dml/app/dml_shell.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/screens/auth/login_screen.dart';
 import 'package:oy_site/screens/auth/register_screen.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 
 class LegacyHomeScreen extends StatefulWidget {
   final dynamic pressureRepository;
 
-  const LegacyHomeScreen({
-    super.key,
-    required this.pressureRepository,
-  });
+  const LegacyHomeScreen({super.key, required this.pressureRepository});
 
   @override
   State<LegacyHomeScreen> createState() => _LegacyHomeScreenState();
@@ -37,9 +38,8 @@ class _LegacyHomeScreenState extends State<LegacyHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LoginScreen(
-          pressureRepository: widget.pressureRepository,
-        ),
+        builder: (_) =>
+            LoginScreen(pressureRepository: widget.pressureRepository),
       ),
     );
   }
@@ -48,6 +48,13 @@ class _LegacyHomeScreenState extends State<LegacyHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RegisterScreen()),
+    );
+  }
+
+  void _goToDml() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DmlShell()),
     );
   }
 
@@ -74,6 +81,7 @@ class _LegacyHomeScreenState extends State<LegacyHomeScreen> {
           _Navbar(
             onLogin: _goToLogin,
             onRegister: _goToRegister,
+            onDml: _goToDml,
             onScrollToServices: () => _scrollTo(_servicesKey),
             onScrollToProducts: () => _scrollTo(_productsKey),
             onScrollToCenters: () => _scrollTo(_centersKey),
@@ -85,10 +93,7 @@ class _LegacyHomeScreenState extends State<LegacyHomeScreen> {
               controller: _scrollController,
               child: Column(
                 children: [
-                  _HeroSection(
-                    isNarrow: isNarrow,
-                    onGetStarted: _goToRegister,
-                  ),
+                  _HeroSection(isNarrow: isNarrow, onGetStarted: _goToRegister),
                   _ImpactStatsSection(isNarrow: isNarrow),
                   _KimIcinSection(isNarrow: isNarrow),
                   Container(
@@ -132,6 +137,7 @@ class _LegacyHomeScreenState extends State<LegacyHomeScreen> {
 class _Navbar extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onRegister;
+  final VoidCallback onDml;
   final VoidCallback onScrollToServices;
   final VoidCallback onScrollToProducts;
   final VoidCallback onScrollToCenters;
@@ -141,6 +147,7 @@ class _Navbar extends StatelessWidget {
   const _Navbar({
     required this.onLogin,
     required this.onRegister,
+    required this.onDml,
     required this.onScrollToServices,
     required this.onScrollToProducts,
     required this.onScrollToCenters,
@@ -150,6 +157,7 @@ class _Navbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       height: 66,
       decoration: BoxDecoration(
@@ -179,33 +187,51 @@ class _Navbar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
-              Image.asset(
-                'assets/images/branding/logo.png',
-                height: 50,
-              ),
+              Image.asset('assets/images/branding/logo.png', height: 50),
             ],
           ),
           const Spacer(),
+          LanguageSelector(compact: isNarrow),
+          const SizedBox(width: 8),
           if (!isNarrow) ...[
-            _NavLink(label: 'Hizmetler', onTap: onScrollToServices),
-            _NavLink(label: 'Ürünler', onTap: onScrollToProducts),
-            _NavLink(label: 'Merkezler', onTap: onScrollToCenters),
-            _NavLink(label: 'Hakkımızda', onTap: onScrollToAbout),
+            _NavLink(label: l10n.services, onTap: onScrollToServices),
+            _NavLink(label: l10n.products, onTap: onScrollToProducts),
+            _NavLink(label: l10n.measurementCenters, onTap: onScrollToCenters),
+            _NavLink(label: l10n.aboutUs, onTap: onScrollToAbout),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: onDml,
+              icon: const Icon(Icons.view_in_ar_outlined, size: 18),
+              label: Text(l10n.digitalManufacturingLab),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF182629),
+                side: const BorderSide(color: Color(0xFF182629)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
             const SizedBox(width: 16),
             OutlinedButton(
               onPressed: onLogin,
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.teal,
                 side: const BorderSide(color: Colors.teal),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Giriş Yap',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              child: Text(
+                l10n.login,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 10),
@@ -214,25 +240,23 @@ class _Navbar extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Kayıt Ol',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              child: Text(
+                l10n.register,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ] else
             PopupMenuButton<String>(
-              icon: const Icon(
-                Icons.menu,
-                color: Color(0xFF1A2340),
-                size: 26,
-              ),
+              icon: const Icon(Icons.menu, color: Color(0xFF1A2340), size: 26),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -250,6 +274,9 @@ class _Navbar extends StatelessWidget {
                     break;
                   case 'about':
                     onScrollToAbout();
+                    break;
+                  case 'dml':
+                    onDml();
                     break;
                   case 'login':
                     onLogin();
@@ -306,13 +333,23 @@ class _Navbar extends StatelessWidget {
                   value: 'about',
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 18,
-                        color: Colors.teal,
-                      ),
+                      Icon(Icons.info_outline, size: 18, color: Colors.teal),
                       SizedBox(width: 10),
                       Text('Hakkımızda'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dml',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.view_in_ar_outlined,
+                        size: 18,
+                        color: Color(0xFF182629),
+                      ),
+                      SizedBox(width: 10),
+                      Text('DML Platformu'),
                     ],
                   ),
                 ),
@@ -353,10 +390,7 @@ class _NavLink extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _NavLink({
-    required this.label,
-    required this.onTap,
-  });
+  const _NavLink({required this.label, required this.onTap});
 
   @override
   State<_NavLink> createState() => _NavLinkState();
@@ -410,10 +444,7 @@ class _HeroSection extends StatelessWidget {
   final bool isNarrow;
   final VoidCallback onGetStarted;
 
-  const _HeroSection({
-    required this.isNarrow,
-    required this.onGetStarted,
-  });
+  const _HeroSection({required this.isNarrow, required this.onGetStarted});
 
   @override
   Widget build(BuildContext context) {
@@ -444,8 +475,9 @@ class _HeroSection extends StatelessWidget {
 
   Widget _heroContent(BuildContext context, bool isNarrow) {
     return Column(
-      crossAxisAlignment:
-          isNarrow ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isNarrow
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -486,16 +518,19 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 36),
         Row(
-          mainAxisAlignment:
-              isNarrow ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isNarrow
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             ElevatedButton(
               onPressed: onGetStarted,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.teal.shade800,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 16,
+                ),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -537,10 +572,7 @@ class _HeroSection extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.75),
-            fontSize: 13,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13),
         ),
       ],
     );
@@ -877,12 +909,30 @@ class _AnalysisSystemsSection extends StatelessWidget {
                   'Klinik ve uzman kullanımı',
                 ],
                 comparisonItems: const [
-                  _SystemComparisonItem(label: '3D ayak tarama', available: true),
-                  _SystemComparisonItem(label: 'Ayak sağlığı analizi', available: true),
-                  _SystemComparisonItem(label: 'Plantar basınç ölçümü', available: true),
-                  _SystemComparisonItem(label: 'Ayakkabı içi dinamik ölçüm', available: true),
-                  _SystemComparisonItem(label: 'Yüksek hacimli tarama', available: false),
-                  _SystemComparisonItem(label: 'Fabrika / yoğun sirkülasyon', available: false),
+                  _SystemComparisonItem(
+                    label: '3D ayak tarama',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Ayak sağlığı analizi',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Plantar basınç ölçümü',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Ayakkabı içi dinamik ölçüm',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Yüksek hacimli tarama',
+                    available: false,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Fabrika / yoğun sirkülasyon',
+                    available: false,
+                  ),
                 ],
                 modules: const [
                   _SystemMiniModule(
@@ -891,7 +941,8 @@ class _AnalysisSystemsSection extends StatelessWidget {
                   ),
                   _SystemMiniModule(
                     title: 'Ayakkabı İçi Dinamik Modül',
-                    imagePath: 'assets/images/systems/inshoe_dynamic_pressure.png',
+                    imagePath:
+                        'assets/images/systems/inshoe_dynamic_pressure.png',
                   ),
                 ],
               ),
@@ -909,12 +960,30 @@ class _AnalysisSystemsSection extends StatelessWidget {
                   'Toplu analiz operasyonları',
                 ],
                 comparisonItems: const [
-                  _SystemComparisonItem(label: '3D ayak tarama', available: true),
-                  _SystemComparisonItem(label: 'Ayak sağlığı analizi', available: true),
-                  _SystemComparisonItem(label: 'Plantar basınç ölçümü', available: false),
-                  _SystemComparisonItem(label: 'Ayakkabı içi dinamik ölçüm', available: false),
-                  _SystemComparisonItem(label: 'Yüksek hacimli tarama', available: true),
-                  _SystemComparisonItem(label: 'Fabrika / yoğun sirkülasyon', available: true),
+                  _SystemComparisonItem(
+                    label: '3D ayak tarama',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Ayak sağlığı analizi',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Plantar basınç ölçümü',
+                    available: false,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Ayakkabı içi dinamik ölçüm',
+                    available: false,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Yüksek hacimli tarama',
+                    available: true,
+                  ),
+                  _SystemComparisonItem(
+                    label: 'Fabrika / yoğun sirkülasyon',
+                    available: true,
+                  ),
                 ],
               ),
             ],
@@ -929,20 +998,14 @@ class _SystemComparisonItem {
   final String label;
   final bool available;
 
-  const _SystemComparisonItem({
-    required this.label,
-    required this.available,
-  });
+  const _SystemComparisonItem({required this.label, required this.available});
 }
 
 class _SystemMiniModule {
   final String title;
   final String imagePath;
 
-  const _SystemMiniModule({
-    required this.title,
-    required this.imagePath,
-  });
+  const _SystemMiniModule({required this.title, required this.imagePath});
 }
 
 class _AnalysisSystemCard extends StatefulWidget {
@@ -1121,9 +1184,7 @@ class _AnalysisSystemCardState extends State<_AnalysisSystemCard> {
 class _SystemMiniModuleCard extends StatelessWidget {
   final _SystemMiniModule module;
 
-  const _SystemMiniModuleCard({
-    required this.module,
-  });
+  const _SystemMiniModuleCard({required this.module});
 
   @override
   Widget build(BuildContext context) {
@@ -1167,9 +1228,7 @@ class _SystemMiniModuleCard extends StatelessWidget {
 class _SystemAvailabilityChip extends StatelessWidget {
   final _SystemComparisonItem item;
 
-  const _SystemAvailabilityChip({
-    required this.item,
-  });
+  const _SystemAvailabilityChip({required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -1177,7 +1236,9 @@ class _SystemAvailabilityChip extends StatelessWidget {
         ? Colors.green.withOpacity(0.10)
         : Colors.grey.withOpacity(0.12);
 
-    final textColor = item.available ? Colors.green.shade700 : Colors.grey.shade700;
+    final textColor = item.available
+        ? Colors.green.shade700
+        : Colors.grey.shade700;
     final iconColor = item.available ? Colors.green : Colors.grey;
 
     return Container(
@@ -1270,10 +1331,7 @@ class _ServicesSection extends StatelessWidget {
           Text(
             'Optiyou çözümleri bireysel, uzman ve kurumsal kullanım senaryolarına göre şekillenir.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
           const SizedBox(height: 40),
           Wrap(
@@ -1355,18 +1413,12 @@ class _ServiceCardState extends State<_ServiceCard> {
             const SizedBox(height: 12),
             Text(
               widget.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 17,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
             const SizedBox(height: 8),
             Text(
               widget.desc,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.45,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, height: 1.45),
             ),
             if (_hovered) ...[
               const SizedBox(height: 14),
@@ -1402,10 +1454,7 @@ class _ProductsSection extends StatelessWidget {
   final bool isNarrow;
   final VoidCallback onOpenStore;
 
-  const _ProductsSection({
-    required this.isNarrow,
-    required this.onOpenStore,
-  });
+  const _ProductsSection({required this.isNarrow, required this.onOpenStore});
 
   static const products = [
     {
@@ -1449,10 +1498,7 @@ class _ProductsSection extends StatelessWidget {
           Text(
             'Optiyou ürünleri analiz sonuçlarına göre kişisel veya hedefli kullanım senaryolarına uyarlanır.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
           const SizedBox(height: 40),
           Wrap(
@@ -1546,10 +1592,7 @@ class _ProductCardState extends State<_ProductCard> {
                   const SizedBox(height: 8),
                   Text(
                     widget.desc,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      height: 1.45,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade700, height: 1.45),
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
@@ -1557,8 +1600,9 @@ class _ProductCardState extends State<_ProductCard> {
                     child: ElevatedButton(
                       onPressed: widget.onOpen,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            _hovered ? Colors.teal.shade700 : Colors.teal,
+                        backgroundColor: _hovered
+                            ? Colors.teal.shade700
+                            : Colors.teal,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1640,10 +1684,7 @@ class _ImpactStatsSection extends StatelessWidget {
           Text(
             'Ayak sağlığı ve ortopedik destek süreçlerinde öne çıkan etkiler',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
           const SizedBox(height: 40),
           Wrap(
@@ -1768,10 +1809,7 @@ class _KimIcinSection extends StatelessWidget {
       'icon': Icons.sports,
       'title': 'Sporcular',
       'desc': 'Performansını geliştirmek isteyen sporcular',
-      'items': [
-        'Bireysel sporcular',
-        'Takım sporcuları',
-      ],
+      'items': ['Bireysel sporcular', 'Takım sporcuları'],
     },
     {
       'icon': Icons.favorite_border,
@@ -1809,10 +1847,7 @@ class _KimIcinSection extends StatelessWidget {
           Text(
             'Optiyou çözümleri farklı yaş, ihtiyaç ve kullanım senaryolarına uygun olarak tasarlanır.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
           const SizedBox(height: 40),
           Wrap(
@@ -1987,10 +2022,7 @@ class _MeasurementCentersSection extends StatelessWidget {
           Text(
             'Ayak analizi, ölçüm ve değerlendirme süreçlerimize farklı merkezlerimiz üzerinden erişebilirsiniz.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
           const SizedBox(height: 40),
           Wrap(
@@ -2064,8 +2096,10 @@ class _MeasurementCenterCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.teal.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(999),
@@ -2248,10 +2282,7 @@ class _AboutSection extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.teal.shade50,
-            Colors.teal.shade100,
-          ],
+          colors: [Colors.teal.shade50, Colors.teal.shade100],
         ),
         borderRadius: BorderRadius.circular(24),
       ),
@@ -2279,11 +2310,7 @@ class _AboutSection extends StatelessWidget {
           Positioned(
             bottom: 110,
             left: 24,
-            child: _infoChip(
-              Icons.sports_soccer,
-              'Sporcu Takibi',
-              Colors.blue,
-            ),
+            child: _infoChip(Icons.sports_soccer, 'Sporcu Takibi', Colors.blue),
           ),
           Positioned(
             bottom: 34,
@@ -2294,11 +2321,7 @@ class _AboutSection extends StatelessWidget {
               Colors.orange,
             ),
           ),
-          const Icon(
-            Icons.accessibility_new,
-            size: 140,
-            color: Colors.teal,
-          ),
+          const Icon(Icons.accessibility_new, size: 140, color: Colors.teal),
         ],
       ),
     );
@@ -2339,10 +2362,7 @@ class _CtaSection extends StatelessWidget {
   final VoidCallback onGetStarted;
   final VoidCallback onLogin;
 
-  const _CtaSection({
-    required this.onGetStarted,
-    required this.onLogin,
-  });
+  const _CtaSection({required this.onGetStarted, required this.onLogin});
 
   @override
   Widget build(BuildContext context) {
@@ -2383,8 +2403,10 @@ class _CtaSection extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.teal.shade800,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -2401,16 +2423,15 @@ class _CtaSection extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: BorderSide(color: Colors.white.withOpacity(0.6)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 16,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Giriş Yap',
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: const Text('Giriş Yap', style: TextStyle(fontSize: 16)),
               ),
             ],
           ),
@@ -2433,10 +2454,7 @@ class _Footer extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
       child: Column(
         children: [
-          Image.asset(
-            'assets/images/branding/logo_footer.png',
-            height: 48,
-          ),
+          Image.asset('assets/images/branding/logo_footer.png', height: 48),
           const SizedBox(height: 18),
           Text(
             '© 2026 Tüm hakları saklıdır.',
@@ -2450,3 +2468,4 @@ class _Footer extends StatelessWidget {
     );
   }
 }
+

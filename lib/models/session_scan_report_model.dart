@@ -77,9 +77,10 @@ class SessionScanReportModel {
     };
   }
 
-  static Map<String, dynamic> _parsedScanReportToMap(
-    ParsedScanReport report,
-  ) {
+  ParsedScanReport toParsedScanReport() =>
+      ParsedScanReport.fromMap(parsedReportJson);
+
+  static Map<String, dynamic> _parsedScanReportToMap(ParsedScanReport report) {
     return {
       'reportNo': report.reportNo,
       'reportDate': report.reportDate,
@@ -97,10 +98,22 @@ class SessionScanReportModel {
       'rightSoleLength': report.rightSoleLength,
       'leftArchLength': report.leftArchLength,
       'rightArchLength': report.rightArchLength,
+      'leftFirstMetaLength': report.leftFirstMetaLength,
+      'rightFirstMetaLength': report.rightFirstMetaLength,
+      'leftFifthMetaLength': report.leftFifthMetaLength,
+      'rightFifthMetaLength': report.rightFifthMetaLength,
       'leftFootWidth': report.leftFootWidth,
       'rightFootWidth': report.rightFootWidth,
+      'leftToeWidth': report.leftToeWidth,
+      'rightToeWidth': report.rightToeWidth,
+      'leftArchOutsideWidth': report.leftArchOutsideWidth,
+      'rightArchOutsideWidth': report.rightArchOutsideWidth,
+      'leftTotalHeelWidth': report.leftTotalHeelWidth,
+      'rightTotalHeelWidth': report.rightTotalHeelWidth,
       'leftArchHeight': report.leftArchHeight,
       'rightArchHeight': report.rightArchHeight,
+      'leftFirstMetaJointHeight': report.leftFirstMetaJointHeight,
+      'rightFirstMetaJointHeight': report.rightFirstMetaJointHeight,
 
       'leftArchType': report.leftArchType,
       'rightArchType': report.rightArchType,

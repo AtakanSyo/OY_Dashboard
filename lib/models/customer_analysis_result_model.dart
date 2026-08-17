@@ -105,6 +105,12 @@ class CustomerRecommendationItem {
 }
 
 class CustomerAnalysisResult {
+  /// Supabase measurement_sessions.id değeri.
+  ///
+  /// Basınç ölçüm kayıtlarını ve diğer oturum verilerini analiz sonucu ile
+  /// ilişkilendirmek için kullanılır.
+  final int? sessionId;
+
   final String sessionCode;
   final String locationLabel;
   final DateTime analysisDate;
@@ -118,6 +124,7 @@ class CustomerAnalysisResult {
   final ParsedScanReport? parsedReport;
 
   const CustomerAnalysisResult({
+    this.sessionId,
     required this.sessionCode,
     required this.locationLabel,
     required this.analysisDate,
@@ -134,12 +141,17 @@ class CustomerAnalysisResult {
   Map<String, dynamic> toMap({
     int? userId,
     int? patientId,
+
+    /// Geriye dönük uyumluluk için korunmuştur.
+    ///
+    /// Metoda bir sessionId verilirse bu değer kullanılır. Verilmezse modelin
+    /// kendi sessionId alanı kullanılır.
     int? sessionId,
   }) {
     return {
       'user_id': userId,
       'patient_id': patientId,
-      'session_id': sessionId,
+      'session_id': sessionId ?? this.sessionId,
       'session_code': sessionCode,
       'analysis_date': analysisDate.toIso8601String(),
       'location_label': locationLabel,
@@ -148,15 +160,19 @@ class CustomerAnalysisResult {
       'left_foot': leftFoot.toMap(),
       'right_foot': rightFoot.toMap(),
       'metrics': metrics.map((item) => item.toMap()).toList(),
-      'recommendations': recommendations.map((item) => item.toMap()).toList(),
+      'recommendations': recommendations
+          .map((item) => item.toMap())
+          .toList(),
       'visuals': visuals.toMap(),
-      'parsed_report':
-          parsedReport == null ? null : _parsedScanReportToMap(parsedReport!),
+      'parsed_report': parsedReport == null
+          ? null
+          : _parsedScanReportToMap(parsedReport!),
     };
   }
 
   factory CustomerAnalysisResult.fromMap(Map<String, dynamic> map) {
     return CustomerAnalysisResult(
+      sessionId: _toInt(map['session_id']),
       sessionCode: map['session_code']?.toString() ?? '',
       locationLabel: map['location_label']?.toString() ?? '',
       analysisDate: _toDateTime(map['analysis_date']),
@@ -169,17 +185,60 @@ class CustomerAnalysisResult {
         _asMap(map['right_foot']),
       ),
       metrics: _asList(map['metrics'])
-          .map((item) => CustomerAnalysisMetric.fromMap(_asMap(item)))
+          .map(
+            (item) => CustomerAnalysisMetric.fromMap(
+              _asMap(item),
+            ),
+          )
           .toList(),
       recommendations: _asList(map['recommendations'])
-          .map((item) => CustomerRecommendationItem.fromMap(_asMap(item)))
+          .map(
+            (item) => CustomerRecommendationItem.fromMap(
+              _asMap(item),
+            ),
+          )
           .toList(),
       visuals: CustomerAnalysisVisualSet.fromMap(
         _asMap(map['visuals']),
       ),
       parsedReport: map['parsed_report'] == null
           ? null
-          : _parsedScanReportFromMap(_asMap(map['parsed_report'])),
+          : _parsedScanReportFromMap(
+              _asMap(map['parsed_report']),
+            ),
+    );
+  }
+
+  CustomerAnalysisResult copyWith({
+    int? sessionId,
+    bool clearSessionId = false,
+    String? sessionCode,
+    String? locationLabel,
+    DateTime? analysisDate,
+    String? overallSummary,
+    String? generalRiskNote,
+    CustomerFootSummary? leftFoot,
+    CustomerFootSummary? rightFoot,
+    List<CustomerAnalysisMetric>? metrics,
+    List<CustomerRecommendationItem>? recommendations,
+    CustomerAnalysisVisualSet? visuals,
+    ParsedScanReport? parsedReport,
+    bool clearParsedReport = false,
+  }) {
+    return CustomerAnalysisResult(
+      sessionId: clearSessionId ? null : sessionId ?? this.sessionId,
+      sessionCode: sessionCode ?? this.sessionCode,
+      locationLabel: locationLabel ?? this.locationLabel,
+      analysisDate: analysisDate ?? this.analysisDate,
+      overallSummary: overallSummary ?? this.overallSummary,
+      generalRiskNote: generalRiskNote ?? this.generalRiskNote,
+      leftFoot: leftFoot ?? this.leftFoot,
+      rightFoot: rightFoot ?? this.rightFoot,
+      metrics: metrics ?? this.metrics,
+      recommendations: recommendations ?? this.recommendations,
+      visuals: visuals ?? this.visuals,
+      parsedReport:
+          clearParsedReport ? null : parsedReport ?? this.parsedReport,
     );
   }
 }
@@ -235,18 +294,36 @@ class CustomerAnalysisVisualSet {
   factory CustomerAnalysisVisualSet.fromMap(Map<String, dynamic> map) {
     return CustomerAnalysisVisualSet(
       sessionCode: map['sessionCode']?.toString() ?? '',
-      archLeftImagePath: map['archLeftImagePath']?.toString(),
-      archRightImagePath: map['archRightImagePath']?.toString(),
-      archSectionLeftImagePath:
-          map['archSectionLeftImagePath']?.toString(),
-      archSectionRightImagePath:
-          map['archSectionRightImagePath']?.toString(),
-      foot2dLeftImagePath: map['foot2dLeftImagePath']?.toString(),
-      foot2dRightImagePath: map['foot2dRightImagePath']?.toString(),
-      pronatorLeftImagePath: map['pronatorLeftImagePath']?.toString(),
-      pronatorRightImagePath: map['pronatorRightImagePath']?.toString(),
-      leftStlPath: map['leftStlPath']?.toString(),
-      rightStlPath: map['rightStlPath']?.toString(),
+      archLeftImagePath: _toNullableString(
+        map['archLeftImagePath'],
+      ),
+      archRightImagePath: _toNullableString(
+        map['archRightImagePath'],
+      ),
+      archSectionLeftImagePath: _toNullableString(
+        map['archSectionLeftImagePath'],
+      ),
+      archSectionRightImagePath: _toNullableString(
+        map['archSectionRightImagePath'],
+      ),
+      foot2dLeftImagePath: _toNullableString(
+        map['foot2dLeftImagePath'],
+      ),
+      foot2dRightImagePath: _toNullableString(
+        map['foot2dRightImagePath'],
+      ),
+      pronatorLeftImagePath: _toNullableString(
+        map['pronatorLeftImagePath'],
+      ),
+      pronatorRightImagePath: _toNullableString(
+        map['pronatorRightImagePath'],
+      ),
+      leftStlPath: _toNullableString(
+        map['leftStlPath'],
+      ),
+      rightStlPath: _toNullableString(
+        map['rightStlPath'],
+      ),
     );
   }
 }
@@ -341,15 +418,15 @@ Map<String, dynamic> _parsedScanReportToMap(ParsedScanReport report) {
 
 ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
   return ParsedScanReport(
-    reportNo: map['reportNo']?.toString(),
-    reportDate: map['reportDate']?.toString(),
-    reportTime: map['reportTime']?.toString(),
-    storeCode: map['storeCode']?.toString(),
-    address: map['address']?.toString(),
-    customerName: map['customerName']?.toString(),
-    gender: map['gender']?.toString(),
-    age: map['age']?.toString(),
-    phone: map['phone']?.toString(),
+    reportNo: _toNullableString(map['reportNo']),
+    reportDate: _toNullableString(map['reportDate']),
+    reportTime: _toNullableString(map['reportTime']),
+    storeCode: _toNullableString(map['storeCode']),
+    address: _toNullableString(map['address']),
+    customerName: _toNullableString(map['customerName']),
+    gender: _toNullableString(map['gender']),
+    age: _toNullableString(map['age']),
+    phone: _toNullableString(map['phone']),
 
     leftFootLength: _toNullableDouble(map['leftFootLength']),
     rightFootLength: _toNullableDouble(map['rightFootLength']),
@@ -361,18 +438,30 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     rightFirstMetaLength: _toNullableDouble(map['rightFirstMetaLength']),
     leftFifthMetaLength: _toNullableDouble(map['leftFifthMetaLength']),
     rightFifthMetaLength: _toNullableDouble(map['rightFifthMetaLength']),
-    leftHalluxBumpsLength:
-        _toNullableDouble(map['leftHalluxBumpsLength']),
-    rightHalluxBumpsLength:
-        _toNullableDouble(map['rightHalluxBumpsLength']),
-    leftFootFlankLength: _toNullableDouble(map['leftFootFlankLength']),
-    rightFootFlankLength: _toNullableDouble(map['rightFootFlankLength']),
-    leftHeelCenterLength: _toNullableDouble(map['leftHeelCenterLength']),
-    rightHeelCenterLength:
-        _toNullableDouble(map['rightHeelCenterLength']),
-    leftHeelMarginLength: _toNullableDouble(map['leftHeelMarginLength']),
-    rightHeelMarginLength:
-        _toNullableDouble(map['rightHeelMarginLength']),
+    leftHalluxBumpsLength: _toNullableDouble(
+      map['leftHalluxBumpsLength'],
+    ),
+    rightHalluxBumpsLength: _toNullableDouble(
+      map['rightHalluxBumpsLength'],
+    ),
+    leftFootFlankLength: _toNullableDouble(
+      map['leftFootFlankLength'],
+    ),
+    rightFootFlankLength: _toNullableDouble(
+      map['rightFootFlankLength'],
+    ),
+    leftHeelCenterLength: _toNullableDouble(
+      map['leftHeelCenterLength'],
+    ),
+    rightHeelCenterLength: _toNullableDouble(
+      map['rightHeelCenterLength'],
+    ),
+    leftHeelMarginLength: _toNullableDouble(
+      map['leftHeelMarginLength'],
+    ),
+    rightHeelMarginLength: _toNullableDouble(
+      map['rightHeelMarginLength'],
+    ),
 
     leftFootWidth: _toNullableDouble(map['leftFootWidth']),
     rightFootWidth: _toNullableDouble(map['rightFootWidth']),
@@ -380,27 +469,45 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     rightSlantWidth: _toNullableDouble(map['rightSlantWidth']),
     leftToeWidth: _toNullableDouble(map['leftToeWidth']),
     rightToeWidth: _toNullableDouble(map['rightToeWidth']),
-    leftArchOutsideWidth:
-        _toNullableDouble(map['leftArchOutsideWidth']),
-    rightArchOutsideWidth:
-        _toNullableDouble(map['rightArchOutsideWidth']),
-    leftFootFlankWidth: _toNullableDouble(map['leftFootFlankWidth']),
-    rightFootFlankWidth: _toNullableDouble(map['rightFootFlankWidth']),
-    leftHeelCenterWidth: _toNullableDouble(map['leftHeelCenterWidth']),
-    rightHeelCenterWidth: _toNullableDouble(map['rightHeelCenterWidth']),
-    leftTotalHeelWidth: _toNullableDouble(map['leftTotalHeelWidth']),
-    rightTotalHeelWidth: _toNullableDouble(map['rightTotalHeelWidth']),
+    leftArchOutsideWidth: _toNullableDouble(
+      map['leftArchOutsideWidth'],
+    ),
+    rightArchOutsideWidth: _toNullableDouble(
+      map['rightArchOutsideWidth'],
+    ),
+    leftFootFlankWidth: _toNullableDouble(
+      map['leftFootFlankWidth'],
+    ),
+    rightFootFlankWidth: _toNullableDouble(
+      map['rightFootFlankWidth'],
+    ),
+    leftHeelCenterWidth: _toNullableDouble(
+      map['leftHeelCenterWidth'],
+    ),
+    rightHeelCenterWidth: _toNullableDouble(
+      map['rightHeelCenterWidth'],
+    ),
+    leftTotalHeelWidth: _toNullableDouble(
+      map['leftTotalHeelWidth'],
+    ),
+    rightTotalHeelWidth: _toNullableDouble(
+      map['rightTotalHeelWidth'],
+    ),
 
     leftArchHeight: _toNullableDouble(map['leftArchHeight']),
     rightArchHeight: _toNullableDouble(map['rightArchHeight']),
-    leftFirstMetaJointHeight:
-        _toNullableDouble(map['leftFirstMetaJointHeight']),
-    rightFirstMetaJointHeight:
-        _toNullableDouble(map['rightFirstMetaJointHeight']),
-    leftHeelProtrusionHeight:
-        _toNullableDouble(map['leftHeelProtrusionHeight']),
-    rightHeelProtrusionHeight:
-        _toNullableDouble(map['rightHeelProtrusionHeight']),
+    leftFirstMetaJointHeight: _toNullableDouble(
+      map['leftFirstMetaJointHeight'],
+    ),
+    rightFirstMetaJointHeight: _toNullableDouble(
+      map['rightFirstMetaJointHeight'],
+    ),
+    leftHeelProtrusionHeight: _toNullableDouble(
+      map['leftHeelProtrusionHeight'],
+    ),
+    rightHeelProtrusionHeight: _toNullableDouble(
+      map['rightHeelProtrusionHeight'],
+    ),
 
     leftHalluxAngle: _toNullableDouble(map['leftHalluxAngle']),
     rightHalluxAngle: _toNullableDouble(map['rightHalluxAngle']),
@@ -409,29 +516,37 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     leftKneeAngle: _toNullableDouble(map['leftKneeAngle']),
     rightKneeAngle: _toNullableDouble(map['rightKneeAngle']),
 
-    leftShoeSize: map['leftShoeSize']?.toString(),
-    rightShoeSize: map['rightShoeSize']?.toString(),
-    leftInsoleRecommendation:
-        map['leftInsoleRecommendation']?.toString(),
-    rightInsoleRecommendation:
-        map['rightInsoleRecommendation']?.toString(),
+    leftShoeSize: _toNullableString(map['leftShoeSize']),
+    rightShoeSize: _toNullableString(map['rightShoeSize']),
+    leftInsoleRecommendation: _toNullableString(
+      map['leftInsoleRecommendation'],
+    ),
+    rightInsoleRecommendation: _toNullableString(
+      map['rightInsoleRecommendation'],
+    ),
 
-    leftArchType: map['leftArchType']?.toString(),
-    rightArchType: map['rightArchType']?.toString(),
+    leftArchType: _toNullableString(map['leftArchType']),
+    rightArchType: _toNullableString(map['rightArchType']),
     leftArchIndex: _toNullableDouble(map['leftArchIndex']),
     rightArchIndex: _toNullableDouble(map['rightArchIndex']),
-    leftArchWidthIndex: _toNullableDouble(map['leftArchWidthIndex']),
-    rightArchWidthIndex: _toNullableDouble(map['rightArchWidthIndex']),
+    leftArchWidthIndex: _toNullableDouble(
+      map['leftArchWidthIndex'],
+    ),
+    rightArchWidthIndex: _toNullableDouble(
+      map['rightArchWidthIndex'],
+    ),
 
-    leftHalluxType: map['leftHalluxType']?.toString(),
-    rightHalluxType: map['rightHalluxType']?.toString(),
-    leftHeelType: map['leftHeelType']?.toString(),
-    rightHeelType: map['rightHeelType']?.toString(),
-    leftKneeType: map['leftKneeType']?.toString(),
-    rightKneeType: map['rightKneeType']?.toString(),
+    leftHalluxType: _toNullableString(map['leftHalluxType']),
+    rightHalluxType: _toNullableString(map['rightHalluxType']),
+    leftHeelType: _toNullableString(map['leftHeelType']),
+    rightHeelType: _toNullableString(map['rightHeelType']),
+    leftKneeType: _toNullableString(map['leftKneeType']),
+    rightKneeType: _toNullableString(map['rightKneeType']),
 
-    recommendationText: map['recommendationText']?.toString(),
-    rawText: map['rawText']?.toString(),
+    recommendationText: _toNullableString(
+      map['recommendationText'],
+    ),
+    rawText: _toNullableString(map['rawText']),
   );
 }
 
@@ -441,11 +556,16 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
 
 Map<String, dynamic> _asMap(dynamic value) {
   if (value is Map<String, dynamic>) return value;
+
   if (value is Map) {
     return value.map(
-      (key, val) => MapEntry(key.toString(), val),
+      (key, val) => MapEntry(
+        key.toString(),
+        val,
+      ),
     );
   }
+
   return <String, dynamic>{};
 }
 
@@ -454,20 +574,51 @@ List<dynamic> _asList(dynamic value) {
   return <dynamic>[];
 }
 
+int? _toInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+
+  final normalized = value.toString().trim();
+  if (normalized.isEmpty) return null;
+
+  return int.tryParse(normalized);
+}
+
 double _toDouble(dynamic value) {
-  if (value == null) return 0;
+  if (value == null) return 0.0;
   if (value is num) return value.toDouble();
-  return double.tryParse(value.toString()) ?? 0;
+
+  return double.tryParse(
+        value.toString().trim().replaceAll(',', '.'),
+      ) ??
+      0.0;
 }
 
 double? _toNullableDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
+
+  final normalized = value
+      .toString()
+      .trim()
+      .replaceAll(',', '.');
+
+  if (normalized.isEmpty) return null;
+
+  return double.tryParse(normalized);
+}
+
+String? _toNullableString(dynamic value) {
+  if (value == null) return null;
+
+  final normalized = value.toString().trim();
+  return normalized.isEmpty ? null : normalized;
 }
 
 DateTime _toDateTime(dynamic value) {
   if (value == null) return DateTime.now();
   if (value is DateTime) return value;
+
   return DateTime.tryParse(value.toString()) ?? DateTime.now();
 }

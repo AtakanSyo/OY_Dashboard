@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 import 'package:oy_site/data/repositories/supabase_patient_consent_repository.dart';
 import 'package:oy_site/legal/legal_document_registry.dart';
 import 'package:oy_site/models/patient_consent_request_model.dart';
@@ -15,10 +16,7 @@ enum _ConsentViewState {
 class LegalConsentScreen extends StatefulWidget {
   final String token;
 
-  const LegalConsentScreen({
-    super.key,
-    required this.token,
-  });
+  const LegalConsentScreen({super.key, required this.token});
 
   @override
   State<LegalConsentScreen> createState() => _LegalConsentScreenState();
@@ -116,6 +114,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        actions: const [LanguageSelector(), SizedBox(width: 12)],
         title: const Text('KVKK Onayı'),
         backgroundColor: Colors.teal,
       ),
@@ -140,7 +139,8 @@ class _LegalConsentScreenState extends State<LegalConsentScreen> {
           icon: Icons.error_outline,
           iconColor: Colors.red,
           title: 'Bağlantı Geçersiz',
-          message: _errorMessage ??
+          message:
+              _errorMessage ??
               'Bu onay bağlantısı bulunamadı. Bağlantının doğru kopyalandığından emin olun.',
         );
       case _ConsentViewState.expired:
@@ -163,7 +163,8 @@ class _LegalConsentScreenState extends State<LegalConsentScreen> {
           icon: Icons.check_circle_outline,
           iconColor: Colors.green,
           title: 'Onayınız Kaydedildi',
-          message: 'KVKK Aydınlatma Metni onayınız kaydedildi. Teşekkür ederiz.',
+          message:
+              'KVKK Aydınlatma Metni onayınız kaydedildi. Teşekkür ederiz.',
         );
       case _ConsentViewState.pending:
         return _buildPendingCard();
@@ -203,8 +204,9 @@ class _LegalConsentScreenState extends State<LegalConsentScreen> {
   }
 
   Widget _buildPendingCard() {
-    final document =
-        LegalDocumentRegistry.findByCode(LegalDocumentCodes.aydinlatmaMetni);
+    final document = LegalDocumentRegistry.findByCode(
+      LegalDocumentCodes.aydinlatmaMetni,
+    );
     final patientName = _request?.patientName?.trim();
 
     return Card(

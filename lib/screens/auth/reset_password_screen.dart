@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:oy_site/widgets/language_selector.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({
-    super.key,
-  });
+  const ResetPasswordScreen({super.key});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -33,26 +33,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _updatePassword() async {
+    final l10n = AppLocalizations.of(context);
     final password = _passwordController.text;
     final passwordAgain = _passwordAgainController.text;
 
     if (password.isEmpty || passwordAgain.isEmpty) {
       setState(() {
-        _errorMessage = 'Lütfen yeni şifrenizi iki kez girin.';
+        _errorMessage = l10n.enterPasswordTwice;
       });
       return;
     }
 
     if (password.length < 8) {
       setState(() {
-        _errorMessage = 'Şifre en az 8 karakter olmalı.';
+        _errorMessage = l10n.passwordMinEight;
       });
       return;
     }
 
     if (password != passwordAgain) {
       setState(() {
-        _errorMessage = 'Şifreler eşleşmiyor.';
+        _errorMessage = l10n.passwordsDoNotMatch;
       });
       return;
     }
@@ -63,9 +64,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
-      await _authService.updatePassword(
-        newPassword: password,
-      );
+      await _authService.updatePassword(newPassword: password);
 
       await Supabase.instance.client.auth.signOut();
 
@@ -77,7 +76,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.'),
+          content: Text(
+            'Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -118,12 +119,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Yeni Şifre Belirle'),
+        title: Text(l10n.setNewPassword),
         foregroundColor: Colors.black87,
         backgroundColor: Colors.white,
         elevation: 0.6,
+        actions: const [LanguageSelector(), SizedBox(width: 12)],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -136,10 +139,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: Colors.grey.shade300),
               boxShadow: const [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                ),
+                BoxShadow(color: Colors.black12, blurRadius: 10),
               ],
             ),
             child: _isCompleted
@@ -156,9 +156,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      const Text(
-                        'Şifre Güncellendi',
-                        style: TextStyle(
+                      Text(
+                        l10n.passwordUpdated,
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
@@ -167,10 +167,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       Text(
                         'Yeni şifreniz kaydedildi. Güvenlik için oturum kapatıldı. Yeni şifrenizle tekrar giriş yapabilirsiniz.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          height: 1.4,
-                        ),
+                        style: TextStyle(color: Colors.grey[700], height: 1.4),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -190,7 +187,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text('Giriş ekranına dön'),
+                          child: Text(l10n.backToLogin),
                         ),
                       ),
                     ],
@@ -208,21 +205,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      const Text(
-                        'Yeni Şifre Belirle',
-                        style: TextStyle(
+                      Text(
+                        l10n.setNewPassword,
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Hesabınız için yeni bir şifre belirleyin.',
+                        l10n.setPasswordDescription,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          height: 1.4,
-                        ),
+                        style: TextStyle(color: Colors.grey[700], height: 1.4),
                       ),
                       const SizedBox(height: 24),
                       TextField(
@@ -230,7 +224,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         enabled: !_isLoading,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Yeni şifre',
+                          labelText: l10n.newPassword,
                           prefixIcon: const Icon(Icons.lock_outline),
                           errorText: _errorMessage,
                           border: OutlineInputBorder(
@@ -265,7 +259,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         enabled: !_isLoading,
                         obscureText: _obscurePasswordAgain,
                         decoration: InputDecoration(
-                          labelText: 'Yeni şifre tekrar',
+                          labelText: l10n.newPasswordAgain,
                           prefixIcon: const Icon(Icons.lock_reset_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -306,9 +300,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 )
                               : const Icon(Icons.save_outlined),
                           label: Text(
-                            _isLoading
-                                ? 'Kaydediliyor...'
-                                : 'Yeni Şifreyi Kaydet',
+                            _isLoading ? l10n.saving : l10n.saveNewPassword,
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal,
