@@ -19,6 +19,7 @@ import 'package:oy_site/screens/dashboard/profiles/customer_profile_screen.dart'
 import 'package:oy_site/screens/dashboard/profiles/expert_profile_screen.dart';
 import 'package:oy_site/screens/dashboard/profiles/profile_screen.dart';
 import 'package:oy_site/screens/dashboard/store/store_screen.dart';
+import 'package:oy_site/screens/dashboard/store/store_management_screen.dart';
 import 'package:oy_site/screens/dashboard/support/support_screen.dart';
 
 import '/widgets/sidebar.dart';
@@ -80,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           CustomerAnalysisResultsScreen(currentUser: widget.currentUser),
           OrdersScreen(currentUser: widget.currentUser),
-          const StoreScreen(),
+          StoreScreen(currentUser: widget.currentUser),
           SupportScreen(currentUser: widget.currentUser),
           CustomerProfileScreen(currentUser: widget.currentUser),
         ];
@@ -107,6 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             pressureRepository: widget.pressureRepository,
           ),
           OrdersScreen(currentUser: widget.currentUser),
+          const StoreManagementScreen(),
           SupportScreen(currentUser: widget.currentUser),
           ProfileScreen(currentUser: widget.currentUser),
         ];

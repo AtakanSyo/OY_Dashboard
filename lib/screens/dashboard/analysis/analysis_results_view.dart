@@ -914,9 +914,9 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 ),
                 const SizedBox(height: 7),
                 _headerMetaRow(
-                  Icons.location_on_outlined,
+                  Icons.local_hospital_outlined,
                   result.locationLabel.trim().isEmpty
-                      ? l10n.locationNotSpecified
+                      ? '—'
                       : result.locationLabel,
                 ),
               ],
@@ -1029,7 +1029,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
                 ),
                 const SizedBox(height: 7),
                 _smallInformationRow(
-                  Icons.location_on_outlined,
+                  Icons.local_hospital_outlined,
                   result.locationLabel.trim().isEmpty
                       ? '—'
                       : result.locationLabel,

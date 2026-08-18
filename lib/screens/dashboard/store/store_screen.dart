@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
+import 'package:oy_site/data/repositories/supabase_store_repository.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/models/store_measurement_summary_model.dart';
 import 'package:oy_site/models/store_product_model.dart';
+import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/screens/dashboard/store/store_product_detail_screen.dart';
 
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key});
+  const StoreScreen({super.key, required this.currentUser});
+  final AppUser currentUser;
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
@@ -17,6 +20,10 @@ class StoreScreen extends StatefulWidget {
 class _StoreScreenState extends State<StoreScreen> {
   final SupabaseAnalysisRepository _analysisRepository =
       SupabaseAnalysisRepository();
+  final SupabaseStoreRepository _storeRepository = SupabaseStoreRepository();
+  List<StoreProduct> _catalogProducts = const [];
+  bool _isLoadingProducts = true;
+  bool _productsLoadFailed = false;
 
   StoreMeasurementSummary? _latestMeasurement;
   bool _isLoadingMeasurement = true;
@@ -26,6 +33,31 @@ class _StoreScreenState extends State<StoreScreen> {
   void initState() {
     super.initState();
     _loadLatestMeasurement();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoadingProducts = true;
+      _productsLoadFailed = false;
+    });
+    try {
+      final products = await _storeRepository.getProducts(
+        clinicId: widget.currentUser.clinicId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _catalogProducts = products;
+        _isLoadingProducts = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _catalogProducts = const [];
+        _isLoadingProducts = false;
+        _productsLoadFailed = true;
+      });
+    }
   }
 
   Future<void> _loadLatestMeasurement() async {
@@ -64,96 +96,6 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  List<StoreProduct> _buildProducts(AppLocalizations l10n) {
-    String price(double amount) {
-      final formatted = NumberFormat.currency(
-        locale: Localizations.localeOf(context).toLanguageTag(),
-        symbol: '',
-        decimalDigits: 0,
-      ).format(amount).trim();
-      return '$formatted TRY';
-    }
-
-    return [
-      StoreProduct(
-        id: 'custom-insole',
-        title: l10n.customInsole,
-        shortDescription: l10n.customInsoleDescription,
-        fullDescription: l10n.customInsoleFullDescription,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.customInsoleUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(4000),
-        icon: Icons.accessibility_new,
-        imagePath: 'assets/images/products/custom_insole.png',
-      ),
-      StoreProduct(
-        id: 'sport-insole',
-        title: l10n.sportsInsoleTitle,
-        shortDescription: l10n.sportsInsoleShort,
-        fullDescription: l10n.sportsInsoleFull,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.sportsInsoleUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(4500),
-        icon: Icons.directions_run,
-        imagePath: 'assets/images/products/sport_insole.png',
-      ),
-      StoreProduct(
-        id: 'heel-pad',
-        title: l10n.heelPadTitle,
-        shortDescription: l10n.heelPadShort,
-        fullDescription: l10n.heelPadFull,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.heelPadUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(350),
-        icon: Icons.radio_button_checked,
-        imagePath: 'assets/images/addons/heel_pad.png',
-        isAddOn: true,
-      ),
-      StoreProduct(
-        id: 'met-pad',
-        title: l10n.metPadTitle,
-        shortDescription: l10n.metPadShort,
-        fullDescription: l10n.metPadFull,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.metPadUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(420),
-        icon: Icons.blur_circular,
-        imagePath: 'assets/images/addons/met_pad.png',
-        isAddOn: true,
-      ),
-      StoreProduct(
-        id: 'cleaning-spray',
-        title: l10n.cleaningSprayTitle,
-        shortDescription: l10n.cleaningSprayShort,
-        fullDescription: l10n.cleaningSprayFull,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.cleaningSprayUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(250),
-        icon: Icons.cleaning_services_outlined,
-        imagePath: 'assets/images/addons/cleaning_spray.png',
-        isAddOn: true,
-      ),
-      StoreProduct(
-        id: 'carry-case',
-        title: l10n.carryCaseTitle,
-        shortDescription: l10n.carryCaseShort,
-        fullDescription: l10n.carryCaseFull,
-        usageTitle: l10n.whoSuitable,
-        usageDescription: l10n.carryCaseUsage,
-        whyRecommended: l10n.storeRecommendationDisclaimer,
-        priceLabel: price(300),
-        icon: Icons.inventory_2_outlined,
-        imagePath: 'assets/images/addons/carry_case.png',
-        isAddOn: true,
-      ),
-    ];
-  }
-
   void _openProduct(StoreProduct product) {
     Navigator.push(
       context,
@@ -169,7 +111,7 @@ class _StoreScreenState extends State<StoreScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final products = _buildProducts(l10n);
+    final products = _catalogProducts;
     final mainProducts = products.where((product) => !product.isAddOn).toList();
     final addOns = products.where((product) => product.isAddOn).toList();
 
@@ -199,19 +141,49 @@ class _StoreScreenState extends State<StoreScreen> {
                     const SizedBox(height: 20),
                     _buildMeasurementArea(l10n),
                     const SizedBox(height: 28),
-                    _SectionHeading(
-                      title: l10n.mainProducts,
-                      subtitle: l10n.mainProductsSubtitle,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildProductWrap(mainProducts, isAddOn: false),
-                    const SizedBox(height: 30),
-                    _SectionHeading(
-                      title: l10n.accessoryProducts,
-                      subtitle: l10n.accessoryProductsSubtitle,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildProductWrap(addOns, isAddOn: true),
+                    if (_isLoadingProducts)
+                      const SizedBox(
+                        height: 180,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_productsLoadFailed)
+                      _MessageCard(
+                        icon: Icons.sync_problem_outlined,
+                        title: l10n.genericError,
+                        description: 'Mağaza ürünleri yüklenemedi.',
+                        action: OutlinedButton.icon(
+                          onPressed: _loadProducts,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(l10n.retry),
+                        ),
+                      )
+                    else if (products.isEmpty)
+                      const _MessageCard(
+                        icon: Icons.storefront_outlined,
+                        title: 'Şu anda yayında ürün bulunmuyor',
+                        description:
+                            'Yeni ürünler yayınlandığında burada görüntülenecek.',
+                      )
+                    else ...[
+                      if (mainProducts.isNotEmpty) ...[
+                        _SectionHeading(
+                          title: l10n.mainProducts,
+                          subtitle: l10n.mainProductsSubtitle,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildProductWrap(mainProducts, isAddOn: false),
+                      ],
+                      if (mainProducts.isNotEmpty && addOns.isNotEmpty)
+                        const SizedBox(height: 30),
+                      if (addOns.isNotEmpty) ...[
+                        _SectionHeading(
+                          title: l10n.accessoryProducts,
+                          subtitle: l10n.accessoryProductsSubtitle,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildProductWrap(addOns, isAddOn: true),
+                      ],
+                    ],
                   ],
                 ),
               ),
@@ -295,8 +267,8 @@ Widget buildMeasurementCard({
   final formattedDate = DateFormat.yMMMd(
     Localizations.localeOf(context).toLanguageTag(),
   ).format(measurement.analysisDate.toLocal());
-  final location = measurement.locationLabel.trim().isEmpty
-      ? l10n.locationNotSpecified
+  final clinicName = measurement.locationLabel.trim().isEmpty
+      ? '—'
       : measurement.locationLabel;
 
   return Container(
@@ -336,7 +308,7 @@ Widget buildMeasurementCard({
           value: measurement.sessionCode,
         ),
         _MeasurementRow(label: l10n.dateLabel, value: formattedDate),
-        _MeasurementRow(label: l10n.locationLabel, value: location),
+        _MeasurementRow(label: l10n.clinicLabel, value: clinicName),
         const SizedBox(height: 8),
         Text(
           l10n.linkedMeasurementMessage,

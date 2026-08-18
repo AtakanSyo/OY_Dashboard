@@ -100,6 +100,7 @@ class Sidebar extends StatelessWidget {
           _SidebarMenuItem(Icons.hub_outlined, l10n.measurementPool),
           _SidebarMenuItem(Icons.inventory_2_outlined, l10n.operations),
           _SidebarMenuItem(Icons.shopping_bag, l10n.orders),
+          const _SidebarMenuItem(Icons.storefront_outlined, 'Mağaza yönetimi'),
           _SidebarMenuItem(Icons.help_outline, l10n.support),
           _SidebarMenuItem(Icons.person, l10n.profile),
         ];

@@ -32,7 +32,7 @@ class SupabaseAnalysisRepository {
 
     final patientResponse = await _client
         .from('patients')
-        .select('id')
+        .select('id, clinic_id')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
 
@@ -40,7 +40,7 @@ class SupabaseAnalysisRepository {
       return [];
     }
 
-    final patientId = patientResponse['id'] as int?;
+    final patientId = _asInt(patientResponse['id']);
 
     if (patientId == null) {
       return [];
@@ -52,13 +52,74 @@ class SupabaseAnalysisRepository {
         .eq('patient_id', patientId)
         .order('analysis_date', ascending: false);
 
-    return (response as List<dynamic>)
-        .map(
-          (item) => CustomerAnalysisResult.fromMap(
-            Map<String, dynamic>.from(item as Map),
-          ),
-        )
+    final rows = (response as List<dynamic>)
+        .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
+
+    return _withClinicNames(
+      rows,
+      fallbackClinicId: _asInt(patientResponse['clinic_id']),
+    );
+  }
+
+  Future<List<CustomerAnalysisResult>> _withClinicNames(
+    List<Map<String, dynamic>> rows, {
+    int? fallbackClinicId,
+  }) async {
+    if (rows.isEmpty) return const [];
+
+    final sessionIds = rows
+        .map((row) => _asInt(row['session_id']))
+        .whereType<int>()
+        .toSet()
+        .toList();
+    final clinicIdBySession = <int, int>{};
+
+    if (sessionIds.isNotEmpty) {
+      final sessionRows = await _client
+          .from('measurement_sessions')
+          .select('id, clinic_id')
+          .inFilter('id', sessionIds);
+
+      for (final raw in sessionRows as List<dynamic>) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final sessionId = _asInt(row['id']);
+        final clinicId = _asInt(row['clinic_id']);
+        if (sessionId != null && clinicId != null) {
+          clinicIdBySession[sessionId] = clinicId;
+        }
+      }
+    }
+
+    final clinicIds = <int>{...clinicIdBySession.values, ?fallbackClinicId};
+    final clinicNameById = <int, String>{};
+
+    if (clinicIds.isNotEmpty) {
+      final clinicRows = await _client
+          .from('clinics')
+          .select('id, clinic_name')
+          .inFilter('id', clinicIds.toList());
+
+      for (final raw in clinicRows as List<dynamic>) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final clinicId = _asInt(row['id']);
+        final clinicName = (row['clinic_name'] ?? '').toString().trim();
+        if (clinicId != null && clinicName.isNotEmpty) {
+          clinicNameById[clinicId] = clinicName;
+        }
+      }
+    }
+
+    return rows.map((row) {
+      final result = CustomerAnalysisResult.fromMap(row);
+      final sessionId = _asInt(row['session_id']);
+      final clinicId = sessionId == null
+          ? fallbackClinicId
+          : clinicIdBySession[sessionId] ?? fallbackClinicId;
+      return result.copyWith(
+        locationLabel: clinicId == null ? '' : clinicNameById[clinicId] ?? '',
+      );
+    }).toList();
   }
 
   Future<CustomerAnalysisResult?> getLatestAnalysis({
@@ -157,5 +218,11 @@ class SupabaseAnalysisRepository {
           ),
         )
         .toList();
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
   }
 }

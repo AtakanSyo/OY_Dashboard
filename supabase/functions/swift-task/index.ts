@@ -3,6 +3,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import {
   getPaymentProduct,
   localizedProductName,
+  type PaymentProduct,
 } from "../_shared/payment_catalog.ts";
 import {
   initializeCheckout,
@@ -101,8 +102,7 @@ Deno.serve(async (req: Request) => {
     const addressId = asInteger(body.addressId);
     const requestedSessionId = asInteger(body.sessionId);
     const locale = body.locale === "en" ? "en" : "tr";
-    const product = getPaymentProduct(productId);
-    if (!product) return json({ ok: false, errorMessage: "Product is not available." }, 400);
+    let product: PaymentProduct | null = getPaymentProduct(productId);
     if (!addressId) return json({ ok: false, errorMessage: "Delivery address is required." }, 400);
 
     const { data: patient, error: patientError } = await admin
@@ -112,6 +112,35 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (patientError) throw patientError;
     if (!patient) return json({ ok: false, errorMessage: "Customer record was not found." }, 400);
+
+    // The database catalog is authoritative. The bundled catalog remains a
+    // deployment-safe fallback until migration 024 and this function are live.
+    const { data: catalogProduct, error: catalogError } = await admin
+      .from("store_products")
+      .select("id, title, base_price, currency_code, is_add_on, is_active")
+      .eq("id", productId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (catalogError && catalogError.code !== "42P01") throw catalogError;
+    if (catalogProduct) {
+      const { data: clinicPrice, error: clinicPriceError } = await admin
+        .from("store_product_clinic_prices")
+        .select("price")
+        .eq("product_id", productId)
+        .eq("clinic_id", patient.clinic_id)
+        .maybeSingle();
+      if (clinicPriceError && clinicPriceError.code !== "42P01") throw clinicPriceError;
+      product = {
+        id: catalogProduct.id,
+        nameTr: catalogProduct.title,
+        nameEn: catalogProduct.title,
+        productType: catalogProduct.id.replaceAll("-", "_"),
+        price: Number(clinicPrice?.price ?? catalogProduct.base_price),
+        currency: "TRY",
+        category: catalogProduct.is_add_on ? "Tamamlayıcı Ürünler" : "Kişiselleştirilmiş Ürünler",
+      };
+    }
+    if (!product) return json({ ok: false, errorMessage: "Product is not available." }, 400);
 
     const { data: profile } = await admin
       .from("user_profiles")

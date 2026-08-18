@@ -1,13 +1,14 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 import 'package:oy_site/data/repositories/supabase_order_repository.dart';
+import 'package:oy_site/data/repositories/supabase_session_reference_photo_repository.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/order_model.dart';
+import 'package:oy_site/models/session_reference_photo_model.dart';
+import 'package:oy_site/services/storage/supabase_storage_service.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -22,16 +23,62 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   final SupabaseAnalysisRepository _analysisRepository =
       SupabaseAnalysisRepository();
   final SupabaseOrderRepository _orderRepository = SupabaseOrderRepository();
+  final SupabaseSessionReferencePhotoRepository _photoRepository =
+      SupabaseSessionReferencePhotoRepository();
+  final SupabaseStorageService _storageService = SupabaseStorageService();
   final List<_UploadedInsoleItem> _uploadedInsoles = [];
 
   int? _analysisCount;
   int? _activeOrderCount;
   bool _isSummaryLoading = true;
+  bool _isInsolesLoading = true;
+  bool _isUploadingInsoles = false;
+  String? _insoleError;
 
   @override
   void initState() {
     super.initState();
     _loadSummary();
+    _loadInsoleImages();
+  }
+
+  Future<void> _loadInsoleImages() async {
+    try {
+      final photos = await _photoRepository.getInsolePhotosForCurrentCustomer();
+      final items = await Future.wait(
+        photos.map((photo) async {
+          String? imageUrl = photo.publicUrl;
+          if ((imageUrl == null || imageUrl.isEmpty) &&
+              photo.storagePath != null &&
+              photo.storagePath!.isNotEmpty) {
+            imageUrl = await _storageService.createSignedUrl(
+              storagePath: photo.storagePath!,
+              bucket:
+                  photo.storageBucket ?? SupabaseStorageService.defaultBucket,
+            );
+          }
+          return _UploadedInsoleItem(
+            fileName: photo.fileName ?? 'İç taban fotoğrafı',
+            uploadedAt: photo.createdAt ?? DateTime.now(),
+            imageUrl: imageUrl,
+          );
+        }),
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploadedInsoles
+          ..clear()
+          ..addAll(items);
+        _isInsolesLoading = false;
+        _insoleError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isInsolesLoading = false;
+        _insoleError = 'İç taban fotoğrafları yüklenemedi.';
+      });
+    }
   }
 
   Future<void> _loadSummary() async {
@@ -69,20 +116,71 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
     if (result == null || result.files.isEmpty || !mounted) return;
 
-    final now = DateTime.now();
-    setState(() {
+    setState(() => _isUploadingInsoles = true);
+    try {
+      final session = await _photoRepository
+          .getLatestSessionForCurrentCustomer();
+      if (session == null) {
+        throw Exception(
+          'Fotoğraf eklemek için önce bir ölçüm session’ı olmalı.',
+        );
+      }
+
       for (final file in result.files) {
         final bytes = file.bytes;
         if (bytes == null) continue;
-        _uploadedInsoles.add(
-          _UploadedInsoleItem(
-            bytes: bytes,
-            fileName: file.name,
-            uploadedAt: now,
-          ),
+        final uniqueName =
+            '${DateTime.now().microsecondsSinceEpoch}_${file.name}';
+        final storagePath = _storageService.buildReferencePhotoPath(
+          sessionId: session.sessionId,
+          photoType: SessionReferencePhotoTypes.insolePhoto,
+          fileName: uniqueName,
         );
+        final upload = await _storageService.uploadBytes(
+          bytes: bytes,
+          storagePath: storagePath,
+        );
+        try {
+          await _photoRepository.createPhoto(
+            photo: SessionReferencePhotoModel(
+              sessionId: session.sessionId,
+              patientId: session.patientId,
+              expertUserId: session.expertUserId,
+              photoType: SessionReferencePhotoTypes.insolePhoto,
+              fileName: file.name,
+              mimeType: _mimeTypeFor(file.name),
+              sizeBytes: upload.sizeBytes,
+              storageBucket: upload.bucket,
+              storagePath: upload.storagePath,
+              uploadStatus: ReferencePhotoUploadStatuses.uploaded,
+              note: 'Müşteri profilinden yüklendi',
+            ),
+          );
+        } catch (_) {
+          await _storageService.removeFile(
+            storagePath: upload.storagePath,
+            bucket: upload.bucket,
+          );
+          rethrow;
+        }
       }
-    });
+      await _loadInsoleImages();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _insoleError = error.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => _isUploadingInsoles = false);
+    }
+  }
+
+  String? _mimeTypeFor(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return null;
   }
 
   void _openImagePreview(_UploadedInsoleItem item) {
@@ -118,8 +216,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: InteractiveViewer(
-                    child: Image.memory(
-                      item.bytes,
+                    child: Image.network(
+                      item.imageUrl ?? '',
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) =>
                           Center(child: Text(l10n.imageUnavailable)),
@@ -250,7 +348,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.insoleImagesTemporaryNote,
+            'Geçmiş ölçümlerinizdeki iç taban fotoğraflarını görebilir ve yenilerini ekleyebilirsiniz.',
             style: TextStyle(
               color: Colors.grey.shade700,
               fontSize: 13,
@@ -259,16 +357,29 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           ),
           const SizedBox(height: 14),
           ElevatedButton.icon(
-            onPressed: _pickInsoleImage,
+            onPressed: _isUploadingInsoles ? null : _pickInsoleImage,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
             ),
-            icon: const Icon(Icons.upload_outlined),
-            label: Text(l10n.uploadInsoleImage),
+            icon: _isUploadingInsoles
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_outlined),
+            label: Text(
+              _isUploadingInsoles ? 'Yükleniyor…' : l10n.uploadInsoleImage,
+            ),
           ),
           const SizedBox(height: 16),
-          if (_uploadedInsoles.isEmpty)
+          if (_insoleError != null) ...[
+            Text(_insoleError!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+          ],
+          if (_isInsolesLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_uploadedInsoles.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -303,8 +414,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                           child: SizedBox(
                             width: double.infinity,
                             height: 130,
-                            child: Image.memory(
-                              item.bytes,
+                            child: Image.network(
+                              item.imageUrl ?? '',
                               fit: BoxFit.contain,
                               errorBuilder: (_, _, _) =>
                                   Center(child: Text(l10n.imageUnavailable)),
@@ -339,12 +450,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
 }
 
 class _UploadedInsoleItem {
-  final Uint8List bytes;
+  final String? imageUrl;
   final String fileName;
   final DateTime uploadedAt;
 
   const _UploadedInsoleItem({
-    required this.bytes,
+    this.imageUrl,
     required this.fileName,
     required this.uploadedAt,
   });
