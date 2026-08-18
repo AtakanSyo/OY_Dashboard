@@ -74,8 +74,10 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
   // Tek ayak/yarım yük protokolü kullanılacaksa 0.5 gibi güncellenebilir.
   double _measurementLoadRatio = 1.0;
 
-  List<List<int>> _pressureData =
-      List.generate(rows, (_) => List.filled(cols, 0));
+  List<List<int>> _pressureData = List.generate(
+    rows,
+    (_) => List.filled(cols, 0),
+  );
 
   List<int> _buffer = [];
   ui.Image? _heatmapImage;
@@ -248,8 +250,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
     if (payload.length < rows * cols) return;
 
-    List<List<int>> newData =
-        List.generate(rows, (_) => List.filled(cols, 0));
+    List<List<int>> newData = List.generate(rows, (_) => List.filled(cols, 0));
 
     for (int i = 0; i < rows * cols; i++) {
       final row = (rows - 1) - (i ~/ cols);
@@ -308,8 +309,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
     final half = k ~/ 2;
 
-    List<List<int>> result =
-        List.generate(rows, (_) => List.filled(cols, 0));
+    List<List<int>> result = List.generate(rows, (_) => List.filled(cols, 0));
 
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
@@ -387,9 +387,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return completer.future;
   }
 
-  List<List<int>> _applyVisualSettingsToPlaybackMatrix(
-    List<List<int>> source,
-  ) {
+  List<List<int>> _applyVisualSettingsToPlaybackMatrix(List<List<int>> source) {
     final thresholded = List.generate(rows, (r) {
       return List.generate(cols, (c) {
         if (r >= source.length || c >= source[r].length) return 0;
@@ -405,9 +403,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return _applySmoothing(thresholded);
   }
 
-  Future<ui.Image> _generatePlaybackHeatmapImage(
-    PressureFrameSnapshot frame,
-  ) {
+  Future<ui.Image> _generatePlaybackHeatmapImage(PressureFrameSnapshot frame) {
     final displayMatrix = _applyVisualSettingsToPlaybackMatrix(frame.matrix);
 
     return _generateHeatmapImage(displayMatrix);
@@ -420,10 +416,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       return;
     }
 
-    final safeIndex = _playbackFrameIndex.clamp(
-      0,
-      recording.frames.length - 1,
-    );
+    final safeIndex = _playbackFrameIndex.clamp(0, recording.frames.length - 1);
 
     final playbackImage = await _generatePlaybackHeatmapImage(
       recording.frames[safeIndex],
@@ -495,9 +488,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     await _saveRecordingToSupabase(newRecording);
   }
 
-  Future<void> _saveRecordingToSupabase(
-    PressureRecording recording,
-  ) async {
+  Future<void> _saveRecordingToSupabase(PressureRecording recording) async {
     final sessionId = widget.sessionId;
     final patientId = widget.patientId;
     final expertUserId = widget.expertUserId;
@@ -568,9 +559,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         .inMilliseconds;
   }
 
-  _PressureStats _calculatePressureStats(
-    List<PressureFrameSnapshot> frames,
-  ) {
+  _PressureStats _calculatePressureStats(List<PressureFrameSnapshot> frames) {
     int maxValue = 0;
     int sum = 0;
     int count = 0;
@@ -699,9 +688,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         _addTextFileToArchive(
           archive: archive,
           path: '$folderName/recording.json',
-          content: const JsonEncoder.withIndent('  ').convert(
-            _recordingToJson(recording),
-          ),
+          content: const JsonEncoder.withIndent(
+            '  ',
+          ).convert(_recordingToJson(recording)),
         );
 
         _addTextFileToArchive(
@@ -973,9 +962,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       throw Exception('CSV içinde yeterli satır bulunamadı.');
     }
 
-    final header = _splitCsvLine(lines.first)
-        .map((item) => item.trim().toUpperCase())
-        .toList();
+    final header = _splitCsvLine(
+      lines.first,
+    ).map((item) => item.trim().toUpperCase()).toList();
 
     final timestampIndex = header.indexOf('TIMESTAMP');
 
@@ -1011,7 +1000,8 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
       frames.add(
         PressureFrameSnapshot(
-          timestamp: timestamp ?? importedAt.add(Duration(milliseconds: i * 100)),
+          timestamp:
+              timestamp ?? importedAt.add(Duration(milliseconds: i * 100)),
           matrix: _matrixFromFlatValues(paddedValues),
         ),
       );
@@ -1035,13 +1025,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     required String content,
   }) {
     final bytes = utf8.encode(content);
-    archive.addFile(
-      ArchiveFile(
-        path,
-        bytes.length,
-        bytes,
-      ),
-    );
+    archive.addFile(ArchiveFile(path, bytes.length, bytes));
   }
 
   String _buildRecordingCsv(PressureRecording recording) {
@@ -1058,9 +1042,11 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
     buffer.writeln(headers.join(','));
 
-    for (int frameIndex = 0;
-        frameIndex < recording.frames.length;
-        frameIndex++) {
+    for (
+      int frameIndex = 0;
+      frameIndex < recording.frames.length;
+      frameIndex++
+    ) {
       final frame = recording.frames[frameIndex];
       final flatValues = _flattenMatrix(frame.matrix);
 
@@ -1097,10 +1083,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       return values.sublist(0, packageSize);
     }
 
-    return [
-      ...values,
-      ...List<int>.filled(packageSize - values.length, 0),
-    ];
+    return [...values, ...List<int>.filled(packageSize - values.length, 0)];
   }
 
   List<List<int>> get _activePressureMatrix {
@@ -1260,12 +1243,16 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     if (!sensorRect.contains(localPosition)) return;
 
     final normalizedX =
-        ((localPosition.dx - sensorRect.left) / sensorRect.width)
-            .clamp(0.0, 1.0);
+        ((localPosition.dx - sensorRect.left) / sensorRect.width).clamp(
+          0.0,
+          1.0,
+        );
 
     final normalizedY =
-        ((localPosition.dy - sensorRect.top) / sensorRect.height)
-            .clamp(0.0, 1.0);
+        ((localPosition.dy - sensorRect.top) / sensorRect.height).clamp(
+          0.0,
+          1.0,
+        );
 
     final col = (normalizedX * cols).floor().clamp(0, cols - 1);
     final displayRow = (normalizedY * rows).floor().clamp(0, rows - 1);
@@ -1374,11 +1361,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         '${value.second.toString().padLeft(2, '0')}';
   }
 
-  String _formatDouble(
-    double? value, {
-    int digits = 1,
-    String fallback = '—',
-  }) {
+  String _formatDouble(double? value, {int digits = 1, String fallback = '—'}) {
     if (value == null) return fallback;
     return value.toStringAsFixed(digits);
   }
@@ -1420,10 +1403,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return totalForceN / analysis.totalLoad;
   }
 
-  double? _rawToForceN(
-    num rawValue,
-    _PressureAnalysis analysis,
-  ) {
+  double? _rawToForceN(num rawValue, _PressureAnalysis analysis) {
     final newtonPerRawUnit = _newtonPerRawUnit(analysis);
 
     if (newtonPerRawUnit == null) return null;
@@ -1431,10 +1411,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return rawValue.toDouble() * newtonPerRawUnit;
   }
 
-  double? _rawToPressureKpa(
-    num rawValue,
-    _PressureAnalysis analysis,
-  ) {
+  double? _rawToPressureKpa(num rawValue, _PressureAnalysis analysis) {
     final forceN = _rawToForceN(rawValue, analysis);
 
     if (forceN == null) return null;
@@ -1443,10 +1420,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return (forceN / _sensorCellAreaM2) / 1000.0;
   }
 
-  double? _ratioToForceN(
-    double ratio,
-    _PressureAnalysis analysis,
-  ) {
+  double? _ratioToForceN(double ratio, _PressureAnalysis analysis) {
     final totalForceN = _totalMeasuredForceN(analysis);
 
     if (totalForceN == null) return null;
@@ -1454,10 +1428,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return totalForceN * ratio;
   }
 
-  double? _regionForceN(
-    _RegionStats? region,
-    _PressureAnalysis analysis,
-  ) {
+  double? _regionForceN(_RegionStats? region, _PressureAnalysis analysis) {
     if (region == null) return null;
 
     return _rawToForceN(region.totalLoad, analysis);
@@ -1473,8 +1444,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
     if (regionForceN == null) return null;
 
-    final effectiveCellCount =
-        region.contactCellCount > 0 ? region.contactCellCount : region.cellCount;
+    final effectiveCellCount = region.contactCellCount > 0
+        ? region.contactCellCount
+        : region.cellCount;
 
     if (effectiveCellCount <= 0) return null;
 
@@ -1485,28 +1457,19 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return (regionForceN / areaM2) / 1000.0;
   }
 
-  String _formatNewton(
-    double? value, {
-    int digits = 1,
-  }) {
+  String _formatNewton(double? value, {int digits = 1}) {
     if (value == null || value.isNaN || value.isInfinite) return '—';
 
     return '${value.toStringAsFixed(digits)} N';
   }
 
-  String _formatKpa(
-    double? value, {
-    int digits = 1,
-  }) {
+  String _formatKpa(double? value, {int digits = 1}) {
     if (value == null || value.isNaN || value.isInfinite) return '—';
 
     return '${value.toStringAsFixed(digits)} kPa';
   }
 
-  String _formatCm2(
-    double? value, {
-    int digits = 1,
-  }) {
+  String _formatCm2(double? value, {int digits = 1}) {
     if (value == null || value.isNaN || value.isInfinite) return '—';
 
     return '${value.toStringAsFixed(digits)} cm²';
@@ -1521,10 +1484,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     );
   }
 
-  String _pressureZoneLabel({
-    required double? row,
-    required double? col,
-  }) {
+  String _pressureZoneLabel({required double? row, required double? col}) {
     if (row == null || col == null) return '—';
 
     final verticalZone = _displayVerticalZone(row);
@@ -1630,10 +1590,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
           return parsedRow.sublist(0, cols);
         }
 
-        return [
-          ...parsedRow,
-          ...List<int>.filled(cols - parsedRow.length, 0),
-        ];
+        return [...parsedRow, ...List<int>.filled(cols - parsedRow.length, 0)];
       }).toList();
 
       if (matrix.length == rows) return matrix;
@@ -1668,10 +1625,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       return values.sublist(0, packageSize);
     }
 
-    return [
-      ...values,
-      ...List<int>.filled(packageSize - values.length, 0),
-    ];
+    return [...values, ...List<int>.filled(packageSize - values.length, 0)];
   }
 
   List<List<int>> _matrixFromFlatValues(List<int> values) {
@@ -1733,8 +1687,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final activePreviewImage =
-        _isPlaybackMode ? _playbackHeatmapImage : _heatmapImage;
+    final activePreviewImage = _isPlaybackMode
+        ? _playbackHeatmapImage
+        : _heatmapImage;
 
     final activeMatrix = _activePressureMatrix;
     final analysis = _analyzeMatrix(activeMatrix);
@@ -1786,10 +1741,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         const Expanded(
           child: Text(
             'Plantar Basınç Ölçümü',
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
           ),
         ),
         Text(
@@ -1852,8 +1804,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed:
-                          _connectedPort == null ? null : _disconnect,
+                      onPressed: _connectedPort == null ? null : _disconnect,
                       child: const Text('Bağlantıyı Kes'),
                     ),
                   ),
@@ -1889,7 +1840,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                     label: 'Eşik',
                     valueText: _threshold.toString(),
                     tooltip:
-                        'Bu değerin altındaki okumalar görsel analizde sıfırlanır. Gürültüyü temizlemek için kullanılır.',
+                        'Bu değerin altındaki okumalar görsel değerlendirmede sıfırlanır. Gürültüyü temizlemek için kullanılır.',
                     slider: Slider(
                       min: 0,
                       max: 20,
@@ -1930,8 +1881,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          _connectedPort == null ? null : _toggleRecording,
+                      onPressed: _connectedPort == null
+                          ? null
+                          : _toggleRecording,
                       icon: Icon(
                         _isRecording
                             ? Icons.stop_circle_outlined
@@ -1941,8 +1893,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                         _isRecording ? 'Ölçümü Durdur' : 'Ölçümü Başlat',
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            _isRecording ? Colors.red : Colors.teal,
+                        backgroundColor: _isRecording
+                            ? Colors.red
+                            : Colors.teal,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -2004,10 +1957,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       children: [
         Text(
           'Bilgisayara kaydedilmiş basınç ölçüm dosyasını açabilirsin. Dosya içe aktarıldığında ölçüm kayıtlarına eklenir ve otomatik inceleme modunda açılır.',
-          style: TextStyle(
-            color: Colors.grey[700],
-            height: 1.35,
-          ),
+          style: TextStyle(color: Colors.grey[700], height: 1.35),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -2040,11 +1990,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         const SizedBox(height: 10),
         Text(
           'Desteklenen formatlar: .json, .csv. ZIP dosyası içindeki kayıtları açmak için önce ZIP’i çıkartıp içindeki recording.json veya recording.csv dosyasını seç.',
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 12,
-            height: 1.35,
-          ),
+          style: TextStyle(color: Colors.grey[600], fontSize: 12, height: 1.35),
         ),
       ],
     );
@@ -2104,10 +2050,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
 
                   return GestureDetector(
                     onTapDown: (details) {
-                      _handleHeatmapTap(
-                        details.localPosition,
-                        canvasSize,
-                      );
+                      _handleHeatmapTap(details.localPosition, canvasSize);
                     },
                     child: Stack(
                       children: [
@@ -2123,8 +2066,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                                           _showCenterOfPressure,
                                       showPeakPressure: _showPeakPressure,
                                       showSelectedPoint: _enablePointProbe,
-                                      showCircularRegion:
-                                          _showCircularRegion,
+                                      showCircularRegion: _showCircularRegion,
                                       roiRadius: _roiRadius,
                                     )
                                   : null,
@@ -2137,9 +2079,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                               _isPlaybackMode
                                   ? 'İncelenecek kare yok'
                                   : 'Canlı veri bekleniyor',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                              ),
+                              style: TextStyle(color: Colors.grey[600]),
                             ),
                           ),
                         if (_enablePointProbe || _showCircularRegion)
@@ -2198,9 +2138,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         children: [
           Text(
             _selectedRecording!.title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
@@ -2215,9 +2153,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                 ? _selectedRecording!.frames.length - 1
                 : 1,
             value: _playbackFrameIndex.toDouble().clamp(
-                  0,
-                  (_selectedRecording!.frames.length - 1).toDouble(),
-                ),
+              0,
+              (_selectedRecording!.frames.length - 1).toDouble(),
+            ),
             onChanged: (value) {
               _updatePlaybackFrame(value.round());
             },
@@ -2231,23 +2169,28 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     );
   }
 
-    Widget _buildAnalysisPanel({
+  Widget _buildAnalysisPanel({
     required _PressureAnalysis analysis,
     required List<List<int>> activeMatrix,
   }) {
     final selectedValue = _selectedPointValue(activeMatrix);
-    final selectedNeighborhoodAvg =
-        _selectedPointNeighborhoodAverage(activeMatrix);
+    final selectedNeighborhoodAvg = _selectedPointNeighborhoodAverage(
+      activeMatrix,
+    );
 
-    final leftRatio =
-        analysis.totalLoad == 0 ? 0.0 : analysis.leftLoad / analysis.totalLoad;
-    final rightRatio =
-        analysis.totalLoad == 0 ? 0.0 : analysis.rightLoad / analysis.totalLoad;
+    final leftRatio = analysis.totalLoad == 0
+        ? 0.0
+        : analysis.leftLoad / analysis.totalLoad;
+    final rightRatio = analysis.totalLoad == 0
+        ? 0.0
+        : analysis.rightLoad / analysis.totalLoad;
 
-    final forefootRatio =
-        analysis.totalLoad == 0 ? 0.0 : analysis.bottomLoad / analysis.totalLoad;
-    final heelRatio =
-        analysis.totalLoad == 0 ? 0.0 : analysis.topLoad / analysis.totalLoad;
+    final forefootRatio = analysis.totalLoad == 0
+        ? 0.0
+        : analysis.bottomLoad / analysis.totalLoad;
+    final heelRatio = analysis.totalLoad == 0
+        ? 0.0
+        : analysis.topLoad / analysis.totalLoad;
 
     final totalMeasuredForceN = _totalMeasuredForceN(analysis);
 
@@ -2272,13 +2215,18 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         ? null
         : _rawToPressureKpa(selectedNeighborhoodAvg, analysis);
 
-    final selectedRegionForceN =
-        _regionForceN(analysis.selectedRegion, analysis);
+    final selectedRegionForceN = _regionForceN(
+      analysis.selectedRegion,
+      analysis,
+    );
 
-    final selectedRegionPressureKpa =
-        _regionAveragePressureKpa(analysis.selectedRegion, analysis);
+    final selectedRegionPressureKpa = _regionAveragePressureKpa(
+      analysis.selectedRegion,
+      analysis,
+    );
 
-    final showAnthropometricWarning = _bodyWeightKg == null ||
+    final showAnthropometricWarning =
+        _bodyWeightKg == null ||
         _anthropometricInfoStatus.contains('okunamadı') ||
         _anthropometricInfoStatus.contains('bulunamadı') ||
         _anthropometricInfoStatus.contains('boş');
@@ -2343,7 +2291,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                       ),
                       _buildAnalysisSwitchCard(
                         icon: Icons.radio_button_checked,
-                        title: 'Bölge analizi',
+                        title: 'Bölge incelemesi',
                         subtitle: 'Dairesel alan',
                         value: _showCircularRegion,
                         onChanged: (value) {
@@ -2361,7 +2309,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                     label: 'Alan',
                     valueText: _roiRadius.toString(),
                     tooltip:
-                        'Bölge analizinde seçilen noktanın etrafındaki inceleme yarıçapını belirler.',
+                        'Bölge incelemesinde seçilen noktanın etrafındaki inceleme yarıçapını belirler.',
                     slider: Slider(
                       min: 1,
                       max: 12,
@@ -2420,7 +2368,8 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                       ),
                     ],
                   ),
-                  if (showAnthropometricWarning || showScientificMetricWarning) ...[
+                  if (showAnthropometricWarning ||
+                      showScientificMetricWarning) ...[
                     const SizedBox(height: 10),
                     _buildClinicalNotice(
                       icon: Icons.info_outline,
@@ -2504,25 +2453,33 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                       _buildClinicalMetricCard(
                         icon: Icons.arrow_upward_outlined,
                         title: 'Ön ayak yükü',
-                        value: _formatNewton(_ratioToForceN(forefootRatio, analysis)),
+                        value: _formatNewton(
+                          _ratioToForceN(forefootRatio, analysis),
+                        ),
                         subtitle: _formatRatio(forefootRatio),
                       ),
                       _buildClinicalMetricCard(
                         icon: Icons.arrow_downward_outlined,
                         title: 'Topuk yükü',
-                        value: _formatNewton(_ratioToForceN(heelRatio, analysis)),
+                        value: _formatNewton(
+                          _ratioToForceN(heelRatio, analysis),
+                        ),
                         subtitle: _formatRatio(heelRatio),
                       ),
                       _buildClinicalMetricCard(
                         icon: Icons.keyboard_arrow_left_outlined,
                         title: 'Sol taraf yükü',
-                        value: _formatNewton(_ratioToForceN(leftRatio, analysis)),
+                        value: _formatNewton(
+                          _ratioToForceN(leftRatio, analysis),
+                        ),
                         subtitle: _formatRatio(leftRatio),
                       ),
                       _buildClinicalMetricCard(
                         icon: Icons.keyboard_arrow_right_outlined,
                         title: 'Sağ taraf yükü',
-                        value: _formatNewton(_ratioToForceN(rightRatio, analysis)),
+                        value: _formatNewton(
+                          _ratioToForceN(rightRatio, analysis),
+                        ),
                         subtitle: _formatRatio(rightRatio),
                       ),
                     ],
@@ -2616,10 +2573,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     );
   }
 
-
-  Widget _buildCompactTileGrid({
-    required List<Widget> children,
-  }) {
+  Widget _buildCompactTileGrid({required List<Widget> children}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final itemWidth = (constraints.maxWidth - 10) / 2;
@@ -2628,10 +2582,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
           spacing: 10,
           runSpacing: 10,
           children: children.map((child) {
-            return SizedBox(
-              width: itemWidth,
-              child: child,
-            );
+            return SizedBox(width: itemWidth, child: child);
           }).toList(),
         );
       },
@@ -2646,9 +2597,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     String? tooltip,
   }) {
     return Container(
-      constraints: const BoxConstraints(
-        minHeight: 112,
-      ),
+      constraints: const BoxConstraints(minHeight: 112),
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
@@ -2667,11 +2616,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                   color: Colors.teal.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: Colors.teal.shade700,
-                ),
+                child: Icon(icon, size: 18, color: Colors.teal.shade700),
               ),
               const Spacer(),
               if (tooltip != null && tooltip.trim().isNotEmpty)
@@ -2694,10 +2639,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
             value.trim().isEmpty ? '—' : value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
           if (subtitle != null && subtitle.trim().isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -2729,16 +2671,12 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
       onTap: () => onChanged(!value),
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        constraints: const BoxConstraints(
-          minHeight: 112,
-        ),
+        constraints: const BoxConstraints(minHeight: 112),
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: value ? Colors.teal.withOpacity(0.08) : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: value ? Colors.teal : Colors.grey.shade300,
-          ),
+          border: Border.all(color: value ? Colors.teal : Colors.grey.shade300),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2810,28 +2748,19 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     );
   }
 
-  Widget _buildClinicalNotice({
-    required IconData icon,
-    required String text,
-  }) {
+  Widget _buildClinicalNotice({required IconData icon, required String text}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.blueGrey.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.blueGrey.withOpacity(0.18),
-        ),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.18)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 17,
-            color: Colors.blueGrey.shade600,
-          ),
+          Icon(icon, size: 17, color: Colors.blueGrey.shade600),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -2862,23 +2791,13 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade300),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 5,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 4,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           leading: Icon(icon, color: Colors.teal),
           title: Row(
@@ -2886,9 +2805,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
               if (tooltip != null && tooltip.trim().isNotEmpty) ...[
@@ -2901,12 +2818,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
               ],
             ],
           ),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: child,
-            ),
-          ],
+          children: [Align(alignment: Alignment.centerLeft, child: child)],
         ),
       ),
     );
@@ -2921,9 +2833,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade300,
-          ),
+          border: Border.all(color: Colors.grey.shade300),
         ),
         child: Text(
           'Henüz ölçüm kaydı yok',
@@ -2947,7 +2857,9 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.teal.withOpacity(0.08) : Colors.white,
+                color: isSelected
+                    ? Colors.teal.withOpacity(0.08)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isSelected ? Colors.teal : Colors.grey.shade300,
@@ -2958,25 +2870,17 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
                 children: [
                   Text(
                     recording.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _formatDateTime(recording.createdAt),
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontSize: 12),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     '${recording.frames.length} kare',
-                    style: TextStyle(
-                      color: Colors.grey[800],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[800], fontSize: 12),
                   ),
                 ],
               ),
@@ -3008,13 +2912,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
           ),
         ),
         Expanded(child: slider),
-        SizedBox(
-          width: 42,
-          child: Text(
-            valueText,
-            textAlign: TextAlign.right,
-          ),
-        ),
+        SizedBox(width: 42, child: Text(valueText, textAlign: TextAlign.right)),
       ],
     );
   }
@@ -3033,10 +2931,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
         children: [
           Text(title, style: TextStyle(color: Colors.grey[700])),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -3046,11 +2941,7 @@ class _PressureMeasurementDialogState extends State<PressureMeasurementDialog> {
     return Tooltip(
       message: message,
       waitDuration: const Duration(milliseconds: 350),
-      child: Icon(
-        Icons.info_outline,
-        size: 16,
-        color: Colors.grey[600],
-      ),
+      child: Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
     );
   }
 }
@@ -3059,10 +2950,7 @@ class PressureFrameSnapshot {
   final DateTime timestamp;
   final List<List<int>> matrix;
 
-  const PressureFrameSnapshot({
-    required this.timestamp,
-    required this.matrix,
-  });
+  const PressureFrameSnapshot({required this.timestamp, required this.matrix});
 }
 
 class PressureRecording {
@@ -3113,12 +3001,7 @@ class HeatmapPainter extends CustomPainter {
     canvas.drawImageRect(
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-      Rect.fromLTWH(
-        dstRect.left,
-        dstRect.top,
-        dstRect.width,
-        dstRect.height,
-      ),
+      Rect.fromLTWH(dstRect.left, dstRect.top, dstRect.width, dstRect.height),
       paint,
     );
 
@@ -3251,10 +3134,7 @@ class _GridPoint {
   final int row;
   final int col;
 
-  const _GridPoint({
-    required this.row,
-    required this.col,
-  });
+  const _GridPoint({required this.row, required this.col});
 }
 
 class _PressureAnalysis {
@@ -3315,8 +3195,5 @@ class _PressureStats {
   final double maxPressure;
   final double avgPressure;
 
-  const _PressureStats({
-    required this.maxPressure,
-    required this.avgPressure,
-  });
+  const _PressureStats({required this.maxPressure, required this.avgPressure});
 }

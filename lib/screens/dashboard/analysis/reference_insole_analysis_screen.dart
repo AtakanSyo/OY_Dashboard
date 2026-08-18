@@ -13,10 +13,7 @@ import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/optiyou_order_operation_item.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum _AnalysisToolMode {
-  calibration,
-  measurement,
-}
+enum _AnalysisToolMode { calibration, measurement }
 
 enum _CalibrationMode {
   simpleTwoPoint,
@@ -243,7 +240,7 @@ class _ReferenceInsoleAnalysisScreenState
 
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Referans iç taban analizi yüklenemedi: $e';
+        _errorMessage = 'Referans iç taban değerlendirmesi yüklenemedi: $e';
       });
     }
   }
@@ -262,17 +259,19 @@ class _ReferenceInsoleAnalysisScreenState
     final records = rows.map((row) {
       final id = _asInt(row['id']);
 
-      final fileType = (row['file_type'] ??
-              row['photo_type'] ??
-              row['reference_type'] ??
-              'reference_photo')
-          .toString();
+      final fileType =
+          (row['file_type'] ??
+                  row['photo_type'] ??
+                  row['reference_type'] ??
+                  'reference_photo')
+              .toString();
 
-      final fileName = (row['file_name'] ??
-              row['title'] ??
-              row['photo_title'] ??
-              'Referans fotoğraf #${id ?? '—'}')
-          .toString();
+      final fileName =
+          (row['file_name'] ??
+                  row['title'] ??
+                  row['photo_title'] ??
+                  'Referans fotoğraf #${id ?? '—'}')
+              .toString();
 
       final bucket = (row['storage_bucket'] ?? '').toString();
       final path = (row['storage_path'] ?? '').toString();
@@ -347,7 +346,8 @@ class _ReferenceInsoleAnalysisScreenState
         (calibrationJson['mode'] ?? row['calibration_type'] ?? '').toString();
     _calibrationMode = _calibrationModeFromDbCode(dbCalibrationType);
 
-    final referenceMm = _asDouble(row['calibration_reference_mm']) ??
+    final referenceMm =
+        _asDouble(row['calibration_reference_mm']) ??
         _asDouble(calibrationJson['referenceLengthMm']);
 
     if (referenceMm != null && referenceMm > 0) {
@@ -371,7 +371,9 @@ class _ReferenceInsoleAnalysisScreenState
       calibrationJson['perspectivePoints'] ?? calibrationJson['imagePoints'],
     ).map(_pointFromDynamic).whereType<_ImagePoint>().take(4).toList();
 
-    _homographyImageToMm = _asDoubleList(calibrationJson['homographyImageToMm']);
+    _homographyImageToMm = _asDoubleList(
+      calibrationJson['homographyImageToMm'],
+    );
 
     _multiReferences = _asList(calibrationJson['multiReferences'])
         .map(_localReferenceFromDynamic)
@@ -385,9 +387,12 @@ class _ReferenceInsoleAnalysisScreenState
         .whereType<_InsoleMeasurement>()
         .toList();
 
-    final boundaryFromColumn = _boundaryFromDynamic(row['insole_boundary_json']);
-    final boundaryFromCalibration =
-        _boundaryFromDynamic(calibrationJson['insoleBoundary']);
+    final boundaryFromColumn = _boundaryFromDynamic(
+      row['insole_boundary_json'],
+    );
+    final boundaryFromCalibration = _boundaryFromDynamic(
+      calibrationJson['insoleBoundary'],
+    );
 
     _insoleBoundary = boundaryFromColumn ?? boundaryFromCalibration;
     _boundaryRoiImageRect = _insoleBoundary?.roiImageRect;
@@ -479,9 +484,9 @@ class _ReferenceInsoleAnalysisScreenState
     final publicUrl = photo.publicUrl;
 
     if (publicUrl != null && publicUrl.trim().isNotEmpty) {
-      final byteData = await NetworkAssetBundle(Uri.parse(publicUrl)).load(
-        publicUrl,
-      );
+      final byteData = await NetworkAssetBundle(
+        Uri.parse(publicUrl),
+      ).load(publicUrl);
 
       return byteData.buffer.asUint8List();
     }
@@ -492,10 +497,7 @@ class _ReferenceInsoleAnalysisScreenState
   Future<ui.Image> _decodeImage(Uint8List bytes) {
     final completer = Completer<ui.Image>();
 
-    ui.decodeImageFromList(
-      bytes,
-      (image) => completer.complete(image),
-    );
+    ui.decodeImageFromList(bytes, (image) => completer.complete(image));
 
     return completer.future;
   }
@@ -576,12 +578,14 @@ class _ReferenceInsoleAnalysisScreenState
         break;
       case _CalibrationMode.multiReference:
         if (_multiReferences.isNotEmpty) {
-          _calibrationPixelDistance = _multiReferences
+          _calibrationPixelDistance =
+              _multiReferences
                   .map((reference) => reference.pixelDistance)
                   .reduce((a, b) => a + b) /
               _multiReferences.length;
 
-          _pixelsPerMm = _multiReferences
+          _pixelsPerMm =
+              _multiReferences
                   .map((reference) => reference.pixelsPerMm)
                   .reduce((a, b) => a + b) /
               _multiReferences.length;
@@ -629,7 +633,6 @@ class _ReferenceInsoleAnalysisScreenState
         return const [];
     }
   }
-
 
   double _currentCanvasScale() {
     return _canvasTransformationController.value.getMaxScaleOnAxis();
@@ -705,7 +708,6 @@ class _ReferenceInsoleAnalysisScreenState
       },
     );
   }
-
 
   Widget _buildOverlayVisibilityControls() {
     return Container(
@@ -788,18 +790,11 @@ class _ReferenceInsoleAnalysisScreenState
     final image = _sourceImage;
     if (image == null) return;
 
-    final imageRect = _imageDrawRect(
-      canvasSize,
-      image.width / image.height,
-    );
+    final imageRect = _imageDrawRect(canvasSize, image.width / image.height);
 
     if (!imageRect.contains(localPosition)) return;
 
-    final point = _canvasPointToImagePoint(
-      localPosition,
-      imageRect,
-      image,
-    );
+    final point = _canvasPointToImagePoint(localPosition, imageRect, image);
 
     if (_isSelectingBoundarySeed) {
       _setBoundarySeedPoint(point);
@@ -971,10 +966,7 @@ class _ReferenceInsoleAnalysisScreenState
 
               Navigator.pop(
                 context,
-                _ReferenceScaleDialogResult(
-                  label: label,
-                  lengthMm: length,
-                ),
+                _ReferenceScaleDialogResult(label: label, lengthMm: length),
               );
             },
             child: const Text('Ekle'),
@@ -1194,7 +1186,7 @@ class _ReferenceInsoleAnalysisScreenState
 
     setState(() {
       _isSaving = true;
-      _statusMessage = 'Referans iç taban analizi kaydediliyor...';
+      _statusMessage = 'Referans iç taban değerlendirmesi kaydediliyor...';
     });
 
     try {
@@ -1212,8 +1204,9 @@ class _ReferenceInsoleAnalysisScreenState
         'calibration_pixel_distance': _calibrationPixelDistance,
         'pixels_per_mm': _pixelsPerMm,
         'calibration_points_json': _calibrationJson(),
-        'measurements_json':
-            _measurements.map((measurement) => measurement.toJson()).toList(),
+        'measurements_json': _measurements
+            .map((measurement) => measurement.toJson())
+            .toList(),
         'insole_boundary_json':
             _insoleBoundary?.toJson() ?? <String, dynamic>{},
         'created_by_user_id': widget.currentUser.userId,
@@ -1239,10 +1232,11 @@ class _ReferenceInsoleAnalysisScreenState
 
       setState(() {
         _isSaving = false;
-        _statusMessage = 'Analiz order ile ilişkilendirilerek kaydedildi.';
+        _statusMessage =
+            'Değerlendirme siparişle ilişkilendirilerek kaydedildi.';
       });
 
-      _showMessage('Referans iç taban analizi kaydedildi.');
+      _showMessage('Referans iç taban değerlendirmesi kaydedildi.');
     } catch (e) {
       if (!mounted) return;
 
@@ -1251,7 +1245,7 @@ class _ReferenceInsoleAnalysisScreenState
         _statusMessage = null;
       });
 
-      _showMessage('Analiz kaydedilemedi: $e');
+      _showMessage('Değerlendirme kaydedilemedi: $e');
     }
   }
 
@@ -1262,8 +1256,9 @@ class _ReferenceInsoleAnalysisScreenState
       'referenceLengthMm': _referenceLengthMm,
       'a4WidthMm': _a4WidthMm,
       'a4HeightMm': _a4HeightMm,
-      'simplePoints':
-          _simpleCalibrationPoints.map((point) => point.toJson()).toList(),
+      'simplePoints': _simpleCalibrationPoints
+          .map((point) => point.toJson())
+          .toList(),
       'perspectivePoints': _perspectiveCalibrationPoints
           .map((point) => point.toJson())
           .toList(),
@@ -1271,8 +1266,9 @@ class _ReferenceInsoleAnalysisScreenState
           .map((point) => point.toJson())
           .toList(),
       'homographyImageToMm': _homographyImageToMm,
-      'multiReferences':
-          _multiReferences.map((reference) => reference.toJson()).toList(),
+      'multiReferences': _multiReferences
+          .map((reference) => reference.toJson())
+          .toList(),
       'insoleBoundary': _insoleBoundary?.toJson(),
       'boundarySettings': {
         'sensitivity': _boundarySensitivity,
@@ -1286,7 +1282,6 @@ class _ReferenceInsoleAnalysisScreenState
       'note': _noteController.text.trim(),
     };
   }
-
 
   Future<void> _exportFullAnnotatedPng() async {
     await _exportPngVariant(
@@ -1386,7 +1381,8 @@ class _ReferenceInsoleAnalysisScreenState
     required String preparingMessage,
     required String successMessage,
   }) async {
-    if (_sourceImage == null || (!transparentOverlay && _sourceImageBytes == null)) {
+    if (_sourceImage == null ||
+        (!transparentOverlay && _sourceImageBytes == null)) {
       _showMessage('Dışa aktarılacak görsel yok.');
       return;
     }
@@ -1404,9 +1400,7 @@ class _ReferenceInsoleAnalysisScreenState
     });
 
     try {
-      final svg = _buildSvgString(
-        transparentOverlay: transparentOverlay,
-      );
+      final svg = _buildSvgString(transparentOverlay: transparentOverlay);
       final fileName =
           '${_safeFileName(widget.operationItem.order.orderNo)}_reference_insole_$fileSuffix.svg';
 
@@ -1481,10 +1475,7 @@ class _ReferenceInsoleAnalysisScreenState
     );
 
     final picture = recorder.endRecording();
-    final exportedImage = await picture.toImage(
-      image.width,
-      image.height,
-    );
+    final exportedImage = await picture.toImage(image.width, image.height);
 
     final byteData = await exportedImage.toByteData(
       format: ui.ImageByteFormat.png,
@@ -1629,10 +1620,7 @@ class _ReferenceInsoleAnalysisScreenState
         _drawCanvasLabel(
           canvas: canvas,
           text: 'Kalibrasyon: ${_referenceLengthMm.toStringAsFixed(2)} mm',
-          position: Offset(
-            (a.dx + b.dx) / 2,
-            (a.dy + b.dy) / 2,
-          ),
+          position: Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2),
           color: Colors.blue,
           exportScale: exportScale,
         );
@@ -1689,10 +1677,7 @@ class _ReferenceInsoleAnalysisScreenState
         canvas.drawCircle(a, 7 * exportScale, pointPaint);
         canvas.drawCircle(b, 7 * exportScale, pointPaint);
 
-        final midpoint = Offset(
-          (a.dx + b.dx) / 2,
-          (a.dy + b.dy) / 2,
-        );
+        final midpoint = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
 
         _drawCanvasLabel(
           canvas: canvas,
@@ -1760,16 +1745,11 @@ class _ReferenceInsoleAnalysisScreenState
 
     textPainter.paint(
       canvas,
-      Offset(
-        rect.left + padding.left,
-        rect.top + padding.top,
-      ),
+      Offset(rect.left + padding.left, rect.top + padding.top),
     );
   }
 
-  String _buildSvgString({
-    bool transparentOverlay = false,
-  }) {
+  String _buildSvgString({bool transparentOverlay = false}) {
     final image = _sourceImage!;
     final buffer = StringBuffer();
 
@@ -1793,7 +1773,10 @@ class _ReferenceInsoleAnalysisScreenState
     final boundary = _insoleBoundary;
     if (boundary != null && boundary.points.length >= 3) {
       final polygonPoints = boundary.points
-          .map((point) => '${point.x.toStringAsFixed(2)},${point.y.toStringAsFixed(2)}')
+          .map(
+            (point) =>
+                '${point.x.toStringAsFixed(2)},${point.y.toStringAsFixed(2)}',
+          )
           .join(' ');
 
       buffer.writeln(
@@ -1878,8 +1861,12 @@ class _ReferenceInsoleAnalysisScreenState
           'stroke="#5E35B1" stroke-width="4" stroke-linecap="round" />',
         );
 
-        buffer.writeln('<circle cx="${a.x}" cy="${a.y}" r="7" fill="#5E35B1" />');
-        buffer.writeln('<circle cx="${b.x}" cy="${b.y}" r="7" fill="#5E35B1" />');
+        buffer.writeln(
+          '<circle cx="${a.x}" cy="${a.y}" r="7" fill="#5E35B1" />',
+        );
+        buffer.writeln(
+          '<circle cx="${b.x}" cy="${b.y}" r="7" fill="#5E35B1" />',
+        );
 
         buffer.writeln(
           '<text x="${midX + 8}" y="${midY - 8}" '
@@ -2032,13 +2019,10 @@ class _ReferenceInsoleAnalysisScreenState
       return;
     }
 
-    _boundaryDetectionDebounce = Timer(
-      const Duration(milliseconds: 260),
-      () {
-        if (!mounted) return;
-        _detectInsoleBoundary(showMessages: false);
-      },
-    );
+    _boundaryDetectionDebounce = Timer(const Duration(milliseconds: 260), () {
+      if (!mounted) return;
+      _detectInsoleBoundary(showMessages: false);
+    });
   }
 
   Future<_InsoleBoundary?> _autoDetectInsoleBoundary(
@@ -2062,26 +2046,28 @@ class _ReferenceInsoleAnalysisScreenState
     final imageHeight = image.height;
 
     final maxAnalysisSize = 900;
-    final sampleStep =
-        math.max(1, (math.max(imageWidth, imageHeight) / maxAnalysisSize).ceil());
+    final sampleStep = math.max(
+      1,
+      (math.max(imageWidth, imageHeight) / maxAnalysisSize).ceil(),
+    );
 
     final gridWidth = (imageWidth / sampleStep).floor();
     final gridHeight = (imageHeight / sampleStep).floor();
 
     if (gridWidth < 20 || gridHeight < 20) {
-      throw Exception('Görsel sınır analizi için çok küçük.');
+      throw Exception('Görsel sınır incelemesi için çok küçük.');
     }
 
     final normalizedRoi = _normalizeImageRect(roiImageRect, image);
     if (normalizedRoi.width < 20 || normalizedRoi.height < 20) {
-      throw Exception('Seçilen ROI alanı sınır analizi için çok küçük.');
+      throw Exception('Seçilen ROI alanı sınır incelemesi için çok küçük.');
     }
 
     final a4RestrictPolygon =
         _calibrationMode == _CalibrationMode.perspectiveA4 &&
-                _perspectiveCalibrationPoints.length == 4
-            ? _perspectiveCalibrationPoints
-            : null;
+            _perspectiveCalibrationPoints.length == 4
+        ? _perspectiveCalibrationPoints
+        : null;
 
     final seedFeature = _sampleAverageFeature(
       data: data,
@@ -2107,8 +2093,7 @@ class _ReferenceInsoleAnalysisScreenState
     for (int gy = 0; gy < gridHeight; gy++) {
       for (int gx = 0; gx < gridWidth; gx++) {
         final px = math.min(imageWidth - 1, gx * sampleStep + sampleStep ~/ 2);
-        final py =
-            math.min(imageHeight - 1, gy * sampleStep + sampleStep ~/ 2);
+        final py = math.min(imageHeight - 1, gy * sampleStep + sampleStep ~/ 2);
 
         final imagePoint = _ImagePoint(x: px.toDouble(), y: py.toDouble());
 
@@ -2141,7 +2126,8 @@ class _ReferenceInsoleAnalysisScreenState
           shadowTolerance: 0.20,
         );
 
-        final isCandidate = seedDistance <= seedThreshold &&
+        final isCandidate =
+            seedDistance <= seedThreshold &&
             (backgroundDistance - seedDistance) >= separationMargin;
 
         if (isCandidate) {
@@ -2209,10 +2195,22 @@ class _ReferenceInsoleAnalysisScreenState
     final imageWidth = image.width.toDouble();
     final imageHeight = image.height.toDouble();
 
-    final left = math.min(rect.left, rect.right).clamp(0.0, imageWidth).toDouble();
-    final right = math.max(rect.left, rect.right).clamp(0.0, imageWidth).toDouble();
-    final top = math.min(rect.top, rect.bottom).clamp(0.0, imageHeight).toDouble();
-    final bottom = math.max(rect.top, rect.bottom).clamp(0.0, imageHeight).toDouble();
+    final left = math
+        .min(rect.left, rect.right)
+        .clamp(0.0, imageWidth)
+        .toDouble();
+    final right = math
+        .max(rect.left, rect.right)
+        .clamp(0.0, imageWidth)
+        .toDouble();
+    final top = math
+        .min(rect.top, rect.bottom)
+        .clamp(0.0, imageHeight)
+        .toDouble();
+    final bottom = math
+        .max(rect.top, rect.bottom)
+        .clamp(0.0, imageHeight)
+        .toDouble();
 
     return Rect.fromLTRB(left, top, right, bottom);
   }
@@ -2264,8 +2262,14 @@ class _ReferenceInsoleAnalysisScreenState
     required Rect roiImageRect,
     required _ImagePoint seedPoint,
   }) {
-    final seedX = (seedPoint.x / sampleStep).round().clamp(0, width - 1).toInt();
-    final seedY = (seedPoint.y / sampleStep).round().clamp(0, height - 1).toInt();
+    final seedX = (seedPoint.x / sampleStep)
+        .round()
+        .clamp(0, width - 1)
+        .toInt();
+    final seedY = (seedPoint.y / sampleStep)
+        .round()
+        .clamp(0, height - 1)
+        .toInt();
     final seedIndex = seedY * width + seedX;
 
     if (mask[seedIndex]) return seedIndex;
@@ -2291,8 +2295,12 @@ class _ReferenceInsoleAnalysisScreenState
           if (!mask[index]) continue;
 
           final imagePoint = _ImagePoint(
-            x: math.min((width * sampleStep) - 1, x * sampleStep + sampleStep / 2).toDouble(),
-            y: math.min((height * sampleStep) - 1, y * sampleStep + sampleStep / 2).toDouble(),
+            x: math
+                .min((width * sampleStep) - 1, x * sampleStep + sampleStep / 2)
+                .toDouble(),
+            y: math
+                .min((height * sampleStep) - 1, y * sampleStep + sampleStep / 2)
+                .toDouble(),
           );
 
           if (!roiImageRect.contains(imagePoint.toOffset())) continue;
@@ -2395,8 +2403,18 @@ class _ReferenceInsoleAnalysisScreenState
             if (!mask[nextIndex] || visited[nextIndex]) continue;
 
             final imagePoint = _ImagePoint(
-              x: math.min((width * sampleStep) - 1, nx * sampleStep + sampleStep / 2).toDouble(),
-              y: math.min((height * sampleStep) - 1, ny * sampleStep + sampleStep / 2).toDouble(),
+              x: math
+                  .min(
+                    (width * sampleStep) - 1,
+                    nx * sampleStep + sampleStep / 2,
+                  )
+                  .toDouble(),
+              y: math
+                  .min(
+                    (height * sampleStep) - 1,
+                    ny * sampleStep + sampleStep / 2,
+                  )
+                  .toDouble(),
             );
 
             if (!roiImageRect.contains(imagePoint.toOffset())) continue;
@@ -2547,22 +2565,14 @@ class _ReferenceInsoleAnalysisScreenState
     for (int i = 0; i < 6; i++) {
       final t = i / 5.0;
 
-      samplePoints.add(_ImagePoint(
-        x: ui.lerpDouble(left, right, t)!,
-        y: top,
-      ));
-      samplePoints.add(_ImagePoint(
-        x: ui.lerpDouble(left, right, t)!,
-        y: bottom,
-      ));
-      samplePoints.add(_ImagePoint(
-        x: left,
-        y: ui.lerpDouble(top, bottom, t)!,
-      ));
-      samplePoints.add(_ImagePoint(
-        x: right,
-        y: ui.lerpDouble(top, bottom, t)!,
-      ));
+      samplePoints.add(_ImagePoint(x: ui.lerpDouble(left, right, t)!, y: top));
+      samplePoints.add(
+        _ImagePoint(x: ui.lerpDouble(left, right, t)!, y: bottom),
+      );
+      samplePoints.add(_ImagePoint(x: left, y: ui.lerpDouble(top, bottom, t)!));
+      samplePoints.add(
+        _ImagePoint(x: right, y: ui.lerpDouble(top, bottom, t)!),
+      );
     }
 
     final features = samplePoints
@@ -2585,17 +2595,22 @@ class _ReferenceInsoleAnalysisScreenState
     _BoundaryPixelFeatures b, {
     required double shadowTolerance,
   }) {
-    final chromaDistance = math.sqrt(
-      math.pow(a.nr - b.nr, 2) +
-          math.pow(a.ng - b.ng, 2) +
-          math.pow(a.nb - b.nb, 2),
-    ) / 1.7320508075688772;
+    final chromaDistance =
+        math.sqrt(
+          math.pow(a.nr - b.nr, 2) +
+              math.pow(a.ng - b.ng, 2) +
+              math.pow(a.nb - b.nb, 2),
+        ) /
+        1.7320508075688772;
 
     final saturationDistance = (a.saturation - b.saturation).abs();
     final luminanceDistance = (a.luminance - b.luminance).abs();
 
-    final luminanceWeight =
-        ui.lerpDouble(0.20, 0.06, shadowTolerance.clamp(0.0, 1.0).toDouble())!;
+    final luminanceWeight = ui.lerpDouble(
+      0.20,
+      0.06,
+      shadowTolerance.clamp(0.0, 1.0).toDouble(),
+    )!;
 
     return (chromaDistance * 0.72) +
         (saturationDistance * 0.18) +
@@ -2639,10 +2654,7 @@ class _ReferenceInsoleAnalysisScreenState
           final cx = current % width;
           final cy = current ~/ width;
 
-          if (cx <= 1 ||
-              cy <= 1 ||
-              cx >= width - 2 ||
-              cy >= height - 2) {
+          if (cx <= 1 || cy <= 1 || cx >= width - 2 || cy >= height - 2) {
             touchesGridEdge = true;
           }
 
@@ -2668,11 +2680,7 @@ class _ReferenceInsoleAnalysisScreenState
     return best;
   }
 
-  List<int> _extractBoundaryCells(
-    Set<int> component,
-    int width,
-    int height,
-  ) {
+  List<int> _extractBoundaryCells(Set<int> component, int width, int height) {
     final boundary = <int>[];
 
     for (final index in component) {
@@ -2780,7 +2788,9 @@ class _ReferenceInsoleAnalysisScreenState
       final smoothed = <_ImagePoint>[];
 
       for (int i = 0; i < currentPoints.length; i++) {
-        final prev = currentPoints[(i - 1 + currentPoints.length) % currentPoints.length];
+        final prev =
+            currentPoints[(i - 1 + currentPoints.length) %
+                currentPoints.length];
         final current = currentPoints[i];
         final next = currentPoints[(i + 1) % currentPoints.length];
 
@@ -2813,10 +2823,7 @@ class _ReferenceInsoleAnalysisScreenState
     return mmPoints;
   }
 
-  bool _isPointInsidePolygon(
-    _ImagePoint point,
-    List<_ImagePoint> polygon,
-  ) {
+  bool _isPointInsidePolygon(_ImagePoint point, List<_ImagePoint> polygon) {
     if (polygon.length < 3) return false;
 
     bool inside = false;
@@ -2827,9 +2834,12 @@ class _ReferenceInsoleAnalysisScreenState
       final xj = polygon[j].x;
       final yj = polygon[j].y;
 
-      final intersects = ((yi > point.y) != (yj > point.y)) &&
+      final intersects =
+          ((yi > point.y) != (yj > point.y)) &&
           (point.x <
-              (xj - xi) * (point.y - yi) / ((yj - yi).abs() < 1e-9 ? 1e-9 : yj - yi) +
+              (xj - xi) *
+                      (point.y - yi) /
+                      ((yj - yi).abs() < 1e-9 ? 1e-9 : yj - yi) +
                   xi);
 
       if (intersects) inside = !inside;
@@ -2842,10 +2852,7 @@ class _ReferenceInsoleAnalysisScreenState
     final image = _sourceImage;
     if (image == null) return null;
 
-    final imageRect = _imageDrawRect(
-      canvasSize,
-      image.width / image.height,
-    );
+    final imageRect = _imageDrawRect(canvasSize, image.width / image.height);
 
     if (!imageRect.contains(scenePoint)) return null;
 
@@ -3084,10 +3091,10 @@ class _ReferenceInsoleAnalysisScreenState
   void _clearInsoleBoundary() {
     setState(() {
       _insoleBoundary = null;
-      _statusMessage = 'İç taban sınırı temizlendi. ROI ve iç taban içi nokta korunuyor.';
+      _statusMessage =
+          'İç taban sınırı temizlendi. ROI ve iç taban içi nokta korunuyor.';
     });
   }
-
 
   void _clearCalibration() {
     setState(() {
@@ -3125,15 +3132,17 @@ class _ReferenceInsoleAnalysisScreenState
 
   void _deleteMeasurement(String id) {
     setState(() {
-      _measurements =
-          _measurements.where((measurement) => measurement.id != id).toList();
+      _measurements = _measurements
+          .where((measurement) => measurement.id != id)
+          .toList();
     });
   }
 
   void _deleteMultiReference(String id) {
     setState(() {
-      _multiReferences =
-          _multiReferences.where((reference) => reference.id != id).toList();
+      _multiReferences = _multiReferences
+          .where((reference) => reference.id != id)
+          .toList();
       _recomputeCalibrationAndMeasurements();
     });
   }
@@ -3172,15 +3181,13 @@ class _ReferenceInsoleAnalysisScreenState
     Rect imageRect,
     ui.Image image,
   ) {
-    final normalizedX =
-        ((canvasPoint.dx - imageRect.left) / imageRect.width)
-            .clamp(0.0, 1.0)
-            .toDouble();
+    final normalizedX = ((canvasPoint.dx - imageRect.left) / imageRect.width)
+        .clamp(0.0, 1.0)
+        .toDouble();
 
-    final normalizedY =
-        ((canvasPoint.dy - imageRect.top) / imageRect.height)
-            .clamp(0.0, 1.0)
-            .toDouble();
+    final normalizedY = ((canvasPoint.dy - imageRect.top) / imageRect.height)
+        .clamp(0.0, 1.0)
+        .toDouble();
 
     return _ImagePoint(
       x: normalizedX * image.width,
@@ -3383,9 +3390,7 @@ class _ReferenceInsoleAnalysisScreenState
 
   String _trimDoubleText(double value) {
     final fixed = value.toStringAsFixed(4);
-    return fixed
-        .replaceAll(RegExp(r'0+$'), '')
-        .replaceAll(RegExp(r'\.$'), '');
+    return fixed.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
   }
 
   String _safeFileName(String value) {
@@ -3419,9 +3424,9 @@ class _ReferenceInsoleAnalysisScreenState
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -3429,16 +3434,12 @@ class _ReferenceInsoleAnalysisScreenState
     final order = widget.operationItem.order;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Referans İç Taban Analizi'),
+        title: const Text('Referans İç Taban Değerlendirmesi'),
         backgroundColor: Colors.teal,
       ),
       body: Column(
@@ -3457,10 +3458,7 @@ class _ReferenceInsoleAnalysisScreenState
                       children: [
                         _buildLeftPanel(order.orderNo),
                         const SizedBox(height: 16),
-                        SizedBox(
-                          height: 620,
-                          child: _buildCanvasPanel(),
-                        ),
+                        SizedBox(height: 620, child: _buildCanvasPanel()),
                         const SizedBox(height: 16),
                         _buildRightPanel(),
                       ],
@@ -3475,9 +3473,7 @@ class _ReferenceInsoleAnalysisScreenState
                     children: [
                       _buildLeftPanel(order.orderNo),
                       const SizedBox(width: 18),
-                      Expanded(
-                        child: _buildCanvasPanel(),
-                      ),
+                      Expanded(child: _buildCanvasPanel()),
                       const SizedBox(width: 18),
                       _buildRightPanel(),
                     ],
@@ -3507,14 +3503,8 @@ class _ReferenceInsoleAnalysisScreenState
                     'Kullanıcı',
                     widget.operationItem.patientName,
                   ),
-                  _buildKeyValueRow(
-                    'Klinik',
-                    widget.operationItem.clinicName,
-                  ),
-                  _buildKeyValueRow(
-                    'Uzman',
-                    widget.operationItem.expertName,
-                  ),
+                  _buildKeyValueRow('Klinik', widget.operationItem.clinicName),
+                  _buildKeyValueRow('Uzman', widget.operationItem.expertName),
                 ],
               ),
             ),
@@ -3613,10 +3603,12 @@ class _ReferenceInsoleAnalysisScreenState
                     keyboardType: TextInputType.number,
                     enabled: _calibrationMode != _CalibrationMode.perspectiveA4,
                     decoration: InputDecoration(
-                      labelText: _calibrationMode == _CalibrationMode.multiReference
+                      labelText:
+                          _calibrationMode == _CalibrationMode.multiReference
                           ? 'Yeni referans varsayılan uzunluğu (mm)'
                           : 'Referans uzunluğu (mm)',
-                      helperText: _calibrationMode == _CalibrationMode.perspectiveA4
+                      helperText:
+                          _calibrationMode == _CalibrationMode.perspectiveA4
                           ? 'A4 ölçüsü 210 × 297 mm olarak kullanılır.'
                           : null,
                       border: const OutlineInputBorder(),
@@ -3628,8 +3620,7 @@ class _ReferenceInsoleAnalysisScreenState
                     children: [
                       Expanded(
                         child: ChoiceChip(
-                          selected:
-                              _toolMode == _AnalysisToolMode.calibration,
+                          selected: _toolMode == _AnalysisToolMode.calibration,
                           label: const Text('Kalibrasyon'),
                           avatar: const Icon(Icons.tune, size: 18),
                           onSelected: (_) {
@@ -3643,8 +3634,7 @@ class _ReferenceInsoleAnalysisScreenState
                       const SizedBox(width: 8),
                       Expanded(
                         child: ChoiceChip(
-                          selected:
-                              _toolMode == _AnalysisToolMode.measurement,
+                          selected: _toolMode == _AnalysisToolMode.measurement,
                           label: const Text('Ölçüm'),
                           avatar: const Icon(Icons.linear_scale, size: 18),
                           onSelected: _hasCalibration
@@ -3670,7 +3660,10 @@ class _ReferenceInsoleAnalysisScreenState
                     'Referans piksel',
                     _formatPx(_calibrationPixelDistance),
                   ),
-                  _buildKeyValueRow('Ortalama ölçek', _formatRatio(_pixelsPerMm)),
+                  _buildKeyValueRow(
+                    'Ortalama ölçek',
+                    _formatRatio(_pixelsPerMm),
+                  ),
                   _buildKeyValueRow(
                     'Perspektif matrisi',
                     _homographyImageToMm == null ? '—' : 'Hazır',
@@ -3722,7 +3715,8 @@ class _ReferenceInsoleAnalysisScreenState
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _isDetectingBoundary ||
+                          onPressed:
+                              _isDetectingBoundary ||
                                   _boundaryRoiImageRect == null
                               ? null
                               : _startBoundarySeedSelection,
@@ -3878,7 +3872,8 @@ class _ReferenceInsoleAnalysisScreenState
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _boundaryRoiImageRect == null &&
+                          onPressed:
+                              _boundaryRoiImageRect == null &&
                                   _boundarySeedPoint == null
                               ? null
                               : _clearBoundaryRoiAndSeed,
@@ -3901,7 +3896,7 @@ class _ReferenceInsoleAnalysisScreenState
                     controller: _noteController,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      labelText: 'Analiz notu',
+                      labelText: 'Değerlendirme notu',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -3943,8 +3938,9 @@ class _ReferenceInsoleAnalysisScreenState
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isExporting ? null : _exportFullAnnotatedPng,
+                          onPressed: _isExporting
+                              ? null
+                              : _exportFullAnnotatedPng,
                           icon: const Icon(Icons.image_outlined),
                           label: const Text('PNG'),
                         ),
@@ -4012,10 +4008,7 @@ class _ReferenceInsoleAnalysisScreenState
             const Expanded(
               child: Text(
                 'Görsel Üzerinde Ölçüm',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
             ),
             if (_statusMessage != null)
@@ -4023,9 +4016,7 @@ class _ReferenceInsoleAnalysisScreenState
                 child: Text(
                   _statusMessage!,
                   textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(color: Colors.grey[700]),
                 ),
               ),
             const SizedBox(width: 10),
@@ -4055,127 +4046,120 @@ class _ReferenceInsoleAnalysisScreenState
                     ),
                   )
                 : _sourceImage == null
-                    ? Center(
-                        child: Text(
-                          _isLoadingImage
-                              ? 'Görsel yükleniyor...'
-                              : 'Referans görsel bekleniyor',
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final canvasSize = Size(
-                              constraints.maxWidth,
-                              constraints.maxHeight,
-                            );
+                ? Center(
+                    child: Text(
+                      _isLoadingImage
+                          ? 'Görsel yükleniyor...'
+                          : 'Referans görsel bekleniyor',
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final canvasSize = Size(
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
 
-                            return Listener(
-                              onPointerSignal: _handleCanvasPointerSignal,
-                              onPointerDown: _isSelectingBoundaryRoi
-                                  ? (event) => _handleBoundaryRoiPointerDown(
-                                        event,
-                                        canvasSize,
-                                      )
-                                  : null,
-                              onPointerMove: _isSelectingBoundaryRoi
-                                  ? (event) => _handleBoundaryRoiPointerMove(
-                                        event,
-                                        canvasSize,
-                                      )
-                                  : null,
-                              onPointerUp: _isSelectingBoundaryRoi
-                                  ? _handleBoundaryRoiPointerUp
-                                  : null,
-                              onPointerCancel: _isSelectingBoundaryRoi
-                                  ? _handleBoundaryRoiPointerCancel
-                                  : null,
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTapUp: (details) {
-                                  if (_suppressNextCanvasTap) {
-                                    _suppressNextCanvasTap = false;
-                                    return;
-                                  }
+                        return Listener(
+                          onPointerSignal: _handleCanvasPointerSignal,
+                          onPointerDown: _isSelectingBoundaryRoi
+                              ? (event) => _handleBoundaryRoiPointerDown(
+                                  event,
+                                  canvasSize,
+                                )
+                              : null,
+                          onPointerMove: _isSelectingBoundaryRoi
+                              ? (event) => _handleBoundaryRoiPointerMove(
+                                  event,
+                                  canvasSize,
+                                )
+                              : null,
+                          onPointerUp: _isSelectingBoundaryRoi
+                              ? _handleBoundaryRoiPointerUp
+                              : null,
+                          onPointerCancel: _isSelectingBoundaryRoi
+                              ? _handleBoundaryRoiPointerCancel
+                              : null,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapUp: (details) {
+                              if (_suppressNextCanvasTap) {
+                                _suppressNextCanvasTap = false;
+                                return;
+                              }
 
-                                  if (_isSelectingBoundaryRoi) return;
+                              if (_isSelectingBoundaryRoi) return;
 
-                                  final scenePoint =
-                                      _canvasTransformationController.toScene(
-                                    details.localPosition,
-                                  );
+                              final scenePoint = _canvasTransformationController
+                                  .toScene(details.localPosition);
 
-                                  _handleImageTap(
-                                    scenePoint,
-                                    canvasSize,
-                                  );
-                                },
-                                child: ClipRect(
-                                  child: InteractiveViewer(
-                                    transformationController:
-                                        _canvasTransformationController,
-                                    minScale: _minCanvasScale,
-                                    maxScale: _maxCanvasScale,
-                                    boundaryMargin: const EdgeInsets.all(5000),
-                                    panEnabled: !_isSelectingBoundaryRoi,
-                                    scaleEnabled: !_isSelectingBoundaryRoi,
-                                    child: SizedBox(
-                                      width: canvasSize.width,
-                                      height: canvasSize.height,
-                                      child: CustomPaint(
-                                        painter: _ReferenceInsolePainter(
-                                          image: _sourceImage!,
-                                          calibrationMode: _calibrationMode,
-                                          toolMode: _toolMode,
-                                          simpleCalibrationPoints:
-                                              _simpleCalibrationPoints,
-                                          perspectiveCalibrationPoints:
-                                              _perspectiveCalibrationPoints,
-                                          multiReferences: _multiReferences,
-                                          pendingMultiReferencePoints:
-                                              _pendingMultiReferencePoints,
-                                          measurements: _measurements,
-                                          pendingMeasurementPoints:
-                                              _pendingMeasurementPoints,
-                                          insoleBoundary: _showInsoleBoundary
-                                              ? _insoleBoundary
-                                              : null,
-                                          boundaryRoiImageRect:
-                                              _boundaryRoiImageRect,
-                                          boundarySeedPoint:
-                                              _boundarySeedPoint,
-                                          boundaryBackgroundPoint: null,
-                                          isSelectingBoundaryRoi:
-                                              _isSelectingBoundaryRoi,
-                                          isSelectingBoundarySeed:
-                                              _isSelectingBoundarySeed,
-                                          isSelectingBoundaryBackground: false,
-                                          boundaryRoiDragStartPoint:
-                                              _boundaryRoiDragStartPoint,
-                                          boundaryRoiDragCurrentPoint:
-                                              _boundaryRoiDragCurrentPoint,
-                                          referenceLengthMm: _referenceLengthMm,
-                                          showCalibrationOverlay:
-                                              _showCalibrationOverlay,
-                                          showBoundaryRoiOverlay:
-                                              _showRoiOverlay,
-                                          showInternalPointOverlay:
-                                              _showInternalPointOverlay,
-                                          showMeasurementOverlay:
-                                              _showMeasurementOverlay,
-                                        ),
-                                        size: canvasSize,
-                                      ),
+                              _handleImageTap(scenePoint, canvasSize);
+                            },
+                            child: ClipRect(
+                              child: InteractiveViewer(
+                                transformationController:
+                                    _canvasTransformationController,
+                                minScale: _minCanvasScale,
+                                maxScale: _maxCanvasScale,
+                                boundaryMargin: const EdgeInsets.all(5000),
+                                panEnabled: !_isSelectingBoundaryRoi,
+                                scaleEnabled: !_isSelectingBoundaryRoi,
+                                child: SizedBox(
+                                  width: canvasSize.width,
+                                  height: canvasSize.height,
+                                  child: CustomPaint(
+                                    painter: _ReferenceInsolePainter(
+                                      image: _sourceImage!,
+                                      calibrationMode: _calibrationMode,
+                                      toolMode: _toolMode,
+                                      simpleCalibrationPoints:
+                                          _simpleCalibrationPoints,
+                                      perspectiveCalibrationPoints:
+                                          _perspectiveCalibrationPoints,
+                                      multiReferences: _multiReferences,
+                                      pendingMultiReferencePoints:
+                                          _pendingMultiReferencePoints,
+                                      measurements: _measurements,
+                                      pendingMeasurementPoints:
+                                          _pendingMeasurementPoints,
+                                      insoleBoundary: _showInsoleBoundary
+                                          ? _insoleBoundary
+                                          : null,
+                                      boundaryRoiImageRect:
+                                          _boundaryRoiImageRect,
+                                      boundarySeedPoint: _boundarySeedPoint,
+                                      boundaryBackgroundPoint: null,
+                                      isSelectingBoundaryRoi:
+                                          _isSelectingBoundaryRoi,
+                                      isSelectingBoundarySeed:
+                                          _isSelectingBoundarySeed,
+                                      isSelectingBoundaryBackground: false,
+                                      boundaryRoiDragStartPoint:
+                                          _boundaryRoiDragStartPoint,
+                                      boundaryRoiDragCurrentPoint:
+                                          _boundaryRoiDragCurrentPoint,
+                                      referenceLengthMm: _referenceLengthMm,
+                                      showCalibrationOverlay:
+                                          _showCalibrationOverlay,
+                                      showBoundaryRoiOverlay: _showRoiOverlay,
+                                      showInternalPointOverlay:
+                                          _showInternalPointOverlay,
+                                      showMeasurementOverlay:
+                                          _showMeasurementOverlay,
                                     ),
+                                    size: canvasSize,
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ),
       ],
@@ -4248,19 +4232,14 @@ class _ReferenceInsoleAnalysisScreenState
                     )
                   : Column(
                       children: [
-                        _buildKeyValueRow(
-                          'Yöntem',
-                          _insoleBoundary!.method,
-                        ),
+                        _buildKeyValueRow('Yöntem', _insoleBoundary!.method),
                         _buildKeyValueRow(
                           'Nokta sayısı',
                           _insoleBoundary!.points.length.toString(),
                         ),
                         _buildKeyValueRow(
                           'MM koordinat',
-                          _insoleBoundary!.pointsMm == null
-                              ? 'Yok'
-                              : 'Hazır',
+                          _insoleBoundary!.pointsMm == null ? 'Yok' : 'Hazır',
                         ),
                       ],
                     ),
@@ -4306,9 +4285,7 @@ class _ReferenceInsoleAnalysisScreenState
               children: [
                 Text(
                   measurement.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -4322,37 +4299,25 @@ class _ReferenceInsoleAnalysisScreenState
                 const SizedBox(height: 4),
                 Text(
                   'Piksel: ${measurement.pixelDistance.toStringAsFixed(1)} px • $methodLabel',
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
                 ),
                 if (measurement.startMm != null &&
                     measurement.endMm != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     'Başlangıç: ${measurement.startMm!.x.toStringAsFixed(1)}, ${measurement.startMm!.y.toStringAsFixed(1)} mm',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
                   ),
                   Text(
                     'Bitiş: ${measurement.endMm!.x.toStringAsFixed(1)}, ${measurement.endMm!.y.toStringAsFixed(1)} mm',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
                   ),
                 ],
                 if (measurement.localPixelsPerMm != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     'Lokal ölçek: ${measurement.localPixelsPerMm!.toStringAsFixed(4)} px/mm',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
                   ),
                 ],
               ],
@@ -4394,10 +4359,7 @@ class _ReferenceInsoleAnalysisScreenState
                 const SizedBox(height: 4),
                 Text(
                   '${_formatMm(reference.referenceLengthMm)} • ${reference.pixelsPerMm.toStringAsFixed(4)} px/mm',
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
                 ),
               ],
             ),
@@ -4424,12 +4386,7 @@ class _ReferenceInsoleAnalysisScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.grey.shade300),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 7,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 7)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4463,10 +4420,7 @@ class _ReferenceInsoleAnalysisScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[700])),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -4481,10 +4435,7 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
-  Widget _buildNotice({
-    required IconData icon,
-    required String text,
-  }) {
+  Widget _buildNotice({required IconData icon, required String text}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -4496,19 +4447,12 @@ class _ReferenceInsoleAnalysisScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: Colors.orange.shade800,
-            size: 20,
-          ),
+          Icon(icon, color: Colors.orange.shade800, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                color: Colors.orange.shade900,
-                height: 1.35,
-              ),
+              style: TextStyle(color: Colors.orange.shade900, height: 1.35),
             ),
           ),
         ],
@@ -4556,10 +4500,7 @@ class _ReferenceInsoleAnalysisScreenState
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
           Slider(
             value: value.clamp(min, max).toDouble(),
@@ -4703,7 +4644,6 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
-
   static Rect? _rectFromDynamic(dynamic value) {
     final map = _asMap(value);
     if (map.isEmpty) return null;
@@ -4734,17 +4674,15 @@ class _ReferenceInsoleAnalysisScreenState
 
     if (map.isEmpty) return null;
 
-    final points = _asList(map['points'] ?? map['pointsImage'])
-        .map(_pointFromDynamic)
-        .whereType<_ImagePoint>()
-        .toList();
+    final points = _asList(
+      map['points'] ?? map['pointsImage'],
+    ).map(_pointFromDynamic).whereType<_ImagePoint>().toList();
 
     if (points.length < 3) return null;
 
-    final pointsMm = _asList(map['pointsMm'])
-        .map(_pointFromDynamic)
-        .whereType<_ImagePoint>()
-        .toList();
+    final pointsMm = _asList(
+      map['pointsMm'],
+    ).map(_pointFromDynamic).whereType<_ImagePoint>().toList();
 
     final roiMap = _asMap(map['roi'] ?? map['roiImageRect']);
     final roi = _rectFromDynamic(roiMap);
@@ -4767,14 +4705,15 @@ class _ReferenceInsoleAnalysisScreenState
     );
   }
 
-
   static _InsoleMeasurement? _measurementFromDynamic(dynamic value) {
     final map = _asMap(value);
 
-    final startImage =
-        _pointFromDynamic(map['startImage'] ?? map['start'] ?? map['startPoint']);
-    final endImage =
-        _pointFromDynamic(map['endImage'] ?? map['end'] ?? map['endPoint']);
+    final startImage = _pointFromDynamic(
+      map['startImage'] ?? map['start'] ?? map['startPoint'],
+    );
+    final endImage = _pointFromDynamic(
+      map['endImage'] ?? map['end'] ?? map['endPoint'],
+    );
 
     final startMm = _pointFromDynamic(map['startMm']);
     final endMm = _pointFromDynamic(map['endMm']);
@@ -4866,12 +4805,7 @@ class _ReferenceInsolePainter extends CustomPainter {
 
     canvas.drawImageRect(
       image,
-      Rect.fromLTWH(
-        0,
-        0,
-        image.width.toDouble(),
-        image.height.toDouble(),
-      ),
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
       imageRect,
       Paint(),
     );
@@ -4914,11 +4848,7 @@ class _ReferenceInsolePainter extends CustomPainter {
       _drawPendingMeasurements(canvas, imageRect, pendingPaint);
     }
 
-    _drawTopBadge(
-      canvas: canvas,
-      text: _modeInstructionText,
-      rect: imageRect,
-    );
+    _drawTopBadge(canvas: canvas, text: _modeInstructionText, rect: imageRect);
   }
 
   void _drawBoundaryRoiAndSeed(Canvas canvas, Rect imageRect) {
@@ -4930,7 +4860,9 @@ class _ReferenceInsolePainter extends CustomPainter {
         activeRoi.height > 0) {
       final rect = _imageRectToCanvasRect(activeRoi, imageRect);
       final fillPaint = Paint()
-        ..color = Colors.orange.withOpacity(isSelectingBoundaryRoi ? 0.14 : 0.08)
+        ..color = Colors.orange.withOpacity(
+          isSelectingBoundaryRoi ? 0.14 : 0.08,
+        )
         ..style = PaintingStyle.fill;
       final strokePaint = Paint()
         ..color = Colors.orange.shade800
@@ -4966,15 +4898,12 @@ class _ReferenceInsolePainter extends CustomPainter {
       _drawCrosshair(canvas, point, Colors.amber.shade800);
       _drawLabel(
         canvas: canvas,
-        text: isSelectingBoundaryBackground
-            ? 'Zemin seçiliyor'
-            : 'Zemin/Gölge',
+        text: isSelectingBoundaryBackground ? 'Zemin seçiliyor' : 'Zemin/Gölge',
         position: point + const Offset(10, 18),
         color: Colors.amber.shade800,
       );
     }
   }
-
 
   Rect? _activeBoundaryRoiRect() {
     if (isSelectingBoundaryRoi &&
@@ -5055,11 +4984,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     );
   }
 
-  void _drawSimpleCalibration(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawSimpleCalibration(Canvas canvas, Rect imageRect, Paint paint) {
     if (simpleCalibrationPoints.isEmpty) return;
 
     for (final point in simpleCalibrationPoints) {
@@ -5085,11 +5010,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     }
   }
 
-  void _drawPerspectiveCalibration(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawPerspectiveCalibration(Canvas canvas, Rect imageRect, Paint paint) {
     if (perspectiveCalibrationPoints.isEmpty) return;
 
     final points = perspectiveCalibrationPoints
@@ -5120,11 +5041,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     }
   }
 
-  void _drawMultiReferences(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawMultiReferences(Canvas canvas, Rect imageRect, Paint paint) {
     for (final reference in multiReferences) {
       final a = _imagePointToCanvasPoint(reference.start, imageRect);
       final b = _imagePointToCanvasPoint(reference.end, imageRect);
@@ -5143,11 +5060,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     }
   }
 
-  void _drawPendingReferences(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawPendingReferences(Canvas canvas, Rect imageRect, Paint paint) {
     if (pendingMultiReferencePoints.isEmpty) return;
 
     final points = pendingMultiReferencePoints
@@ -5163,11 +5076,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     }
   }
 
-  void _drawMeasurements(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawMeasurements(Canvas canvas, Rect imageRect, Paint paint) {
     for (final measurement in measurements) {
       final a = _imagePointToCanvasPoint(measurement.startImage, imageRect);
       final b = _imagePointToCanvasPoint(measurement.endImage, imageRect);
@@ -5186,11 +5095,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     }
   }
 
-  void _drawPendingMeasurements(
-    Canvas canvas,
-    Rect imageRect,
-    Paint paint,
-  ) {
+  void _drawPendingMeasurements(Canvas canvas, Rect imageRect, Paint paint) {
     if (pendingMeasurementPoints.isEmpty) return;
 
     final points = pendingMeasurementPoints
@@ -5287,12 +5192,7 @@ class _ReferenceInsolePainter extends CustomPainter {
     canvas.drawCircle(point, 5, innerPaint);
   }
 
-  void _drawSmallIndex(
-    Canvas canvas,
-    Offset point,
-    String text,
-    Color color,
-  ) {
+  void _drawSmallIndex(Canvas canvas, Offset point, String text, Color color) {
     final textPainter = TextPainter(
       text: TextSpan(
         text: text,
@@ -5352,10 +5252,7 @@ class _ReferenceInsolePainter extends CustomPainter {
       backgroundPaint,
     );
 
-    textPainter.paint(
-      canvas,
-      Offset(rect.left + 8, rect.top + 5),
-    );
+    textPainter.paint(canvas, Offset(rect.left + 8, rect.top + 5));
   }
 
   void _drawTopBadge({
@@ -5389,10 +5286,7 @@ class _ReferenceInsolePainter extends CustomPainter {
       paint,
     );
 
-    textPainter.paint(
-      canvas,
-      Offset(badgeRect.left + 9, badgeRect.top + 6),
-    );
+    textPainter.paint(canvas, Offset(badgeRect.left + 9, badgeRect.top + 6));
   }
 
   @override
@@ -5427,7 +5321,8 @@ class _ReferenceInsolePainter extends CustomPainter {
         oldDelegate.isSelectingBoundaryBackground !=
             isSelectingBoundaryBackground ||
         oldDelegate.boundaryRoiDragStartPoint != boundaryRoiDragStartPoint ||
-        oldDelegate.boundaryRoiDragCurrentPoint != boundaryRoiDragCurrentPoint ||
+        oldDelegate.boundaryRoiDragCurrentPoint !=
+            boundaryRoiDragCurrentPoint ||
         oldDelegate.referenceLengthMm != referenceLengthMm ||
         oldDelegate.showCalibrationOverlay != showCalibrationOverlay ||
         oldDelegate.showBoundaryRoiOverlay != showBoundaryRoiOverlay ||
@@ -5468,9 +5363,11 @@ class _ReferencePhotoRecord {
       return mimeType!;
     }
 
-    final lower = [fileName, storagePath ?? '', publicUrl ?? '']
-        .join(' ')
-        .toLowerCase();
+    final lower = [
+      fileName,
+      storagePath ?? '',
+      publicUrl ?? '',
+    ].join(' ').toLowerCase();
 
     if (lower.contains('.jpg') || lower.contains('.jpeg')) {
       return 'image/jpeg';
@@ -5486,18 +5383,12 @@ class _ImagePoint {
   final double x;
   final double y;
 
-  const _ImagePoint({
-    required this.x,
-    required this.y,
-  });
+  const _ImagePoint({required this.x, required this.y});
 
   Offset toOffset() => Offset(x, y);
 
   Map<String, dynamic> toJson() {
-    return {
-      'x': x,
-      'y': y,
-    };
+    return {'x': x, 'y': y};
   }
 
   @override
@@ -5531,10 +5422,7 @@ class _LocalReferenceScale {
   });
 
   _ImagePoint get center {
-    return _ImagePoint(
-      x: (start.x + end.x) / 2,
-      y: (start.y + end.y) / 2,
-    );
+    return _ImagePoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2);
   }
 
   Map<String, dynamic> toJson() {
@@ -5564,16 +5452,15 @@ class _LocalReferenceScale {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        label,
-        start,
-        end,
-        referenceLengthMm,
-        pixelDistance,
-        pixelsPerMm,
-      );
+    id,
+    label,
+    start,
+    end,
+    referenceLengthMm,
+    pixelDistance,
+    pixelsPerMm,
+  );
 }
-
 
 class _InsoleBoundary {
   final String method;
@@ -5654,21 +5541,20 @@ class _InsoleBoundary {
 
   @override
   int get hashCode => Object.hash(
-        method,
-        imageWidth,
-        imageHeight,
-        roiImageRect,
-        seedPoint,
-        sensitivity,
-        shadowTolerance,
-        backgroundSeparation,
-        closingStrength,
-        smoothingStrength,
-        Object.hashAll(points),
-        pointsMm == null ? null : Object.hashAll(pointsMm!),
-      );
+    method,
+    imageWidth,
+    imageHeight,
+    roiImageRect,
+    seedPoint,
+    sensitivity,
+    shadowTolerance,
+    backgroundSeparation,
+    closingStrength,
+    smoothingStrength,
+    Object.hashAll(points),
+    pointsMm == null ? null : Object.hashAll(pointsMm!),
+  );
 }
-
 
 class _InsoleMeasurement {
   final String id;
@@ -5730,17 +5616,17 @@ class _InsoleMeasurement {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        label,
-        startImage,
-        endImage,
-        startMm,
-        endMm,
-        pixelDistance,
-        lengthMm,
-        localPixelsPerMm,
-        calibrationMethod,
-      );
+    id,
+    label,
+    startImage,
+    endImage,
+    startMm,
+    endMm,
+    pixelDistance,
+    lengthMm,
+    localPixelsPerMm,
+    calibrationMethod,
+  );
 }
 
 class _ReferenceScaleDialogResult {
@@ -5752,7 +5638,6 @@ class _ReferenceScaleDialogResult {
     required this.lengthMm,
   });
 }
-
 
 class _BoundaryPixelFeatures {
   final double nr;
@@ -5769,9 +5654,7 @@ class _BoundaryPixelFeatures {
     required this.saturation,
   });
 
-  factory _BoundaryPixelFeatures.average(
-    List<_BoundaryPixelFeatures> items,
-  ) {
+  factory _BoundaryPixelFeatures.average(List<_BoundaryPixelFeatures> items) {
     if (items.isEmpty) {
       return const _BoundaryPixelFeatures(
         nr: 0,

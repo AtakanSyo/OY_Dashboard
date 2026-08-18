@@ -201,7 +201,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _isLoading = false;
         _isProcessingUpload = true;
         _saveMessage =
-            '3D scan dosyaları ve analiz verileri kaydediliyor. Lütfen bekleyin.';
+            '3D tarama dosyaları ve değerlendirme verileri kaydediliyor. Lütfen bekleyin.';
       });
 
       final scanDataSaved = await _saveScanDataToSupabase();
@@ -214,7 +214,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         if (!mounted) return;
         setState(() {
           _saveMessage =
-              '3D scan verileri kaydedildi. Rapor parse edilemediği için analiz sonucu oluşturulmadı.';
+              '3D tarama verileri kaydedildi. Rapor ayrıştırılamadığı için değerlendirme sonucu oluşturulmadı.';
         });
       }
     } catch (e) {
@@ -312,7 +312,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
     setState(() {
       _isSavingAnalysis = true;
       _analysisSaved = false;
-      _saveMessage = 'Analiz sonucu kaydediliyor...';
+      _saveMessage = 'Değerlendirme sonucu kaydediliyor...';
     });
 
     try {
@@ -347,7 +347,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         setState(() {
           _isSavingAnalysis = false;
           _analysisSaved = false;
-          _saveMessage = 'Analiz geçici olarak hazırlandı. Henüz kaydedilmedi.';
+          _saveMessage =
+              'Değerlendirme geçici olarak hazırlandı. Henüz kaydedilmedi.';
         });
         return;
       }
@@ -364,10 +365,11 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
       setState(() {
         _isSavingAnalysis = false;
         _analysisSaved = true;
-        _saveMessage = 'Analiz kaydedildi. Yüklemeyi onaylayabilirsiniz.';
+        _saveMessage =
+            'Değerlendirme kaydedildi. Yüklemeyi onaylayabilirsiniz.';
       });
     } catch (e) {
-      debugPrint('Analiz kayıt hatası: $e');
+      debugPrint('Değerlendirme kayıt hatası: $e');
 
       if (!mounted) return;
 
@@ -375,7 +377,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         _isSavingAnalysis = false;
         _analysisSaved = false;
         _saveMessage =
-            'Analiz geçici olarak hazırlandı ancak kaydedilemedi: $e';
+            'Değerlendirme geçici olarak hazırlandı ancak kaydedilemedi: $e';
       });
     }
   }
@@ -433,8 +435,8 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
         children: [
           Text(
             _parsedReportSourceLabel == null
-                ? 'Rapor Analiz Önizlemesi'
-                : 'Rapor Analiz Önizlemesi ($_parsedReportSourceLabel)',
+                ? 'Rapor Değerlendirme Önizlemesi'
+                : 'Rapor Değerlendirme Önizlemesi ($_parsedReportSourceLabel)',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 12),
@@ -569,7 +571,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             ],
           ),
           _buildPreviewSection(
-            title: 'Kemer Analizi',
+            title: 'Kemer Değerlendirmesi',
             children: [
               _buildPairPreviewRow(
                 ScanReportLabels.tr('Arch type'),
@@ -589,7 +591,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             ],
           ),
           _buildPreviewSection(
-            title: 'Halluks Analizi',
+            title: 'Halluks Değerlendirmesi',
             children: [
               _buildPairPreviewRow(
                 ScanReportLabels.tr('Hallux angle'),
@@ -604,7 +606,7 @@ class _ScanFolderUploadDialogState extends State<ScanFolderUploadDialog> {
             ],
           ),
           _buildPreviewSection(
-            title: 'Topuk Analizi',
+            title: 'Topuk Değerlendirmesi',
             children: [
               _buildPairPreviewRow(
                 'Topuk Açısı (°)',

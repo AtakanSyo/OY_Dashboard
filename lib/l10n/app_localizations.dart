@@ -209,7 +209,7 @@ abstract class AppLocalizations {
   /// No description provided for @myAnalysisResults.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz Sonuçlarım'**
+  /// **'Sonuçlarım'**
   String get myAnalysisResults;
 
   /// No description provided for @store.
@@ -221,7 +221,7 @@ abstract class AppLocalizations {
   /// No description provided for @departmentAnalysis.
   ///
   /// In tr, this message translates to:
-  /// **'Departman Analizi'**
+  /// **'Departman Değerlendirmesi'**
   String get departmentAnalysis;
 
   /// No description provided for @trends.
@@ -932,6 +932,36 @@ abstract class AppLocalizations {
   /// **'Bu bağlantı kişisel sonuç erişimi için hazır. Hesap oluşturma veya giriş işlemini aynı sayfa içinde tamamlayabilirsiniz.'**
   String get qrLinkReady;
 
+  /// No description provided for @qrInviteNotFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu QR kod ile ilişkili ölçüm daveti bulunamadı. Yine de hesap oluşturup uygulamaya geçebilirsiniz.'**
+  String get qrInviteNotFound;
+
+  /// No description provided for @qrInviteCheckError.
+  ///
+  /// In tr, this message translates to:
+  /// **'QR daveti kontrol edilirken hata oluştu: {error}'**
+  String qrInviteCheckError(String error);
+
+  /// No description provided for @qrInviteAlreadyUsed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu QR/davet bağlantısı daha önce kullanılmış.'**
+  String get qrInviteAlreadyUsed;
+
+  /// No description provided for @qrInviteCancelled.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu QR/davet bağlantısı iptal edilmiş.'**
+  String get qrInviteCancelled;
+
+  /// No description provided for @qrInviteExpired.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu QR/davet bağlantısının süresi dolmuş.'**
+  String get qrInviteExpired;
+
   /// No description provided for @qrGoToRegistration.
   ///
   /// In tr, this message translates to:
@@ -953,7 +983,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrRegistrationDescription.
   ///
   /// In tr, this message translates to:
-  /// **'QR bağlantısı ölçüm kaydınızı tanır. Hesap oluşturduğunuzda veya giriş yaptığınızda analiz raporu ve ürün önerisi uygulama hesabınızla ilişkilendirilir.'**
+  /// **'QR bağlantısı ölçüm kaydınızı tanır. Hesap oluşturduğunuzda veya giriş yaptığınızda değerlendirme sonuçları ve ürün önerisi uygulama hesabınızla ilişkilendirilir.'**
   String get qrRegistrationDescription;
 
   /// No description provided for @qrCreateAccount.
@@ -986,6 +1016,168 @@ abstract class AppLocalizations {
   /// **'Giriş Yap ve Uygulamaya Geç'**
   String get qrLoginAndContinue;
 
+  /// No description provided for @qrAcceptRequiredDocuments.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam etmek için sözleşme ve bilgilendirme metinlerini kabul etmelisiniz.'**
+  String get qrAcceptRequiredDocuments;
+
+  /// No description provided for @qrRegistrationEmailConfirmation.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt oluşturuldu. E-posta onayı aktifse, gönderilen onay bağlantısından sonra bu sayfadan giriş yapabilirsiniz.'**
+  String get qrRegistrationEmailConfirmation;
+
+  /// No description provided for @qrAccountCreatedAndLinked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hesabınız oluşturuldu ve sonuçlarınız hesabınıza bağlandı.'**
+  String get qrAccountCreatedAndLinked;
+
+  /// No description provided for @qrAccountCreated.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hesabınız oluşturuldu. Uygulamaya geçebilirsiniz.'**
+  String get qrAccountCreated;
+
+  /// No description provided for @qrRegistrationFailed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt tamamlanamadı: {error}'**
+  String qrRegistrationFailed(String error);
+
+  /// No description provided for @qrEnterEmailAndPassword.
+  ///
+  /// In tr, this message translates to:
+  /// **'E-posta ve şifre girin.'**
+  String get qrEnterEmailAndPassword;
+
+  /// No description provided for @qrLoginAndLinked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş yapıldı ve sonuçlarınız hesabınıza bağlandı.'**
+  String get qrLoginAndLinked;
+
+  /// No description provided for @qrLoginSuccessful.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş yapıldı. Uygulamaya geçebilirsiniz.'**
+  String get qrLoginSuccessful;
+
+  /// No description provided for @qrLoginFailed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş tamamlanamadı: {error}'**
+  String qrLoginFailed(String error);
+
+  /// No description provided for @qrAuthenticationRequiredForInvite.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davet hesabınıza bağlanmadan önce oturum açmanız gerekiyor.'**
+  String get qrAuthenticationRequiredForInvite;
+
+  /// No description provided for @qrEmailAlreadyRegistered.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu e-posta adresi zaten kayıtlı. Giriş sekmesini kullanabilirsiniz.'**
+  String get qrEmailAlreadyRegistered;
+
+  /// No description provided for @qrDocumentNotFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Belge bulunamadı.'**
+  String get qrDocumentNotFound;
+
+  /// No description provided for @qrInviteEmailEditable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davetle gelen e-posta adresini gerekirse değiştirebilirsiniz.'**
+  String get qrInviteEmailEditable;
+
+  /// No description provided for @qrAccessReadyTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sonuçlarınıza erişim hazır.'**
+  String get qrAccessReadyTitle;
+
+  /// No description provided for @qrAccessTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sonuçlarınıza erişin.'**
+  String get qrAccessTitle;
+
+  /// No description provided for @qrAccessDescription.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt veya giriş işlemini bu sayfadan tamamlayıp sonuçlarınıza güvenli şekilde ulaşabilirsiniz.'**
+  String get qrAccessDescription;
+
+  /// No description provided for @qrStartSecureAccess.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvenli Erişimi Başlat'**
+  String get qrStartSecureAccess;
+
+  /// No description provided for @qrAccessIntroTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hesabınızı oluşturun ve sonuçlarınıza bağlanın.'**
+  String get qrAccessIntroTitle;
+
+  /// No description provided for @qrAccessIntroDescription.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kişisel sonuçlarınızı güvenli şekilde görüntüleyebilmeniz için ölçüm kaydınızı size ait kullanıcı hesabıyla ilişkilendiriyoruz.'**
+  String get qrAccessIntroDescription;
+
+  /// No description provided for @qrInviteVerified.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davet doğrulandı. Formdaki e-posta adresini kontrol edip gerekirse değiştirebilirsiniz.'**
+  String get qrInviteVerified;
+
+  /// No description provided for @qrEmailConfirmationHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'E-posta onayı aktif görünüyor. Onaydan sonra aynı sayfadan giriş yapabilirsiniz.'**
+  String get qrEmailConfirmationHint;
+
+  /// No description provided for @qrLegalConsentPrefix.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam ederek '**
+  String get qrLegalConsentPrefix;
+
+  /// No description provided for @qrMembershipAgreement.
+  ///
+  /// In tr, this message translates to:
+  /// **'Üyelik Sözleşmesi'**
+  String get qrMembershipAgreement;
+
+  /// No description provided for @qrPrivacyNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Aydınlatma Metni'**
+  String get qrPrivacyNotice;
+
+  /// No description provided for @qrLegalAnd.
+  ///
+  /// In tr, this message translates to:
+  /// **' ve '**
+  String get qrLegalAnd;
+
+  /// No description provided for @qrTermsOfUse.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kullanım Koşulları'**
+  String get qrTermsOfUse;
+
+  /// No description provided for @qrLegalConsentSuffix.
+  ///
+  /// In tr, this message translates to:
+  /// **'’nı okuduğumu ve kabul ettiğimi onaylıyorum.'**
+  String get qrLegalConsentSuffix;
+
   /// No description provided for @qrReady.
   ///
   /// In tr, this message translates to:
@@ -995,7 +1187,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrClaimSuccess.
   ///
   /// In tr, this message translates to:
-  /// **'Sonuçlarınız hesabınıza bağlandı. Analiz raporunuzu, kullanım önerilerinizi ve destek seçeneklerinizi uygulama içinde görüntüleyebilirsiniz.'**
+  /// **'Sonuçlarınız hesabınıza bağlandı. Değerlendirme sonuçlarınızı, kullanım önerilerinizi ve destek seçeneklerinizi uygulama içinde görüntüleyebilirsiniz.'**
   String get qrClaimSuccess;
 
   /// No description provided for @qrAccountReady.
@@ -1019,19 +1211,19 @@ abstract class AppLocalizations {
   /// No description provided for @qrResultsTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz raporu, ürün önerisi ve takip bilgileri tek yerde.'**
+  /// **'Değerlendirme sonuçları, ürün önerisi ve takip bilgileri tek yerde.'**
   String get qrResultsTitle;
 
   /// No description provided for @qrResultsDescription.
   ///
   /// In tr, this message translates to:
-  /// **'Kayıt tamamlandığında ölçüm geçmişinizi, uzman değerlendirmesini ve size önerilen ürünü Optiyou hesabınızdan görüntüleyebilirsiniz.'**
+  /// **'Kayıt veya giriş tamamlandığında ölçüm geçmişinizi, uzman değerlendirmesini ve size önerilen ürünü bu sayfanın devamında görüntüleyebilirsiniz.'**
   String get qrResultsDescription;
 
   /// No description provided for @qrAnalysisSummary.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz özeti'**
+  /// **'Değerlendirme özeti'**
   String get qrAnalysisSummary;
 
   /// No description provided for @qrAnalysisSummaryText.
@@ -1079,7 +1271,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrAnalysisScore.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz skoru'**
+  /// **'Değerlendirme skoru'**
   String get qrAnalysisScore;
 
   /// No description provided for @qrSupportNeed.
@@ -1100,16 +1292,34 @@ abstract class AppLocalizations {
   /// **'Kişisel iç taban'**
   String get qrPersonalInsole;
 
+  /// No description provided for @qrInlineResultsEyebrow.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvenli kişisel alan'**
+  String get qrInlineResultsEyebrow;
+
+  /// No description provided for @qrInlineResultsTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Değerlendirme sonuçlarınız'**
+  String get qrInlineResultsTitle;
+
+  /// No description provided for @qrInlineResultsDescription.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ölçüm bulgularınız ve görselleriniz bu sayfanın devamında güvenli biçimde sunulur.'**
+  String get qrInlineResultsDescription;
+
   /// No description provided for @analysisResultsLoadError.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz sonuçları yüklenirken hata oluştu: {error}'**
+  /// **'Değerlendirme sonuçları yüklenirken hata oluştu: {error}'**
   String analysisResultsLoadError(String error);
 
   /// No description provided for @noAnalysisResults.
   ///
   /// In tr, this message translates to:
-  /// **'Analiz sonucu bulunamadı.'**
+  /// **'Değerlendirme sonucu bulunamadı.'**
   String get noAnalysisResults;
 
   /// No description provided for @analysisWillAppear.
@@ -1169,7 +1379,7 @@ abstract class AppLocalizations {
   /// No description provided for @totalAnalyses.
   ///
   /// In tr, this message translates to:
-  /// **'Toplam Analiz'**
+  /// **'Toplam Değerlendirme'**
   String get totalAnalyses;
 
   /// No description provided for @myInsoleImages.
@@ -2717,7 +2927,7 @@ abstract class AppLocalizations {
   /// No description provided for @measurementIssue.
   ///
   /// In tr, this message translates to:
-  /// **'Ölçüm / Analiz Sorunu'**
+  /// **'Ölçüm / Değerlendirme Sorunu'**
   String get measurementIssue;
 
   /// No description provided for @orderIssue.

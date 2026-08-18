@@ -26,10 +26,7 @@ class SessionAnalysisService {
       pressure: pressure,
     );
 
-    final metrics = MetricsEngine.build(
-      report: report,
-      pressure: pressure,
-    );
+    final metrics = MetricsEngine.build(report: report, pressure: pressure);
 
     final recommendations = RecommendationEngine.build(
       report: report,
@@ -39,7 +36,11 @@ class SessionAnalysisService {
     return CustomerAnalysisResult(
       analysisDate: analysisDate ?? DateTime.now(),
       sessionCode: sessionCode ?? report.reportNo ?? 'UNKNOWN-SESSION',
-      locationLabel: locationLabel ?? report.storeCode ?? report.address ?? 'Bilinmeyen Lokasyon',
+      locationLabel:
+          locationLabel ??
+          report.storeCode ??
+          report.address ??
+          'Bilinmeyen Lokasyon',
       overallSummary: _buildOverallSummary(report, pressure),
       generalRiskNote: _buildGeneralRiskNote(report, pressure),
       leftFoot: leftFoot,
@@ -66,22 +67,22 @@ class SessionAnalysisService {
         (report.rightPronatorAngle ?? 0) >= 8;
 
     if (hasArchNeed && loadDiff >= 6) {
-      return 'Ayak analizinde kemer desteği ihtiyacı ve yük dağılımında dengesizlik görülmektedir. Kişisel destek kullanımı konforu artırabilir.';
+      return 'Ayak değerlendirmenizde kemer desteği ihtiyacı ve yük dağılımında dengesizlik görülmektedir. Kişisel destek kullanımı konforu artırabilir.';
     }
 
     if (hasPronationRisk) {
-      return 'Ayak analizinde pronasyon eğilimi dikkat çekmektedir. Stabiliteyi artıran destek yapıları değerlendirilebilir.';
+      return 'Ayak değerlendirmenizde pronasyon eğilimi dikkat çekmektedir. Stabiliteyi artıran destek yapıları değerlendirilebilir.';
     }
 
     if (hasArchNeed) {
-      return 'Ayak analizinde kemer yapısına bağlı destek ihtiyacı görülmektedir. Günlük kullanımda kişisel iç taban desteği faydalı olabilir.';
+      return 'Ayak değerlendirmenizde kemer yapısına bağlı destek ihtiyacı görülmektedir. Günlük kullanımda kişisel iç taban desteği faydalı olabilir.';
     }
 
     if (loadDiff >= 6) {
       return 'Sol ve sağ ayak yük dağılımında fark görülmektedir. Dengeleyici destek yapıları değerlendirilebilir.';
     }
 
-    return 'Ayak analizinde genel yapı dengeli görünmektedir. Konforu korumaya yönelik kişisel destek önerilebilir.';
+    return 'Ayak değerlendirmenizde genel yapı dengeli görünmektedir. Konforu korumaya yönelik kişisel destek önerilebilir.';
   }
 
   String _buildGeneralRiskNote(

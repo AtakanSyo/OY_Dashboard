@@ -490,7 +490,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'Ayak Sağlığında\nYeni Nesil\nTakip ve Analiz',
+          'Ayak Sağlığında\nYeni Nesil\nTakip ve Değerlendirme',
           textAlign: isNarrow ? TextAlign.center : TextAlign.left,
           style: const TextStyle(
             color: Colors.white,
@@ -502,7 +502,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'Optiyou; bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için ayak sağlığı analizi, basınç değerlendirmesi, kişisel ortopedik ürün tasarımı ve periyodik takip altyapısı sunar.',
+          'Optiyou; bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için ayak sağlığı değerlendirmesi, basınç ölçümü, kişisel ortopedik ürün tasarımı ve periyodik takip altyapısı sunar.',
           textAlign: isNarrow ? TextAlign.center : TextAlign.left,
           style: TextStyle(
             color: Colors.white.withOpacity(0.88),
@@ -531,7 +531,7 @@ class _HeroSection extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Analiz Randevusu Alın',
+                'Değerlendirme Randevusu Alın',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -541,7 +541,7 @@ class _HeroSection extends StatelessWidget {
         if (!isNarrow)
           Row(
             children: [
-              _statBadge('2,500+', 'Analiz Edilmiş Ayak'),
+              _statBadge('2,500+', 'Değerlendirilmiş Ayak'),
               const SizedBox(width: 32),
               _statBadge('150+', 'Aktif Uzman'),
               const SizedBox(width: 32),
@@ -589,7 +589,7 @@ class _HeroSection extends StatelessWidget {
               left: 26,
               child: _floatingCard(
                 icon: Icons.show_chart,
-                label: 'Basınç Analizi',
+                label: 'Basınç Değerlendirmesi',
                 color: Colors.orange,
               ),
             ),
@@ -616,7 +616,7 @@ class _HeroSection extends StatelessWidget {
               right: 16,
               child: _floatingCard(
                 icon: Icons.apartment_outlined,
-                label: 'Kurumsal Analiz',
+                label: 'Kurumsal Değerlendirme',
                 color: Colors.teal,
               ),
             ),
@@ -689,7 +689,7 @@ class _FeaturesSection extends StatelessWidget {
       'title': 'Uzmanlar',
       'icon': Icons.medical_services_outlined,
       'items': [
-        '3D ayak tarama ve analiz yönetimi',
+        '3D ayak tarama ve değerlendirme yönetimi',
         'Basınç verisi takibi',
         'Kişisel tabanlık tasarım süreci',
         'Kullanıcı ve sipariş operasyonları',
@@ -699,7 +699,7 @@ class _FeaturesSection extends StatelessWidget {
       'title': 'Kullanıcılar',
       'icon': Icons.accessibility_new,
       'items': [
-        'Analiz sonuçlarını inceleme',
+        'Değerlendirme sonuçlarını inceleme',
         'Ölçüm geçmişini takip etme',
         'Kişisel ürünlere erişim',
         'Zamana göre gelişim grafikleri',
@@ -709,7 +709,7 @@ class _FeaturesSection extends StatelessWidget {
       'title': 'Kurumsal',
       'icon': Icons.apartment_outlined,
       'items': [
-        'Departman bazlı ayak sağlığı analizi',
+        'Departman bazlı ayak sağlığı değerlendirmesi',
         'Çalışan grubu risk takibi',
         'Periyodik gelişim raporları',
         'Operasyonel içgörü ve öneriler',
@@ -738,7 +738,7 @@ class _FeaturesSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Optiyou farklı kullanıcı grupları için özelleştirilmiş takip ve analiz deneyimi sunar.',
+            'Optiyou farklı kullanıcı grupları için özelleştirilmiş takip ve değerlendirme deneyimi sunar.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
@@ -848,7 +848,7 @@ class _FeatureGroupCard extends StatelessWidget {
   }
 }
 
-// ── Analiz Sistemleri ────────────────────────────────────────────────────────────────
+// ── Değerlendirme Sistemleri ─────────────────────────────────────────────────────────
 class _AnalysisSystemsSection extends StatelessWidget {
   final bool isNarrow;
 
@@ -866,7 +866,7 @@ class _AnalysisSystemsSection extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            'Analiz Sistemlerimiz',
+            'Değerlendirme Sistemlerimiz',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -875,7 +875,7 @@ class _AnalysisSystemsSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Optiyou analiz sistemleri; 3D ayak tarama, ayak sağlığı analizi ve farklı operasyonel ihtiyaçlara uygun tarama altyapısı sunar.',
+            'Optiyou değerlendirme sistemleri; 3D ayak tarama, ayak sağlığı değerlendirmesi ve farklı operasyonel ihtiyaçlara uygun tarama altyapısı sunar.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey.shade600,
@@ -892,13 +892,13 @@ class _AnalysisSystemsSection extends StatelessWidget {
               _AnalysisSystemCard(
                 isNarrow: isNarrow,
                 title: 'OY Scan',
-                subtitle: 'Modüler ayak sağlığı analiz sistemi',
+                subtitle: 'Modüler ayak sağlığı değerlendirme sistemi',
                 description:
-                    'OY Scan; 3D ayak tarama ve ayak sağlığı analizi için geliştirilen modüler bir sistemdir. Klinik, uzman ve bireysel kullanım senaryolarına uygundur.',
+                    'OY Scan; 3D ayak tarama ve ayak sağlığı değerlendirmesi için geliştirilen modüler bir sistemdir. Klinik, uzman ve bireysel kullanım senaryolarına uygundur.',
                 imagePath: 'assets/images/systems/oy_scan.png',
                 highlights: const [
                   '3D ayak tarama',
-                  'Ayak sağlığı analizi',
+                  'Ayak sağlığı değerlendirmesi',
                   'Modüler genişleme yapısı',
                   'Klinik ve uzman kullanımı',
                 ],
@@ -908,7 +908,7 @@ class _AnalysisSystemsSection extends StatelessWidget {
                     available: true,
                   ),
                   _SystemComparisonItem(
-                    label: 'Ayak sağlığı analizi',
+                    label: 'Ayak sağlığı değerlendirmesi',
                     available: true,
                   ),
                   _SystemComparisonItem(
@@ -951,7 +951,7 @@ class _AnalysisSystemsSection extends StatelessWidget {
                   'Yüksek hızda ayak tarama',
                   'Kurumsal saha kullanımı',
                   'Yoğun çalışan grupları için uygun',
-                  'Toplu analiz operasyonları',
+                  'Toplu değerlendirme operasyonları',
                 ],
                 comparisonItems: const [
                   _SystemComparisonItem(
@@ -959,7 +959,7 @@ class _AnalysisSystemsSection extends StatelessWidget {
                     available: true,
                   ),
                   _SystemComparisonItem(
-                    label: 'Ayak sağlığı analizi',
+                    label: 'Ayak sağlığı değerlendirmesi',
                     available: true,
                   ),
                   _SystemComparisonItem(
@@ -1275,9 +1275,10 @@ class _ServicesSection extends StatelessWidget {
     {
       'icon': Icons.health_and_safety,
       'title': 'Ayak Sağlığı Ekosistemi',
-      'desc': 'Dijital takip ve analiz sistemi ile ayak sağlığınızı izleyin.',
+      'desc':
+          'Dijital takip ve değerlendirme sistemi ile ayak sağlığınızı izleyin.',
       'more':
-          'Periyodik analizler, risk dağılımı, kullanıcı geçmişi ve veri tabanlı içgörüleri tek platformda yönetin.',
+          'Periyodik değerlendirmeleri, risk dağılımını, kullanıcı geçmişini ve veri tabanlı içgörüleri tek platformda yönetin.',
       'image': 'assets/images/services/foot_health_ecosystem.png',
     },
     {
@@ -1285,7 +1286,7 @@ class _ServicesSection extends StatelessWidget {
       'title': 'Kişisel Ortopedik Tasarım',
       'desc': 'Kişiye özel ortopedik ürünler ve tabanlık tasarımları.',
       'more':
-          'Tarama ve basınç analizinden sonra ayağa özel ürün geliştirme ve üretim hazırlık sürecini destekler.',
+          'Tarama ve basınç değerlendirmesinden sonra ayağa özel ürün geliştirme ve üretim hazırlık sürecini destekler.',
       'image': 'assets/images/services/personal_orthopedic_design.png',
     },
     {
@@ -1293,7 +1294,7 @@ class _ServicesSection extends StatelessWidget {
       'title': 'Sporcu Takip Sistemi',
       'desc': 'Performans ve sakatlık riskini takip eden sistem.',
       'more':
-          'Sporcularda basış, yük dağılımı ve destek ihtiyacı analiz edilerek performans takibi yapılır.',
+          'Sporcularda basış, yük dağılımı ve destek ihtiyacı değerlendirilerek performans takibi yapılır.',
       'image': 'assets/images/services/athlete_tracking.png',
     },
     {
@@ -1301,7 +1302,7 @@ class _ServicesSection extends StatelessWidget {
       'title': 'Kurumsal Üretim (B2B)',
       'desc': 'Toplu üretim ve takip sistemleri.',
       'more':
-          'Departman, görev ve demografik kırılımlarla kurumsal firmalarda ayak sağlığı eğilimlerini analiz edin.',
+          'Departman, görev ve demografik kırılımlarla kurumsal firmalarda ayak sağlığı eğilimlerini değerlendirin.',
       'image': 'assets/images/services/corporate_b2b.png',
     },
   ];
@@ -1490,7 +1491,7 @@ class _ProductsSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Optiyou ürünleri analiz sonuçlarına göre kişisel veya hedefli kullanım senaryolarına uyarlanır.',
+            'Optiyou ürünleri değerlendirme sonuçlarına göre kişisel veya hedefli kullanım senaryolarına uyarlanır.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
@@ -2014,7 +2015,7 @@ class _MeasurementCentersSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Ayak analizi, ölçüm ve değerlendirme süreçlerimize farklı merkezlerimiz üzerinden erişebilirsiniz.',
+            'Ayak ölçümü ve değerlendirme süreçlerimize farklı merkezlerimiz üzerinden erişebilirsiniz.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
@@ -2214,7 +2215,7 @@ class _AboutSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Optiyou; ayak sağlığı analizi, ortopedik ürün tasarımı ve dijital takip süreçlerini bir araya getiren teknoloji odaklı bir çözüm ekosistemidir. Bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için veri destekli değerlendirme ve ürünleştirme altyapısı sunar.',
+          'Optiyou; ayak sağlığı değerlendirmesi, ortopedik ürün tasarımı ve dijital takip süreçlerini bir araya getiren teknoloji odaklı bir çözüm ekosistemidir. Bireysel kullanıcılar, uzmanlar ve kurumsal firmalar için veri destekli değerlendirme ve ürünleştirme altyapısı sunar.',
           style: TextStyle(
             color: Colors.grey.shade600,
             fontSize: 15,
@@ -2231,7 +2232,7 @@ class _AboutSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 28),
-        _bulletPoint('Bireysel ve uzman odaklı dijital analiz deneyimi'),
+        _bulletPoint('Bireysel ve uzman odaklı dijital değerlendirme deneyimi'),
         _bulletPoint('Kişisel ortopedik ürün tasarım ve yönlendirme süreci'),
         _bulletPoint('Sporcu performansı ve yük takibi'),
         _bulletPoint('Kurumsal firmalar için toplu sağlık içgörüleri'),
@@ -2288,7 +2289,7 @@ class _AboutSection extends StatelessWidget {
             left: 24,
             child: _infoChip(
               Icons.show_chart,
-              'Dijital Ayak Analizi',
+              'Dijital Ayak Değerlendirmesi',
               Colors.teal,
             ),
           ),
@@ -2381,7 +2382,7 @@ class _CtaSection extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Optiyou ile analiz, takip ve kişisel çözüm süreçlerini tek platformda deneyimleyin.',
+            'Optiyou ile değerlendirme, takip ve kişisel çözüm süreçlerini tek platformda deneyimleyin.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.85),

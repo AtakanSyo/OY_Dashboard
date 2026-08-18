@@ -13,6 +13,7 @@ import 'package:oy_site/screens/dashboard/orthotics/orthotic_design_form_screen.
 import 'package:oy_site/screens/dashboard/measurements/pressure_measurement_dialog.dart';
 import 'package:oy_site/screens/dashboard/analysis/scan_folder_upload_dialog.dart';
 import 'package:oy_site/screens/dashboard/analysis/session_analysis_results_screen.dart';
+import 'package:oy_site/widgets/welcome_qr_link_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -183,8 +184,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       if (!mounted) return;
 
       setState(() {
-        _clinicDisplayName =
-            clinicName.isNotEmpty ? clinicName : 'Klinik #$clinicId';
+        _clinicDisplayName = clinicName.isNotEmpty
+            ? clinicName
+            : 'Klinik #$clinicId';
         _clinicCode = clinicCode.isEmpty ? null : clinicCode;
       });
     } catch (_) {
@@ -210,8 +212,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         setState(() {
           _expertDisplayName =
               _currentSession.expertUserId == widget.currentUser.userId
-                  ? widget.currentUser.displayName
-                  : 'Uzman #${_currentSession.expertUserId}';
+              ? widget.currentUser.displayName
+              : 'Uzman #${_currentSession.expertUserId}';
         });
         return;
       }
@@ -226,13 +228,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       final fullName = '$firstName $lastName'.trim();
       final displayName = fullName.isNotEmpty
           ? title.isNotEmpty
-              ? '$title $fullName'
-              : fullName
+                ? '$title $fullName'
+                : fullName
           : username.isNotEmpty
-              ? username
-              : email.isNotEmpty
-                  ? email
-                  : 'Uzman #${_currentSession.expertUserId}';
+          ? username
+          : email.isNotEmpty
+          ? email
+          : 'Uzman #${_currentSession.expertUserId}';
 
       if (!mounted) return;
 
@@ -245,8 +247,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       setState(() {
         _expertDisplayName =
             _currentSession.expertUserId == widget.currentUser.userId
-                ? widget.currentUser.displayName
-                : 'Uzman #${_currentSession.expertUserId}';
+            ? widget.currentUser.displayName
+            : 'Uzman #${_currentSession.expertUserId}';
       });
     }
   }
@@ -289,13 +291,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       final fullName = '$firstName $lastName'.trim();
       final displayName = fullName.isNotEmpty
           ? title.isNotEmpty
-              ? '$title $fullName'
-              : fullName
+                ? '$title $fullName'
+                : fullName
           : username.isNotEmpty
-              ? username
-              : email.isNotEmpty
-                  ? email
-                  : 'OptiYou #$assignedId';
+          ? username
+          : email.isNotEmpty
+          ? email
+          : 'OptiYou #$assignedId';
 
       if (!mounted) return;
 
@@ -375,9 +377,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ExpertProfileScreen(
-          currentUser: widget.currentUser,
-        ),
+        builder: (_) => ExpertProfileScreen(currentUser: widget.currentUser),
       ),
     ).then((_) {
       if (mounted) {
@@ -386,32 +386,21 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     });
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required Widget child,
-  }) {
+  Widget _buildSectionCard({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
           child,
@@ -420,21 +409,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildKeyValueRow(
-    String label,
-    String value, {
-    Widget? trailing,
-  }) {
+  Widget _buildKeyValueRow(String label, String value, {Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[700])),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -445,15 +427,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   child: Text(
                     value,
                     textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 6),
-                  trailing,
-                ],
+                if (trailing != null) ...[const SizedBox(width: 6), trailing],
               ],
             ),
           ),
@@ -516,24 +493,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 ],
               ),
             ),
-          _buildKeyValueRow(
-            'Hasta',
-            patientText,
-          ),
+          _buildKeyValueRow('Hasta', patientText),
           _buildKeyValueRow(
             'Klinik',
             clinicText,
             trailing: _buildClinicProfileButton(),
           ),
-          _buildKeyValueRow(
-            'Uzman',
-            _safeValue(_expertDisplayName),
-          ),
+          _buildKeyValueRow('Uzman', _safeValue(_expertDisplayName)),
           const Divider(height: 22),
-          _buildKeyValueRow(
-            'Oturum Kodu',
-            _currentSession.sessionCode,
-          ),
+          _buildKeyValueRow('Oturum Kodu', _currentSession.sessionCode),
           _buildKeyValueRow(
             'Oluşturulma',
             _formatDate(_currentSession.createdAt),
@@ -571,12 +539,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   : Colors.grey.shade300,
             ),
             boxShadow: isEnabled
-                ? const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 6,
-                    ),
-                  ]
+                ? const [BoxShadow(color: Colors.black12, blurRadius: 6)]
                 : null,
           ),
           child: Row(
@@ -601,7 +564,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ayak Sağlığı Analiz Sonuçları',
+                      'Ayak Sağlığı Değerlendirme Sonuçları',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -669,10 +632,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               _latestInvite == null
                   ? 'Ölçüm onaylandıktan sonra kullanıcıyı Optiyou karşılama sayfasına yönlendiren QR bağlantısı oluşturulur.'
                   : 'Sonuç erişim bağlantısı oluşturuldu. QR kodu tekrar görüntüleyebilir veya linki kopyalayabilirsiniz.',
-              style: TextStyle(
-                color: Colors.grey[700],
-                height: 1.4,
-              ),
+              style: TextStyle(color: Colors.grey[700], height: 1.4),
             ),
           ),
           const SizedBox(width: 12),
@@ -785,8 +745,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
       await _persistSessionUpdate(
         updated.copyWith(
-          completedAt:
-              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+          completedAt: updated.allStepsCompleted
+              ? DateTime.now()
+              : updated.completedAt,
         ),
       );
 
@@ -826,8 +787,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
     await _persistSessionUpdate(
       updated.copyWith(
-        completedAt:
-            updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+        completedAt: updated.allStepsCompleted
+            ? DateTime.now()
+            : updated.completedAt,
       ),
     );
 
@@ -861,17 +823,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
       await _persistSessionUpdate(
         updated.copyWith(
-          completedAt:
-              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+          completedAt: updated.allStepsCompleted
+              ? DateTime.now()
+              : updated.completedAt,
         ),
       );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tasarım formu tamamlandı.'),
-        ),
+        const SnackBar(content: Text('Tasarım formu tamamlandı.')),
       );
     }
   }
@@ -909,17 +870,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
     await _persistSessionUpdate(
       updated.copyWith(
-        completedAt:
-            updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+        completedAt: updated.allStepsCompleted
+            ? DateTime.now()
+            : updated.completedAt,
       ),
     );
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Plantar basınç ölçümü tamamlandı.'),
-      ),
+      const SnackBar(content: Text('Plantar basınç ölçümü tamamlandı.')),
     );
   }
 
@@ -942,17 +902,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
       await _persistSessionUpdate(
         updated.copyWith(
-          completedAt:
-              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+          completedAt: updated.allStepsCompleted
+              ? DateTime.now()
+              : updated.completedAt,
         ),
       );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('İç taban fotoğrafı yüklendi.'),
-        ),
+        const SnackBar(content: Text('İç taban fotoğrafı yüklendi.')),
       );
     }
   }
@@ -1009,8 +968,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
       await _persistSessionUpdate(
         updated.copyWith(
-          completedAt:
-              updated.allStepsCompleted ? DateTime.now() : updated.completedAt,
+          completedAt: updated.allStepsCompleted
+              ? DateTime.now()
+              : updated.completedAt,
         ),
       );
 
@@ -1057,45 +1017,50 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       builder: (_) => AlertDialog(
         title: const Text('Sonuç Erişim QR'),
         content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Taraması yapılan kişi bu QR kodu okutarak Optiyou karşılama sayfasına gider. Kayıt veya giriş işlemini aynı sayfadan tamamlayıp ölçüm sonuçlarına erişebilir.',
-                textAlign: TextAlign.center,
-                style: TextStyle(height: 1.4),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.teal.withOpacity(0.20)),
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Taraması yapılan kişi bu QR kodu okutarak Optiyou karşılama sayfasına gider. Kayıt veya giriş işlemini aynı sayfadan tamamlayıp ölçüm sonuçlarına erişebilir.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(height: 1.4),
                 ),
-                child: QrImageView(
-                  data: welcomeUrl,
-                  version: QrVersions.auto,
-                  size: 220,
-                  backgroundColor: Colors.white,
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.teal.withOpacity(0.20)),
+                  ),
+                  child: QrImageView(
+                    data: welcomeUrl,
+                    version: QrVersions.auto,
+                    size: 220,
+                    backgroundColor: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              SelectableText(
-                welcomeUrl,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13),
-              ),
-            ],
+                const SizedBox(height: 14),
+                SelectableText(
+                  welcomeUrl,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                WelcomeQrLinkLauncher(
+                  initialLink: welcomeUrl,
+                  pressureRepository: widget.pressureRepository,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () async {
-              await Clipboard.setData(
-                ClipboardData(text: welcomeUrl),
-              );
+              await Clipboard.setData(ClipboardData(text: welcomeUrl));
 
               if (!mounted) return;
 
@@ -1169,10 +1134,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 8,
-                      ),
+                      BoxShadow(color: Colors.black12, blurRadius: 8),
                     ],
                   ),
                   child: Row(
@@ -1277,7 +1239,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   if (_scanFolderFiles.isNotEmpty)
-                                    ..._scanFolderFiles.take(6).map(
+                                    ..._scanFolderFiles
+                                        .take(6)
+                                        .map(
                                           (fileName) => Padding(
                                             padding: const EdgeInsets.only(
                                               bottom: 6,
@@ -1345,10 +1309,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                             ...List.generate(sessionSteps.length, (index) {
                               final step = sessionSteps[index];
                               final isLast = index == sessionSteps.length - 1;
-                              return _buildFlowStep(
-                                step: step,
-                                isLast: isLast,
-                              );
+                              return _buildFlowStep(step: step, isLast: isLast);
                             }),
                           ],
                         ),
@@ -1383,9 +1344,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 decoration: BoxDecoration(
                   color: activeColor.withOpacity(0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: activeColor.withOpacity(0.4),
-                  ),
+                  border: Border.all(color: activeColor.withOpacity(0.4)),
                 ),
                 child: Icon(
                   step.isCompleted ? Icons.check : step.icon,

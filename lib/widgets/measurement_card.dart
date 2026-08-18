@@ -47,7 +47,8 @@ class _MeasurementCardState extends State<MeasurementCard> {
             context: context,
             builder: (_) => MeasurementDetailDialog(
               profile: p,
-              products: widget.products,  // 🔥 Yeni analiz ekranına ürünleri geçiyoruz
+              products: widget
+                  .products, // Yeni değerlendirme ekranına ürünleri geçir.
             ),
           ),
           child: Container(
@@ -57,7 +58,7 @@ class _MeasurementCardState extends State<MeasurementCard> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 6)
+                BoxShadow(color: Colors.black12, blurRadius: 6),
               ],
             ),
 
@@ -76,20 +77,24 @@ class _MeasurementCardState extends State<MeasurementCard> {
                 const SizedBox(height: 12),
 
                 /// === 5 ANA BULGU ===
-                _buildRow("Foot Length",
-                    mergeNum(p.leftLength, p.rightLength)),
+                _buildRow("Foot Length", mergeNum(p.leftLength, p.rightLength)),
 
-                _buildRow("Arch Type",
-                    mergeStr(p.leftArchType, p.rightArchType)),
+                _buildRow(
+                  "Arch Type",
+                  mergeStr(p.leftArchType, p.rightArchType),
+                ),
 
-                _buildRow("Pronation",
-                    mergeStr(p.leftPronType, p.rightPronType)),
+                _buildRow(
+                  "Pronation",
+                  mergeStr(p.leftPronType, p.rightPronType),
+                ),
 
-                _buildRow("Toe Type",
-                    mergeStr(p.leftToeType, p.rightToeType)),
+                _buildRow("Toe Type", mergeStr(p.leftToeType, p.rightToeType)),
 
-                _buildRow("Hallux Type",
-                    mergeStr(p.leftHalluxType, p.rightHalluxType)),
+                _buildRow(
+                  "Hallux Type",
+                  mergeStr(p.leftHalluxType, p.rightHalluxType),
+                ),
               ],
             ),
           ),

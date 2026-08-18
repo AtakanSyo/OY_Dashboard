@@ -23,6 +23,7 @@ class AnalysisResultsView extends StatefulWidget {
   final String pageTitle;
   final List<CustomerAnalysisResult> results;
   final int initialSelectedIndex;
+  final bool embedded;
 
   const AnalysisResultsView({
     super.key,
@@ -30,6 +31,7 @@ class AnalysisResultsView extends StatefulWidget {
     required this.pageTitle,
     required this.results,
     this.initialSelectedIndex = 0,
+    this.embedded = false,
   });
 
   @override
@@ -658,8 +660,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         '${l10n.severe} ${l10n.highArch}',
       ArchWidthCoefficientType.moderateHighArch =>
         '${l10n.moderate} ${l10n.highArch}',
-      ArchWidthCoefficientType.mildHighArch =>
-        '${l10n.mild} ${l10n.highArch}',
+      ArchWidthCoefficientType.mildHighArch => '${l10n.mild} ${l10n.highArch}',
       ArchWidthCoefficientType.normalType4 ||
       ArchWidthCoefficientType.normalType5 => l10n.normalArch,
       ArchWidthCoefficientType.mildFlatFoot => l10n.mildFlatFoot,
@@ -693,12 +694,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
     if (normalizedType.isNotEmpty) {
       return _translateAssessmentText(normalizedType);
     }
-    return _angleAssessmentLabel(
-      angle,
-      mild: 10,
-      moderate: 20,
-      severe: 30,
-    );
+    return _angleAssessmentLabel(angle, mild: 10, moderate: 20, severe: 30);
   }
 
   double? _angleHeatPosition(double? value, double severeThreshold) {
@@ -796,7 +792,7 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
       );
     }
 
-    return SingleChildScrollView(
+    final content = Padding(
       padding: const EdgeInsets.all(20),
       child: Center(
         child: ConstrainedBox(
@@ -824,6 +820,12 @@ class _AnalysisResultsViewState extends State<AnalysisResultsView> {
         ),
       ),
     );
+
+    if (widget.embedded) {
+      return content;
+    }
+
+    return SingleChildScrollView(child: content);
   }
 
   // ---------------------------------------------------------------------------

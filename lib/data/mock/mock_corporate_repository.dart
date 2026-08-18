@@ -11,10 +11,10 @@ class MockCorporateRepository {
         CorporateKpiItem(
           title: 'Toplam Çalışan',
           value: '1.240',
-          subtitle: 'Analiz sistemine kayıtlı çalışan',
+          subtitle: 'Değerlendirme sistemine kayıtlı çalışan',
         ),
         CorporateKpiItem(
-          title: 'Analiz Yapılan',
+          title: 'Değerlendirilen',
           value: '864',
           subtitle: 'Son 12 ay içinde ölçüm yapılan kişi',
         ),
@@ -197,7 +197,7 @@ class MockCorporateRepository {
         status: 'Hazır',
       ),
       CorporateReportItem(
-        title: 'Montaj Bölümü Karşılaştırmalı Analiz',
+        title: 'Montaj Bölümü Karşılaştırmalı Değerlendirme',
         description:
             'Son 3 periyottaki eğilimlerin ve operasyon etkilerinin özeti.',
         date: '11.04.2026',
@@ -205,8 +205,7 @@ class MockCorporateRepository {
       ),
       CorporateReportItem(
         title: 'Mayıs 2026 Planlı Tarama Özeti',
-        description:
-            'Yaklaşan taramalar ve hedef çalışan grupları.',
+        description: 'Yaklaşan taramalar ve hedef çalışan grupları.',
         date: '18.04.2026',
         status: 'Taslak',
       ),

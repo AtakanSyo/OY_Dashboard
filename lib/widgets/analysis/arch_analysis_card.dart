@@ -9,9 +9,8 @@ class ArchAnalysisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return AnalysisCardTemplate(
-      title: "Arch Analysis (Kavis Analizi)",
+      title: "Kavis Değerlendirmesi",
 
       leftContent: _buildSide(
         title: "Left Foot",
@@ -44,8 +43,10 @@ class ArchAnalysisCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
 
         const SizedBox(height: 12),
 

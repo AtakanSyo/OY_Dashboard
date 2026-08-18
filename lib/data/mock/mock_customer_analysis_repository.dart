@@ -23,15 +23,14 @@ class MockCustomerAnalysisRepository {
     const localScanFolderPath =
         r'C:\dev_projects\oy_dashboard_dev_project\OY_Dashboard\assets\mock_data\mock_3d_data';
 
-    final SessionScanAssets assets =
-        _parser.parseFolder(localScanFolderPath);
+    final SessionScanAssets assets = _parser.parseFolder(localScanFolderPath);
 
     return CustomerAnalysisResult(
       sessionCode: 'SES-2026-0408',
       locationLabel: 'OptiYou İzmir',
       analysisDate: DateTime(2026, 4, 8),
       overallSummary:
-          'Ayak analizinizde her iki ayakta da ark desteği ihtiyacı ve uzun süreli yüklenmede yorgunluk artışı görülmektedir. Sol ayakta basınç yoğunluğu sağ ayağa göre biraz daha fazladır.',
+          'Ayak değerlendirmenizde her iki ayakta da ark desteği ihtiyacı ve uzun süreli yüklenmede yorgunluk artışı görülmektedir. Sol ayakta basınç yoğunluğu sağ ayağa göre biraz daha fazladır.',
       generalRiskNote:
           'Uzun süre ayakta kalma ve sert zemin kullanımı gün sonunda konfor kaybını artırabilir.',
       leftFoot: const CustomerFootSummary(
@@ -204,130 +203,127 @@ class MockCustomerAnalysisRepository {
   }
 
   Future<List<CustomerAnalysisResult>> getAnalysisHistory({
-  required int userId,
-}) async {
-  final latest = await getLatestAnalysis(userId: userId);
+    required int userId,
+  }) async {
+    final latest = await getLatestAnalysis(userId: userId);
 
-  final older1 = CustomerAnalysisResult(
-    sessionCode: 'SES-2026-0318',
-    locationLabel: 'OptiYou İzmir',
-    analysisDate: DateTime(2026, 3, 18),
-    overallSummary:
-        'Önceki ölçümde sol ayakta yük dağılımı daha dengesiz görünmektedir.',
-    generalRiskNote:
-        'Destekli kullanım sürdürülmelidir.',
-    leftFoot: const CustomerFootSummary(
-      side: 'left',
-      footType: 'Düz taban eğilimi',
-      pressureSummary: 'Topuk ve ön ayakta yük artışı',
-      balanceSummary: 'Sol ayakta yük daha belirgin',
-      archSupportNeed: 'Yüksek',
-      mainFinding: 'Kemer desteği ihtiyacı daha belirgin',
-      pressureScore: 65,
-      stabilityScore: 58,
-      archScore: 35,
-    ),
-    rightFoot: const CustomerFootSummary(
-      side: 'right',
-      footType: 'Nötr - hafif destek ihtiyacı',
-      pressureSummary: 'Ön ayakta yüklenme',
-      balanceSummary: 'Sağ ayakta denge daha iyi',
-      archSupportNeed: 'Orta',
-      mainFinding: 'Destek ihtiyacı mevcut',
-      pressureScore: 61,
-      stabilityScore: 66,
-      archScore: 48,
-    ),
-    metrics: latest.metrics,
-    recommendations: latest.recommendations,
-    visuals: latest.visuals,
-    parsedReport: _buildMockParsedReport(
-      reportNo: '20251018001',
-      reportDate: '2025-10-18',
-      reportTime: '15:10:12',
-      leftFootLength: 251.2,
-      rightFootLength: 249.1,
-      leftFootWidth: 103.1,
-      rightFootWidth: 102.3,
-      leftArchHeight: 12.8,
-      rightArchHeight: 11.9,
-      leftHalluxAngle: 3.5,
-      rightHalluxAngle: 1.5,
-      leftPronatorAngle: 3.0,
-      rightPronatorAngle: 1.2,
-      leftArchWidthIndex: 0.462,
-      rightArchWidthIndex: 0.341,
-      leftKneeAngle: 0.6,
-      rightKneeAngle: 2.3,
-      leftHalluxType: 'Normal Hallgux',
-      rightHalluxType: 'Normal Hallgux',
-      leftHeelType: 'Normal Heel',
-      rightHeelType: 'Normal Heel',
-      leftKneeType: 'Normal Heel',
-      rightKneeType: 'Normal Heel',
-    ),
-  );
+    final older1 = CustomerAnalysisResult(
+      sessionCode: 'SES-2026-0318',
+      locationLabel: 'OptiYou İzmir',
+      analysisDate: DateTime(2026, 3, 18),
+      overallSummary:
+          'Önceki ölçümde sol ayakta yük dağılımı daha dengesiz görünmektedir.',
+      generalRiskNote: 'Destekli kullanım sürdürülmelidir.',
+      leftFoot: const CustomerFootSummary(
+        side: 'left',
+        footType: 'Düz taban eğilimi',
+        pressureSummary: 'Topuk ve ön ayakta yük artışı',
+        balanceSummary: 'Sol ayakta yük daha belirgin',
+        archSupportNeed: 'Yüksek',
+        mainFinding: 'Kemer desteği ihtiyacı daha belirgin',
+        pressureScore: 65,
+        stabilityScore: 58,
+        archScore: 35,
+      ),
+      rightFoot: const CustomerFootSummary(
+        side: 'right',
+        footType: 'Nötr - hafif destek ihtiyacı',
+        pressureSummary: 'Ön ayakta yüklenme',
+        balanceSummary: 'Sağ ayakta denge daha iyi',
+        archSupportNeed: 'Orta',
+        mainFinding: 'Destek ihtiyacı mevcut',
+        pressureScore: 61,
+        stabilityScore: 66,
+        archScore: 48,
+      ),
+      metrics: latest.metrics,
+      recommendations: latest.recommendations,
+      visuals: latest.visuals,
+      parsedReport: _buildMockParsedReport(
+        reportNo: '20251018001',
+        reportDate: '2025-10-18',
+        reportTime: '15:10:12',
+        leftFootLength: 251.2,
+        rightFootLength: 249.1,
+        leftFootWidth: 103.1,
+        rightFootWidth: 102.3,
+        leftArchHeight: 12.8,
+        rightArchHeight: 11.9,
+        leftHalluxAngle: 3.5,
+        rightHalluxAngle: 1.5,
+        leftPronatorAngle: 3.0,
+        rightPronatorAngle: 1.2,
+        leftArchWidthIndex: 0.462,
+        rightArchWidthIndex: 0.341,
+        leftKneeAngle: 0.6,
+        rightKneeAngle: 2.3,
+        leftHalluxType: 'Normal Hallgux',
+        rightHalluxType: 'Normal Hallgux',
+        leftHeelType: 'Normal Heel',
+        rightHeelType: 'Normal Heel',
+        leftKneeType: 'Normal Heel',
+        rightKneeType: 'Normal Heel',
+      ),
+    );
 
-  final older2 = CustomerAnalysisResult(
-    sessionCode: 'SES-2026-0210',
-    locationLabel: 'OptiYou İzmir',
-    analysisDate: DateTime(2026, 2, 10),
-    overallSummary:
-        'İlk ölçümlerde kemer desteği ihtiyacı daha belirgindir.',
-    generalRiskNote:
-        'Destekleyici iç taban kullanımı önerilmektedir.',
-    leftFoot: const CustomerFootSummary(
-      side: 'left',
-      footType: 'Düz taban eğilimi',
-      pressureSummary: 'Topuk bölgesinde belirgin yük',
-      balanceSummary: 'Sol ayakta yük daha fazla',
-      archSupportNeed: 'Yüksek',
-      mainFinding: 'Kemer desteği ihtiyacı belirgin',
-      pressureScore: 58,
-      stabilityScore: 52,
-      archScore: 30,
-    ),
-    rightFoot: const CustomerFootSummary(
-      side: 'right',
-      footType: 'Nötr - hafif destek ihtiyacı',
-      pressureSummary: 'Ön ayakta orta yük',
-      balanceSummary: 'Sağ ayakta denge daha iyi',
-      archSupportNeed: 'Orta',
-      mainFinding: 'Uzun süreli kullanımda destek önerilir',
-      pressureScore: 55,
-      stabilityScore: 60,
-      archScore: 44,
-    ),
-    metrics: latest.metrics,
-    recommendations: latest.recommendations,
-    visuals: latest.visuals,
-    parsedReport: _buildMockParsedReport(
-      reportNo: '20250902001',
-      reportDate: '2025-09-02',
-      reportTime: '11:42:22',
-      leftFootLength: 251.6,
-      rightFootLength: 249.4,
-      leftFootWidth: 103.8,
-      rightFootWidth: 102.9,
-      leftArchHeight: 12.1,
-      rightArchHeight: 11.2,
-      leftHalluxAngle: 3.5,
-      rightHalluxAngle: 1.9,
-      leftPronatorAngle: 3.8,
-      rightPronatorAngle: 1.8,
-      leftArchWidthIndex: 0.455,
-      rightArchWidthIndex: 0.352,
-      leftKneeAngle: 1.0,
-      rightKneeAngle: 2.6,
-      leftHalluxType: 'Normal Hallgux',
-      rightHalluxType: 'Normal Hallgux',
-      leftHeelType: 'Normal Heel',
-      rightHeelType: 'Normal Heel',
-      leftKneeType: 'Normal Heel',
-      rightKneeType: 'Normal Heel',
-    ),
-  );
+    final older2 = CustomerAnalysisResult(
+      sessionCode: 'SES-2026-0210',
+      locationLabel: 'OptiYou İzmir',
+      analysisDate: DateTime(2026, 2, 10),
+      overallSummary: 'İlk ölçümlerde kemer desteği ihtiyacı daha belirgindir.',
+      generalRiskNote: 'Destekleyici iç taban kullanımı önerilmektedir.',
+      leftFoot: const CustomerFootSummary(
+        side: 'left',
+        footType: 'Düz taban eğilimi',
+        pressureSummary: 'Topuk bölgesinde belirgin yük',
+        balanceSummary: 'Sol ayakta yük daha fazla',
+        archSupportNeed: 'Yüksek',
+        mainFinding: 'Kemer desteği ihtiyacı belirgin',
+        pressureScore: 58,
+        stabilityScore: 52,
+        archScore: 30,
+      ),
+      rightFoot: const CustomerFootSummary(
+        side: 'right',
+        footType: 'Nötr - hafif destek ihtiyacı',
+        pressureSummary: 'Ön ayakta orta yük',
+        balanceSummary: 'Sağ ayakta denge daha iyi',
+        archSupportNeed: 'Orta',
+        mainFinding: 'Uzun süreli kullanımda destek önerilir',
+        pressureScore: 55,
+        stabilityScore: 60,
+        archScore: 44,
+      ),
+      metrics: latest.metrics,
+      recommendations: latest.recommendations,
+      visuals: latest.visuals,
+      parsedReport: _buildMockParsedReport(
+        reportNo: '20250902001',
+        reportDate: '2025-09-02',
+        reportTime: '11:42:22',
+        leftFootLength: 251.6,
+        rightFootLength: 249.4,
+        leftFootWidth: 103.8,
+        rightFootWidth: 102.9,
+        leftArchHeight: 12.1,
+        rightArchHeight: 11.2,
+        leftHalluxAngle: 3.5,
+        rightHalluxAngle: 1.9,
+        leftPronatorAngle: 3.8,
+        rightPronatorAngle: 1.8,
+        leftArchWidthIndex: 0.455,
+        rightArchWidthIndex: 0.352,
+        leftKneeAngle: 1.0,
+        rightKneeAngle: 2.6,
+        leftHalluxType: 'Normal Hallgux',
+        rightHalluxType: 'Normal Hallgux',
+        leftHeelType: 'Normal Heel',
+        rightHeelType: 'Normal Heel',
+        leftKneeType: 'Normal Heel',
+        rightKneeType: 'Normal Heel',
+      ),
+    );
 
-  return [latest, older1, older2];
-}
+    return [latest, older1, older2];
+  }
 }

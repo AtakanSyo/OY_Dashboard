@@ -4,10 +4,7 @@ import 'package:oy_site/models/app_user.dart';
 class CorporateProfileScreen extends StatelessWidget {
   final AppUser currentUser;
 
-  const CorporateProfileScreen({
-    super.key,
-    required this.currentUser,
-  });
+  const CorporateProfileScreen({super.key, required this.currentUser});
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +41,18 @@ class CorporateProfileScreen extends StatelessWidget {
                           children: [
                             _InfoRow(label: 'Yetkili', value: user.displayName),
                             _InfoRow(label: 'E-posta', value: user.email),
-                            _InfoRow(label: 'Telefon', value: user.phone ?? '—'),
-                            _InfoRow(label: 'Rol', value: user.roleName ?? 'Kurumsal'),
-                            _InfoRow(label: 'Kurum / Birim', value: user.clinicName ?? '—'),
+                            _InfoRow(
+                              label: 'Telefon',
+                              value: user.phone ?? '—',
+                            ),
+                            _InfoRow(
+                              label: 'Rol',
+                              value: user.roleName ?? 'Kurumsal',
+                            ),
+                            _InfoRow(
+                              label: 'Kurum / Birim',
+                              value: user.clinicName ?? '—',
+                            ),
                           ],
                         ),
                       ),
@@ -70,7 +76,7 @@ class CorporateProfileScreen extends StatelessWidget {
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: _MiniStatTile(
-                                    title: 'Analiz Yapılan',
+                                    title: 'Değerlendirilen',
                                     value: '542',
                                     icon: Icons.analytics_outlined,
                                   ),
@@ -92,11 +98,17 @@ class CorporateProfileScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('• Montaj hattında ön ayak yüklenmesi daha yüksek görünüyor.'),
+                                Text(
+                                  '• Montaj hattında ön ayak yüklenmesi daha yüksek görünüyor.',
+                                ),
                                 SizedBox(height: 8),
-                                Text('• Lojistik grubunda topuk yükü artışı izlenebilir.'),
+                                Text(
+                                  '• Lojistik grubunda topuk yükü artışı izlenebilir.',
+                                ),
                                 SizedBox(height: 8),
-                                Text('• Periyodik ölçümle departman bazlı gelişim takip edilebilir.'),
+                                Text(
+                                  '• Periyodik ölçümle departman bazlı gelişim takip edilebilir.',
+                                ),
                               ],
                             ),
                           ),
@@ -133,9 +145,7 @@ class _ProfileHeaderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
       child: Row(
         children: [
@@ -161,15 +171,9 @@ class _ProfileHeaderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
+                Text(subtitle, style: TextStyle(color: Colors.grey[700])),
                 const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
+                Text(email, style: TextStyle(color: Colors.grey[600])),
               ],
             ),
           ),
@@ -183,10 +187,7 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
-  });
+  const _SectionCard({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -196,19 +197,14 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
           child,
@@ -222,10 +218,7 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -234,10 +227,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[700])),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -279,18 +269,12 @@ class _MiniStatTile extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.grey[700], fontSize: 12),
           ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
         ],
       ),

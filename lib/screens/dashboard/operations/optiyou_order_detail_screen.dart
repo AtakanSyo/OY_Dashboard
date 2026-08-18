@@ -23,6 +23,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:oy_site/screens/dashboard/analysis/reference_insole_analysis_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:oy_site/widgets/welcome_qr_link_launcher.dart';
 
 class OptiYouOrderDetailScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -134,7 +135,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
       final session = await _loadSessionForOrder();
 
-      final effectiveState = state ??
+      final effectiveState =
+          state ??
           OrderOperationStateModel.empty(
             orderId: orderId,
             sessionId: order.sessionId,
@@ -233,7 +235,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       expertUserId: _asInt(map['expert_user_id']) ?? order.expertUserId,
       assignedOptityouUserId: _asInt(map['assigned_optityou_user_id']),
       sessionCode: (map['session_code'] ?? '').toString(),
-      sessionDate: _asDateTime(map['session_date']) ??
+      sessionDate:
+          _asDateTime(map['session_date']) ??
           _asDateTime(map['created_at']) ??
           DateTime.now(),
       sessionTime: map['session_time']?.toString(),
@@ -290,9 +293,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     return OrderStatuses.pending;
   }
 
-  Future<void> _syncOrderStatusIfNeeded({
-    required int orderId,
-  }) async {
+  Future<void> _syncOrderStatusIfNeeded({required int orderId}) async {
     final nextStatus = _deriveOrderStatusFromOperation();
 
     final updateMap = <String, dynamic>{};
@@ -342,7 +343,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         sessionId: order.sessionId,
         patientId: order.patientId,
         assignedUserId: userId,
-        boardColumnCode: _operationState?.boardColumnCode ??
+        boardColumnCode:
+            _operationState?.boardColumnCode ??
             widget.operationItem.currentColumnCode,
         designCompleted: _designCompleted,
         productionStarted: _productionStarted,
@@ -567,9 +569,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     String number(double? value, {String suffix = ''}) => value == null
         ? 'Belirtilmedi'
         : '${value.toStringAsFixed(value % 1 == 0 ? 0 : 1)}$suffix';
-    String text(String? value) => value == null || value.trim().isEmpty
-        ? 'Belirtilmedi'
-        : value.trim();
+    String text(String? value) =>
+        value == null || value.trim().isEmpty ? 'Belirtilmedi' : value.trim();
 
     final pathologies = <String>[
       if (info.halluxValgus) 'Halluks valgus',
@@ -595,7 +596,10 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
             ]),
             _buildClinicalSection('Meslek ve Günlük Yaşam', [
               ('Meslek', text(info.profession)),
-              ('Günlük ayakta kalma', number(info.dailyStandingHours, suffix: ' saat')),
+              (
+                'Günlük ayakta kalma',
+                number(info.dailyStandingHours, suffix: ' saat'),
+              ),
               ('İş tanımı', text(info.jobDescription)),
               ('Spor yapıyor', info.doesSport ? 'Evet' : 'Hayır'),
               if (info.doesSport) ('Spor bilgisi', text(info.sportDescription)),
@@ -605,7 +609,10 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               ('Tanı / ön tanı', text(info.diagnosisPreDiagnosis)),
               ('Diyabet', info.hasDiabetes ? 'Var' : 'Yok'),
               if (info.hasDiabetes) ('Diyabet notu', text(info.diabetesNote)),
-              ('Patolojiler', pathologies.isEmpty ? 'Belirtilmedi' : pathologies.join(', ')),
+              (
+                'Patolojiler',
+                pathologies.isEmpty ? 'Belirtilmedi' : pathologies.join(', '),
+              ),
               ('Diğer patolojiler', text(info.otherPathologies)),
             ]),
           ],
@@ -614,32 +621,42 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     );
   }
 
-  Widget _buildClinicalSection(
-    String title,
-    List<(String, String)> values,
-  ) {
+  Widget _buildClinicalSection(String title, List<(String, String)> values) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          )),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 8),
-          ...values.map((value) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 180,
-                  child: Text(value.$1, style: TextStyle(color: Colors.grey.shade700)),
-                ),
-                Expanded(child: Text(value.$2, style: const TextStyle(fontWeight: FontWeight.w600))),
-              ],
+          ...values.map(
+            (value) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: Text(
+                      value.$1,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      value.$2,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -683,13 +700,16 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         return;
       }
 
-      final preferredSideNormalized =
-          preferredSideKeywords.map(_normalizeSearchText).toList();
+      final preferredSideNormalized = preferredSideKeywords
+          .map(_normalizeSearchText)
+          .toList();
 
       final stlRows = rows.where(_looksLikeStlScanRecord).toList();
 
       if (stlRows.isEmpty) {
-        _showMessage('Bu oturum için STL formatında 3D scan dosyası bulunamadı.');
+        _showMessage(
+          'Bu oturum için STL formatında 3D scan dosyası bulunamadı.',
+        );
         return;
       }
 
@@ -813,9 +833,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.orange.withOpacity(0.25),
-                    ),
+                    border: Border.all(color: Colors.orange.withOpacity(0.25)),
                   ),
                   child: Text(
                     helperText,
@@ -1071,17 +1089,19 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     return rows.map((row) {
       final id = _asInt(row['id']);
 
-      final fileType = (row['file_type'] ??
-              row['photo_type'] ??
-              row['reference_type'] ??
-              'reference_photo')
-          .toString();
+      final fileType =
+          (row['file_type'] ??
+                  row['photo_type'] ??
+                  row['reference_type'] ??
+                  'reference_photo')
+              .toString();
 
-      final fileName = (row['file_name'] ??
-              row['title'] ??
-              row['photo_title'] ??
-              'Referans iç taban fotoğrafı #${id ?? '—'}')
-          .toString();
+      final fileName =
+          (row['file_name'] ??
+                  row['title'] ??
+                  row['photo_title'] ??
+                  'Referans iç taban fotoğrafı #${id ?? '—'}')
+              .toString();
 
       final bucket = (row['storage_bucket'] ?? '').toString();
       final path = (row['storage_path'] ?? '').toString();
@@ -1120,10 +1140,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
       return;
     }
 
-    final signedUrl = await _client.storage.from(bucket).createSignedUrl(
-          path,
-          3600,
-        );
+    final signedUrl = await _client.storage
+        .from(bucket)
+        .createSignedUrl(path, 3600);
 
     await _openUrl(signedUrl);
   }
@@ -1164,10 +1183,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                   SelectableText(
                     welcomeUrl,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -1186,6 +1202,11 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                         fontSize: 13,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 14),
+                  WelcomeQrLinkLauncher(
+                    initialLink: welcomeUrl,
+                    pressureRepository: widget.pressureRepository,
                   ),
                 ],
               ),
@@ -1274,9 +1295,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
     return 'https://www.optiyou.fit/#/welcome?invite=$encodedToken&source=package';
   }
 
-  Future<void> _savePackagingQrPng({
-    required PatientInviteModel invite,
-  }) async {
+  Future<void> _savePackagingQrPng({required PatientInviteModel invite}) async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 120));
 
@@ -1355,10 +1374,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                   color: Colors.teal.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.qr_code_2_outlined,
-                  color: Colors.teal,
-                ),
+                child: const Icon(Icons.qr_code_2_outlined, color: Colors.teal),
               ),
               const SizedBox(width: 10),
               const Text(
@@ -1411,18 +1427,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           Text(
             'Sipariş: ${order.orderNo}',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
           Text(
             'Davet: ${invite.token.length > 14 ? '${invite.token.substring(0, 14)}...' : invite.token}',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 10,
-            ),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
           ),
         ],
       ),
@@ -1493,8 +1503,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
-              onPressed:
-                  _isPreparingPackagingQr ? null : _showPackagingQrDialog,
+              onPressed: _isPreparingPackagingQr
+                  ? null
+                  : _showPackagingQrDialog,
               icon: _isPreparingPackagingQr
                   ? const SizedBox(
                       width: 18,
@@ -1506,8 +1517,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 _isPreparingPackagingQr
                     ? 'QR hazırlanıyor...'
                     : invite == null
-                        ? 'QR Oluştur / PNG Kaydet'
-                        : 'QR Görüntüle / PNG Kaydet',
+                    ? 'QR Oluştur / PNG Kaydet'
+                    : 'QR Görüntüle / PNG Kaydet',
               ),
             ),
           ),
@@ -1540,10 +1551,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
 
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!opened) {
       _showMessage('Dosya bağlantısı açılamadı.');
@@ -1626,37 +1634,26 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required Widget child,
-  }) {
+  Widget _buildSectionCard({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
           child,
@@ -1755,10 +1752,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1796,8 +1790,9 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color:
-              completed ? Colors.green.withOpacity(0.3) : Colors.grey.shade300,
+          color: completed
+              ? Colors.green.withOpacity(0.3)
+              : Colors.grey.shade300,
         ),
       ),
       child: Column(
@@ -1821,8 +1816,10 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -1880,22 +1877,12 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 2,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          leading: Icon(
-            icon,
-            color: Colors.teal,
-            size: 20,
-          ),
+          leading: Icon(icon, color: Colors.teal, size: 20),
           title: Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           subtitle: subtitle == null
               ? null
@@ -1907,12 +1894,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                     height: 1.3,
                   ),
                 ),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: child,
-            ),
-          ],
+          children: [Align(alignment: Alignment.centerLeft, child: child)],
         ),
       ),
     );
@@ -2115,7 +2097,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               ),
               _buildActionButton(
                 icon: Icons.analytics_outlined,
-                label: 'Analiz Raporunu Görüntüle',
+                label: 'Değerlendirme Sonuçlarını Görüntüle',
                 onPressed: _openAnalysisResults,
               ),
               _buildActionButton(
@@ -2125,7 +2107,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
               ),
               _buildActionButton(
                 icon: Icons.straighten_outlined,
-                label: 'Referans İç Taban Analizi',
+                label: 'Referans İç Taban Değerlendirmesi',
                 onPressed: _openReferenceInsoleAnalysis,
               ),
             ],
@@ -2264,10 +2246,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                     fileType: _camFileType,
                     onSelected: (name) => _camFileName = name,
                   ),
-                  onDownload: () => _downloadOperationFile(
-                    _camFileType,
-                    'CAM dosyası',
-                  ),
+                  onDownload: () =>
+                      _downloadOperationFile(_camFileType, 'CAM dosyası'),
                 ),
                 _buildUploadedFileRow(
                   label: 'G-code dosyası',
@@ -2277,10 +2257,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                     fileType: _gcodeFileType,
                     onSelected: (name) => _gcodeFileName = name,
                   ),
-                  onDownload: () => _downloadOperationFile(
-                    _gcodeFileType,
-                    'G-code dosyası',
-                  ),
+                  onDownload: () =>
+                      _downloadOperationFile(_gcodeFileType, 'G-code dosyası'),
                 ),
               ],
             ),
@@ -2311,7 +2289,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   }
 
   Widget _buildQualityControlCard() {
-    final completed = _qcDesignMatch &&
+    final completed =
+        _qcDesignMatch &&
         _qcMeasurementDone &&
         _qcSurfaceChecked &&
         _qcReadyForDelivery;
@@ -2329,7 +2308,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
           _buildExpandableFileSection(
             title: 'Kontrol Referansları',
             subtitle:
-                'Kalite kontrol sırasında tasarım formu, analiz raporu, tasarım STL, CAM ve G-code dosyaları referans alınır.',
+                'Kalite kontrol sırasında tasarım formu, değerlendirme sonuçları, tasarım STL, CAM ve G-code dosyaları referans alınır.',
             icon: Icons.rule_folder_outlined,
             initiallyExpanded: false,
             child: Column(
@@ -2346,7 +2325,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                     ),
                     _buildActionButton(
                       icon: Icons.analytics_outlined,
-                      label: 'Analiz Raporunu Görüntüle',
+                      label: 'Değerlendirme Sonuçlarını Görüntüle',
                       onPressed: _openAnalysisResults,
                     ),
                   ],
@@ -2371,18 +2350,14 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
                 _buildExistingFileDownloadRow(
                   label: 'CAM dosyası',
                   fileName: _camFileName,
-                  onDownload: () => _downloadOperationFile(
-                    _camFileType,
-                    'CAM dosyası',
-                  ),
+                  onDownload: () =>
+                      _downloadOperationFile(_camFileType, 'CAM dosyası'),
                 ),
                 _buildExistingFileDownloadRow(
                   label: 'G-code dosyası',
                   fileName: _gcodeFileName,
-                  onDownload: () => _downloadOperationFile(
-                    _gcodeFileType,
-                    'G-code dosyası',
-                  ),
+                  onDownload: () =>
+                      _downloadOperationFile(_gcodeFileType, 'G-code dosyası'),
                 ),
               ],
             ),
@@ -2444,7 +2419,8 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
 
   Widget _buildPackagingShippingCard() {
     final completed =
-        _packagingCompleted && _shippingTrackingController.text.trim().isNotEmpty;
+        _packagingCompleted &&
+        _shippingTrackingController.text.trim().isNotEmpty;
 
     return _buildOperationCard(
       index: 4,
@@ -2515,11 +2491,7 @@ class _OptiYouOrderDetailScreenState extends State<OptiYouOrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoadingOperation) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final statusColor = _statusColor(_currentOrderStatus);

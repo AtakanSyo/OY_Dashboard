@@ -22,7 +22,8 @@ class SupabaseAnalysisRepository {
         .toList();
   }
 
-  Future<List<CustomerAnalysisResult>> getAnalysisHistoryForCurrentCustomer() async {
+  Future<List<CustomerAnalysisResult>>
+  getAnalysisHistoryForCurrentCustomer() async {
     final authUser = _client.auth.currentUser;
 
     if (authUser == null) {
@@ -93,7 +94,9 @@ class SupabaseAnalysisRepository {
     int? sessionId,
     required CustomerAnalysisResult result,
   }) async {
-    await _client.from('analysis_results').insert(
+    await _client
+        .from('analysis_results')
+        .insert(
           result.toMap(
             userId: userId,
             patientId: patientId,
@@ -108,7 +111,9 @@ class SupabaseAnalysisRepository {
     int? sessionId,
     required CustomerAnalysisResult result,
   }) async {
-    await _client.from('analysis_results').upsert(
+    await _client
+        .from('analysis_results')
+        .upsert(
           result.toMap(
             userId: userId,
             patientId: patientId,
@@ -120,13 +125,8 @@ class SupabaseAnalysisRepository {
         );
   }
 
-  Future<void> deleteAnalysisResult({
-    required int analysisResultId,
-  }) async {
-    await _client
-        .from('analysis_results')
-        .delete()
-        .eq('id', analysisResultId);
+  Future<void> deleteAnalysisResult({required int analysisResultId}) async {
+    await _client.from('analysis_results').delete().eq('id', analysisResultId);
   }
 
   Future<List<CustomerAnalysisResult>> getAnalysisHistoryBySession({
@@ -143,7 +143,9 @@ class SupabaseAnalysisRepository {
     } else if (sessionCode != null && sessionCode.trim().isNotEmpty) {
       query = query.eq('session_code', sessionCode.trim());
     } else {
-      throw Exception('Analiz sorgusu için sessionId, patientId veya sessionCode gerekli.');
+      throw Exception(
+        'Değerlendirme sorgusu için sessionId, patientId veya sessionCode gerekli.',
+      );
     }
 
     final response = await query.order('analysis_date', ascending: false);

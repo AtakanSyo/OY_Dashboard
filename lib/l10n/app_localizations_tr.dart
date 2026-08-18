@@ -63,13 +63,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get home => 'Ana Sayfa';
 
   @override
-  String get myAnalysisResults => 'Analiz Sonuçlarım';
+  String get myAnalysisResults => 'Sonuçlarım';
 
   @override
   String get store => 'Mağaza';
 
   @override
-  String get departmentAnalysis => 'Departman Analizi';
+  String get departmentAnalysis => 'Departman Değerlendirmesi';
 
   @override
   String get trends => 'Trendler';
@@ -451,6 +451,25 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bu bağlantı kişisel sonuç erişimi için hazır. Hesap oluşturma veya giriş işlemini aynı sayfa içinde tamamlayabilirsiniz.';
 
   @override
+  String get qrInviteNotFound =>
+      'Bu QR kod ile ilişkili ölçüm daveti bulunamadı. Yine de hesap oluşturup uygulamaya geçebilirsiniz.';
+
+  @override
+  String qrInviteCheckError(String error) {
+    return 'QR daveti kontrol edilirken hata oluştu: $error';
+  }
+
+  @override
+  String get qrInviteAlreadyUsed =>
+      'Bu QR/davet bağlantısı daha önce kullanılmış.';
+
+  @override
+  String get qrInviteCancelled => 'Bu QR/davet bağlantısı iptal edilmiş.';
+
+  @override
+  String get qrInviteExpired => 'Bu QR/davet bağlantısının süresi dolmuş.';
+
+  @override
   String get qrGoToRegistration => 'Kullanıcı Kaydına Geç';
 
   @override
@@ -462,7 +481,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get qrRegistrationDescription =>
-      'QR bağlantısı ölçüm kaydınızı tanır. Hesap oluşturduğunuzda veya giriş yaptığınızda analiz raporu ve ürün önerisi uygulama hesabınızla ilişkilendirilir.';
+      'QR bağlantısı ölçüm kaydınızı tanır. Hesap oluşturduğunuzda veya giriş yaptığınızda değerlendirme sonuçları ve ürün önerisi uygulama hesabınızla ilişkilendirilir.';
 
   @override
   String get qrCreateAccount => 'Hesap Oluştur';
@@ -480,11 +499,110 @@ class AppLocalizationsTr extends AppLocalizations {
   String get qrLoginAndContinue => 'Giriş Yap ve Uygulamaya Geç';
 
   @override
+  String get qrAcceptRequiredDocuments =>
+      'Devam etmek için sözleşme ve bilgilendirme metinlerini kabul etmelisiniz.';
+
+  @override
+  String get qrRegistrationEmailConfirmation =>
+      'Kayıt oluşturuldu. E-posta onayı aktifse, gönderilen onay bağlantısından sonra bu sayfadan giriş yapabilirsiniz.';
+
+  @override
+  String get qrAccountCreatedAndLinked =>
+      'Hesabınız oluşturuldu ve sonuçlarınız hesabınıza bağlandı.';
+
+  @override
+  String get qrAccountCreated =>
+      'Hesabınız oluşturuldu. Uygulamaya geçebilirsiniz.';
+
+  @override
+  String qrRegistrationFailed(String error) {
+    return 'Kayıt tamamlanamadı: $error';
+  }
+
+  @override
+  String get qrEnterEmailAndPassword => 'E-posta ve şifre girin.';
+
+  @override
+  String get qrLoginAndLinked =>
+      'Giriş yapıldı ve sonuçlarınız hesabınıza bağlandı.';
+
+  @override
+  String get qrLoginSuccessful => 'Giriş yapıldı. Uygulamaya geçebilirsiniz.';
+
+  @override
+  String qrLoginFailed(String error) {
+    return 'Giriş tamamlanamadı: $error';
+  }
+
+  @override
+  String get qrAuthenticationRequiredForInvite =>
+      'Davet hesabınıza bağlanmadan önce oturum açmanız gerekiyor.';
+
+  @override
+  String get qrEmailAlreadyRegistered =>
+      'Bu e-posta adresi zaten kayıtlı. Giriş sekmesini kullanabilirsiniz.';
+
+  @override
+  String get qrDocumentNotFound => 'Belge bulunamadı.';
+
+  @override
+  String get qrInviteEmailEditable =>
+      'Davetle gelen e-posta adresini gerekirse değiştirebilirsiniz.';
+
+  @override
+  String get qrAccessReadyTitle => 'Sonuçlarınıza erişim hazır.';
+
+  @override
+  String get qrAccessTitle => 'Sonuçlarınıza erişin.';
+
+  @override
+  String get qrAccessDescription =>
+      'Kayıt veya giriş işlemini bu sayfadan tamamlayıp sonuçlarınıza güvenli şekilde ulaşabilirsiniz.';
+
+  @override
+  String get qrStartSecureAccess => 'Güvenli Erişimi Başlat';
+
+  @override
+  String get qrAccessIntroTitle =>
+      'Hesabınızı oluşturun ve sonuçlarınıza bağlanın.';
+
+  @override
+  String get qrAccessIntroDescription =>
+      'Kişisel sonuçlarınızı güvenli şekilde görüntüleyebilmeniz için ölçüm kaydınızı size ait kullanıcı hesabıyla ilişkilendiriyoruz.';
+
+  @override
+  String get qrInviteVerified =>
+      'Davet doğrulandı. Formdaki e-posta adresini kontrol edip gerekirse değiştirebilirsiniz.';
+
+  @override
+  String get qrEmailConfirmationHint =>
+      'E-posta onayı aktif görünüyor. Onaydan sonra aynı sayfadan giriş yapabilirsiniz.';
+
+  @override
+  String get qrLegalConsentPrefix => 'Devam ederek ';
+
+  @override
+  String get qrMembershipAgreement => 'Üyelik Sözleşmesi';
+
+  @override
+  String get qrPrivacyNotice => 'Aydınlatma Metni';
+
+  @override
+  String get qrLegalAnd => ' ve ';
+
+  @override
+  String get qrTermsOfUse => 'Kullanım Koşulları';
+
+  @override
+  String get qrLegalConsentSuffix =>
+      '’nı okuduğumu ve kabul ettiğimi onaylıyorum.';
+
+  @override
   String get qrReady => 'Hazırsınız.';
 
   @override
   String get qrClaimSuccess =>
-      'Sonuçlarınız hesabınıza bağlandı. Analiz raporunuzu, kullanım önerilerinizi ve destek seçeneklerinizi uygulama içinde görüntüleyebilirsiniz.';
+      'Sonuçlarınız hesabınıza bağlandı. Değerlendirme sonuçlarınızı, kullanım önerilerinizi ve destek seçeneklerinizi uygulama içinde görüntüleyebilirsiniz.';
 
   @override
   String get qrAccountReady =>
@@ -498,14 +616,14 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get qrResultsTitle =>
-      'Analiz raporu, ürün önerisi ve takip bilgileri tek yerde.';
+      'Değerlendirme sonuçları, ürün önerisi ve takip bilgileri tek yerde.';
 
   @override
   String get qrResultsDescription =>
-      'Kayıt tamamlandığında ölçüm geçmişinizi, uzman değerlendirmesini ve size önerilen ürünü Optiyou hesabınızdan görüntüleyebilirsiniz.';
+      'Kayıt veya giriş tamamlandığında ölçüm geçmişinizi, uzman değerlendirmesini ve size önerilen ürünü bu sayfanın devamında görüntüleyebilirsiniz.';
 
   @override
-  String get qrAnalysisSummary => 'Analiz özeti';
+  String get qrAnalysisSummary => 'Değerlendirme özeti';
 
   @override
   String get qrAnalysisSummaryText =>
@@ -532,7 +650,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get qrPersonalResults => 'Kişisel sonuç görünümü';
 
   @override
-  String get qrAnalysisScore => 'Analiz skoru';
+  String get qrAnalysisScore => 'Değerlendirme skoru';
 
   @override
   String get qrSupportNeed => 'Destek ihtiyacı';
@@ -544,12 +662,22 @@ class AppLocalizationsTr extends AppLocalizations {
   String get qrPersonalInsole => 'Kişisel iç taban';
 
   @override
+  String get qrInlineResultsEyebrow => 'Güvenli kişisel alan';
+
+  @override
+  String get qrInlineResultsTitle => 'Değerlendirme sonuçlarınız';
+
+  @override
+  String get qrInlineResultsDescription =>
+      'Ölçüm bulgularınız ve görselleriniz bu sayfanın devamında güvenli biçimde sunulur.';
+
+  @override
   String analysisResultsLoadError(String error) {
-    return 'Analiz sonuçları yüklenirken hata oluştu: $error';
+    return 'Değerlendirme sonuçları yüklenirken hata oluştu: $error';
   }
 
   @override
-  String get noAnalysisResults => 'Analiz sonucu bulunamadı.';
+  String get noAnalysisResults => 'Değerlendirme sonucu bulunamadı.';
 
   @override
   String get analysisWillAppear =>
@@ -580,7 +708,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get shortSummary => 'Kısa Özet';
 
   @override
-  String get totalAnalyses => 'Toplam Analiz';
+  String get totalAnalyses => 'Toplam Değerlendirme';
 
   @override
   String get myInsoleImages => 'İç Taban Görsellerim';
@@ -1466,7 +1594,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get technicalIssue => 'Teknik Sorun';
 
   @override
-  String get measurementIssue => 'Ölçüm / Analiz Sorunu';
+  String get measurementIssue => 'Ölçüm / Değerlendirme Sorunu';
 
   @override
   String get orderIssue => 'Sipariş Süreci';

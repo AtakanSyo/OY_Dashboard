@@ -64,11 +64,7 @@ class CustomerAnalysisMetric {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'label': label,
-      'value': value,
-      'description': description,
-    };
+    return {'label': label, 'value': value, 'description': description};
   }
 
   factory CustomerAnalysisMetric.fromMap(Map<String, dynamic> map) {
@@ -90,10 +86,7 @@ class CustomerRecommendationItem {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'title': title,
-      'description': description,
-    };
+    return {'title': title, 'description': description};
   }
 
   factory CustomerRecommendationItem.fromMap(Map<String, dynamic> map) {
@@ -107,7 +100,7 @@ class CustomerRecommendationItem {
 class CustomerAnalysisResult {
   /// Supabase measurement_sessions.id değeri.
   ///
-  /// Basınç ölçüm kayıtlarını ve diğer oturum verilerini analiz sonucu ile
+  /// Basınç ölçüm kayıtlarını ve diğer oturum verilerini değerlendirme sonucu ile
   /// ilişkilendirmek için kullanılır.
   final int? sessionId;
 
@@ -160,9 +153,7 @@ class CustomerAnalysisResult {
       'left_foot': leftFoot.toMap(),
       'right_foot': rightFoot.toMap(),
       'metrics': metrics.map((item) => item.toMap()).toList(),
-      'recommendations': recommendations
-          .map((item) => item.toMap())
-          .toList(),
+      'recommendations': recommendations.map((item) => item.toMap()).toList(),
       'visuals': visuals.toMap(),
       'parsed_report': parsedReport == null
           ? null
@@ -178,34 +169,18 @@ class CustomerAnalysisResult {
       analysisDate: _toDateTime(map['analysis_date']),
       overallSummary: map['overall_summary']?.toString() ?? '',
       generalRiskNote: map['general_risk_note']?.toString() ?? '',
-      leftFoot: CustomerFootSummary.fromMap(
-        _asMap(map['left_foot']),
-      ),
-      rightFoot: CustomerFootSummary.fromMap(
-        _asMap(map['right_foot']),
-      ),
-      metrics: _asList(map['metrics'])
-          .map(
-            (item) => CustomerAnalysisMetric.fromMap(
-              _asMap(item),
-            ),
-          )
-          .toList(),
+      leftFoot: CustomerFootSummary.fromMap(_asMap(map['left_foot'])),
+      rightFoot: CustomerFootSummary.fromMap(_asMap(map['right_foot'])),
+      metrics: _asList(
+        map['metrics'],
+      ).map((item) => CustomerAnalysisMetric.fromMap(_asMap(item))).toList(),
       recommendations: _asList(map['recommendations'])
-          .map(
-            (item) => CustomerRecommendationItem.fromMap(
-              _asMap(item),
-            ),
-          )
+          .map((item) => CustomerRecommendationItem.fromMap(_asMap(item)))
           .toList(),
-      visuals: CustomerAnalysisVisualSet.fromMap(
-        _asMap(map['visuals']),
-      ),
+      visuals: CustomerAnalysisVisualSet.fromMap(_asMap(map['visuals'])),
       parsedReport: map['parsed_report'] == null
           ? null
-          : _parsedScanReportFromMap(
-              _asMap(map['parsed_report']),
-            ),
+          : _parsedScanReportFromMap(_asMap(map['parsed_report'])),
     );
   }
 
@@ -237,8 +212,9 @@ class CustomerAnalysisResult {
       metrics: metrics ?? this.metrics,
       recommendations: recommendations ?? this.recommendations,
       visuals: visuals ?? this.visuals,
-      parsedReport:
-          clearParsedReport ? null : parsedReport ?? this.parsedReport,
+      parsedReport: clearParsedReport
+          ? null
+          : parsedReport ?? this.parsedReport,
     );
   }
 }
@@ -294,36 +270,20 @@ class CustomerAnalysisVisualSet {
   factory CustomerAnalysisVisualSet.fromMap(Map<String, dynamic> map) {
     return CustomerAnalysisVisualSet(
       sessionCode: map['sessionCode']?.toString() ?? '',
-      archLeftImagePath: _toNullableString(
-        map['archLeftImagePath'],
-      ),
-      archRightImagePath: _toNullableString(
-        map['archRightImagePath'],
-      ),
+      archLeftImagePath: _toNullableString(map['archLeftImagePath']),
+      archRightImagePath: _toNullableString(map['archRightImagePath']),
       archSectionLeftImagePath: _toNullableString(
         map['archSectionLeftImagePath'],
       ),
       archSectionRightImagePath: _toNullableString(
         map['archSectionRightImagePath'],
       ),
-      foot2dLeftImagePath: _toNullableString(
-        map['foot2dLeftImagePath'],
-      ),
-      foot2dRightImagePath: _toNullableString(
-        map['foot2dRightImagePath'],
-      ),
-      pronatorLeftImagePath: _toNullableString(
-        map['pronatorLeftImagePath'],
-      ),
-      pronatorRightImagePath: _toNullableString(
-        map['pronatorRightImagePath'],
-      ),
-      leftStlPath: _toNullableString(
-        map['leftStlPath'],
-      ),
-      rightStlPath: _toNullableString(
-        map['rightStlPath'],
-      ),
+      foot2dLeftImagePath: _toNullableString(map['foot2dLeftImagePath']),
+      foot2dRightImagePath: _toNullableString(map['foot2dRightImagePath']),
+      pronatorLeftImagePath: _toNullableString(map['pronatorLeftImagePath']),
+      pronatorRightImagePath: _toNullableString(map['pronatorRightImagePath']),
+      leftStlPath: _toNullableString(map['leftStlPath']),
+      rightStlPath: _toNullableString(map['rightStlPath']),
     );
   }
 }
@@ -438,30 +398,14 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     rightFirstMetaLength: _toNullableDouble(map['rightFirstMetaLength']),
     leftFifthMetaLength: _toNullableDouble(map['leftFifthMetaLength']),
     rightFifthMetaLength: _toNullableDouble(map['rightFifthMetaLength']),
-    leftHalluxBumpsLength: _toNullableDouble(
-      map['leftHalluxBumpsLength'],
-    ),
-    rightHalluxBumpsLength: _toNullableDouble(
-      map['rightHalluxBumpsLength'],
-    ),
-    leftFootFlankLength: _toNullableDouble(
-      map['leftFootFlankLength'],
-    ),
-    rightFootFlankLength: _toNullableDouble(
-      map['rightFootFlankLength'],
-    ),
-    leftHeelCenterLength: _toNullableDouble(
-      map['leftHeelCenterLength'],
-    ),
-    rightHeelCenterLength: _toNullableDouble(
-      map['rightHeelCenterLength'],
-    ),
-    leftHeelMarginLength: _toNullableDouble(
-      map['leftHeelMarginLength'],
-    ),
-    rightHeelMarginLength: _toNullableDouble(
-      map['rightHeelMarginLength'],
-    ),
+    leftHalluxBumpsLength: _toNullableDouble(map['leftHalluxBumpsLength']),
+    rightHalluxBumpsLength: _toNullableDouble(map['rightHalluxBumpsLength']),
+    leftFootFlankLength: _toNullableDouble(map['leftFootFlankLength']),
+    rightFootFlankLength: _toNullableDouble(map['rightFootFlankLength']),
+    leftHeelCenterLength: _toNullableDouble(map['leftHeelCenterLength']),
+    rightHeelCenterLength: _toNullableDouble(map['rightHeelCenterLength']),
+    leftHeelMarginLength: _toNullableDouble(map['leftHeelMarginLength']),
+    rightHeelMarginLength: _toNullableDouble(map['rightHeelMarginLength']),
 
     leftFootWidth: _toNullableDouble(map['leftFootWidth']),
     rightFootWidth: _toNullableDouble(map['rightFootWidth']),
@@ -469,30 +413,14 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     rightSlantWidth: _toNullableDouble(map['rightSlantWidth']),
     leftToeWidth: _toNullableDouble(map['leftToeWidth']),
     rightToeWidth: _toNullableDouble(map['rightToeWidth']),
-    leftArchOutsideWidth: _toNullableDouble(
-      map['leftArchOutsideWidth'],
-    ),
-    rightArchOutsideWidth: _toNullableDouble(
-      map['rightArchOutsideWidth'],
-    ),
-    leftFootFlankWidth: _toNullableDouble(
-      map['leftFootFlankWidth'],
-    ),
-    rightFootFlankWidth: _toNullableDouble(
-      map['rightFootFlankWidth'],
-    ),
-    leftHeelCenterWidth: _toNullableDouble(
-      map['leftHeelCenterWidth'],
-    ),
-    rightHeelCenterWidth: _toNullableDouble(
-      map['rightHeelCenterWidth'],
-    ),
-    leftTotalHeelWidth: _toNullableDouble(
-      map['leftTotalHeelWidth'],
-    ),
-    rightTotalHeelWidth: _toNullableDouble(
-      map['rightTotalHeelWidth'],
-    ),
+    leftArchOutsideWidth: _toNullableDouble(map['leftArchOutsideWidth']),
+    rightArchOutsideWidth: _toNullableDouble(map['rightArchOutsideWidth']),
+    leftFootFlankWidth: _toNullableDouble(map['leftFootFlankWidth']),
+    rightFootFlankWidth: _toNullableDouble(map['rightFootFlankWidth']),
+    leftHeelCenterWidth: _toNullableDouble(map['leftHeelCenterWidth']),
+    rightHeelCenterWidth: _toNullableDouble(map['rightHeelCenterWidth']),
+    leftTotalHeelWidth: _toNullableDouble(map['leftTotalHeelWidth']),
+    rightTotalHeelWidth: _toNullableDouble(map['rightTotalHeelWidth']),
 
     leftArchHeight: _toNullableDouble(map['leftArchHeight']),
     rightArchHeight: _toNullableDouble(map['rightArchHeight']),
@@ -529,12 +457,8 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     rightArchType: _toNullableString(map['rightArchType']),
     leftArchIndex: _toNullableDouble(map['leftArchIndex']),
     rightArchIndex: _toNullableDouble(map['rightArchIndex']),
-    leftArchWidthIndex: _toNullableDouble(
-      map['leftArchWidthIndex'],
-    ),
-    rightArchWidthIndex: _toNullableDouble(
-      map['rightArchWidthIndex'],
-    ),
+    leftArchWidthIndex: _toNullableDouble(map['leftArchWidthIndex']),
+    rightArchWidthIndex: _toNullableDouble(map['rightArchWidthIndex']),
 
     leftHalluxType: _toNullableString(map['leftHalluxType']),
     rightHalluxType: _toNullableString(map['rightHalluxType']),
@@ -543,9 +467,7 @@ ParsedScanReport _parsedScanReportFromMap(Map<String, dynamic> map) {
     leftKneeType: _toNullableString(map['leftKneeType']),
     rightKneeType: _toNullableString(map['rightKneeType']),
 
-    recommendationText: _toNullableString(
-      map['recommendationText'],
-    ),
+    recommendationText: _toNullableString(map['recommendationText']),
     rawText: _toNullableString(map['rawText']),
   );
 }
@@ -558,12 +480,7 @@ Map<String, dynamic> _asMap(dynamic value) {
   if (value is Map<String, dynamic>) return value;
 
   if (value is Map) {
-    return value.map(
-      (key, val) => MapEntry(
-        key.toString(),
-        val,
-      ),
-    );
+    return value.map((key, val) => MapEntry(key.toString(), val));
   }
 
   return <String, dynamic>{};
@@ -589,20 +506,14 @@ double _toDouble(dynamic value) {
   if (value == null) return 0.0;
   if (value is num) return value.toDouble();
 
-  return double.tryParse(
-        value.toString().trim().replaceAll(',', '.'),
-      ) ??
-      0.0;
+  return double.tryParse(value.toString().trim().replaceAll(',', '.')) ?? 0.0;
 }
 
 double? _toNullableDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
 
-  final normalized = value
-      .toString()
-      .trim()
-      .replaceAll(',', '.');
+  final normalized = value.toString().trim().replaceAll(',', '.');
 
   if (normalized.isEmpty) return null;
 

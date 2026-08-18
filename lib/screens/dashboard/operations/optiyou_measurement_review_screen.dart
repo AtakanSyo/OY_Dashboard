@@ -394,9 +394,7 @@ class _OptiYouMeasurementReviewScreenState
 
     await _client
         .from('measurement_sessions')
-        .update({
-          'clinic_id': clinicId,
-        })
+        .update({'clinic_id': clinicId})
         .eq('id', sessionId);
 
     Map<String, dynamic>? freshSessionRow;
@@ -434,9 +432,7 @@ class _OptiYouMeasurementReviewScreenState
     try {
       await _client
           .from('orders')
-          .update({
-            'clinic_id': clinicId,
-          })
+          .update({'clinic_id': clinicId})
           .eq('session_id', sessionId);
     } catch (e) {
       debugPrint('Related order clinic update skipped: $e');
@@ -465,9 +461,8 @@ class _OptiYouMeasurementReviewScreenState
     final clinicCodeController = TextEditingController();
 
     final allowedTypes = _ClinicTypeOption.values.map((e) => e.value).toSet();
-    String selectedClinicType = allowedTypes.contains(
-      (_clinic?['clinic_type'] ?? '').toString().trim(),
-    )
+    String selectedClinicType =
+        allowedTypes.contains((_clinic?['clinic_type'] ?? '').toString().trim())
         ? (_clinic?['clinic_type'] ?? '').toString().trim()
         : 'clinic';
 
@@ -558,31 +553,31 @@ class _OptiYouMeasurementReviewScreenState
                                 child: CircularProgressIndicator(),
                               )
                             : clinics.isEmpty
-                                ? _buildEmptyState(
-                                    'Kayıtlı klinik bulunamadı. Yeni klinik oluşturabilirsiniz.',
-                                  )
-                                : DropdownButtonFormField<int>(
-                                    initialValue: selectedClinicId,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Klinik Seç',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    items: clinics.map((clinic) {
-                                      final id = _asInt(clinic['id']) ?? 0;
+                            ? _buildEmptyState(
+                                'Kayıtlı klinik bulunamadı. Yeni klinik oluşturabilirsiniz.',
+                              )
+                            : DropdownButtonFormField<int>(
+                                initialValue: selectedClinicId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Klinik Seç',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: clinics.map((clinic) {
+                                  final id = _asInt(clinic['id']) ?? 0;
 
-                                      return DropdownMenuItem<int>(
-                                        value: id,
-                                        child: Text(_clinicRowLabel(clinic)),
-                                      );
-                                    }).toList(),
-                                    onChanged: isSaving
-                                        ? null
-                                        : (value) {
-                                            dialogSetState(() {
-                                              selectedClinicId = value;
-                                            });
-                                          },
-                                  )
+                                  return DropdownMenuItem<int>(
+                                    value: id,
+                                    child: Text(_clinicRowLabel(clinic)),
+                                  );
+                                }).toList(),
+                                onChanged: isSaving
+                                    ? null
+                                    : (value) {
+                                        dialogSetState(() {
+                                          selectedClinicId = value;
+                                        });
+                                      },
+                              )
                       else ...[
                         TextField(
                           controller: clinicNameController,
@@ -642,8 +637,9 @@ class _OptiYouMeasurementReviewScreenState
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      isSaving ? null : () => Navigator.pop(dialogContext),
+                  onPressed: isSaving
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Vazgeç'),
                 ),
                 ElevatedButton.icon(
@@ -740,7 +736,9 @@ class _OptiYouMeasurementReviewScreenState
   String _formatDateTime(dynamic value) {
     if (value == null) return '—';
 
-    final date = value is DateTime ? value : DateTime.tryParse(value.toString());
+    final date = value is DateTime
+        ? value
+        : DateTime.tryParse(value.toString());
 
     if (date == null) return value.toString();
 
@@ -1069,10 +1067,9 @@ class _OptiYouMeasurementReviewScreenState
         return;
       }
 
-      final signedUrl = await _client.storage.from(bucket).createSignedUrl(
-            path,
-            3600,
-          );
+      final signedUrl = await _client.storage
+          .from(bucket)
+          .createSignedUrl(path, 3600);
 
       await _openUrl(signedUrl);
     } catch (e) {
@@ -1083,10 +1080,7 @@ class _OptiYouMeasurementReviewScreenState
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
 
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!opened) {
       _showMessage('Bağlantı açılamadı.');
@@ -1094,9 +1088,9 @@ class _OptiYouMeasurementReviewScreenState
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Map<String, dynamic> _mapFromJson(dynamic value) {
@@ -1106,7 +1100,8 @@ class _OptiYouMeasurementReviewScreenState
   }
 
   Map<String, dynamic> _designParameters() {
-    final raw = _designForm?['design_parameters_json'] ??
+    final raw =
+        _designForm?['design_parameters_json'] ??
         _designForm?['ai_recommendation_json'];
 
     if (raw == null) return <String, dynamic>{};
@@ -1165,7 +1160,9 @@ class _OptiYouMeasurementReviewScreenState
 
     if (number == null) return '—';
 
-    final text = number % 1 == 0 ? number.toInt().toString() : number.toString();
+    final text = number % 1 == 0
+        ? number.toInt().toString()
+        : number.toString();
 
     if (number > 0) return '+$text mm';
     return '$text mm';
@@ -1176,7 +1173,9 @@ class _OptiYouMeasurementReviewScreenState
 
     if (number == null) return '—';
 
-    final text = number % 1 == 0 ? number.toInt().toString() : number.toString();
+    final text = number % 1 == 0
+        ? number.toInt().toString()
+        : number.toString();
 
     return '$text°';
   }
@@ -1253,7 +1252,7 @@ class _OptiYouMeasurementReviewScreenState
                   foregroundColor: Colors.white,
                 ),
                 icon: const Icon(Icons.analytics_outlined, size: 18),
-                label: const Text('Analiz Sonuçlarını Aç'),
+                label: const Text('Değerlendirme Sonuçlarını Aç'),
               ),
             ],
           ),
@@ -1305,10 +1304,7 @@ class _OptiYouMeasurementReviewScreenState
         children: [
           Expanded(
             flex: 4,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[700])),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1333,10 +1329,7 @@ class _OptiYouMeasurementReviewScreenState
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
-      child: Text(
-        text,
-        style: TextStyle(color: Colors.grey[700]),
-      ),
+      child: Text(text, style: TextStyle(color: Colors.grey[700])),
     );
   }
 
@@ -1354,7 +1347,7 @@ class _OptiYouMeasurementReviewScreenState
           _buildInfoRow(
             'Oturum Tarihi',
             '${_formatDate(session.sessionDate)}'
-            '${session.sessionTime != null ? ' • ${session.sessionTime}' : ''}',
+                '${session.sessionTime != null ? ' • ${session.sessionTime}' : ''}',
           ),
           _buildInfoRow('Durum', _statusLabel(session.effectiveStatus)),
           _buildInfoRow('Tamamlanma', _formatDate(session.completedAt)),
@@ -1364,7 +1357,7 @@ class _OptiYouMeasurementReviewScreenState
             child: OutlinedButton.icon(
               onPressed: _openAnalysisResults,
               icon: const Icon(Icons.analytics_outlined),
-              label: const Text('Analiz Sonuçlarını Görüntüle'),
+              label: const Text('Değerlendirme Sonuçlarını Görüntüle'),
             ),
           ),
           const SizedBox(height: 10),
@@ -1493,9 +1486,7 @@ class _OptiYouMeasurementReviewScreenState
                         ),
                         label: Text(label),
                         backgroundColor: Colors.teal.withOpacity(0.08),
-                        side: BorderSide(
-                          color: Colors.teal.withOpacity(0.18),
-                        ),
+                        side: BorderSide(color: Colors.teal.withOpacity(0.18)),
                       );
                     }).toList(),
                   ),
@@ -1510,7 +1501,9 @@ class _OptiYouMeasurementReviewScreenState
       return _buildSectionCard(
         title: 'Ortez Tasarım Formu',
         icon: Icons.design_services_outlined,
-        child: _buildEmptyState('Bu oturum için ortez tasarım formu bulunamadı.'),
+        child: _buildEmptyState(
+          'Bu oturum için ortez tasarım formu bulunamadı.',
+        ),
       );
     }
 
@@ -1536,9 +1529,7 @@ class _OptiYouMeasurementReviewScreenState
                 ),
                 label: const Text('Siparişe onaylı'),
                 backgroundColor: Colors.green.withOpacity(0.10),
-                side: BorderSide(
-                  color: Colors.green.withOpacity(0.20),
-                ),
+                side: BorderSide(color: Colors.green.withOpacity(0.20)),
               ),
             ),
           if (cards.isEmpty)
@@ -1546,11 +1537,7 @@ class _OptiYouMeasurementReviewScreenState
               'Tasarım parametresi bulunamadı. Form kaydı var ancak üretim parametreleri boş görünüyor.',
             )
           else
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: cards,
-            ),
+            Wrap(spacing: 12, runSpacing: 12, children: cards),
           if (expertNotes.isNotEmpty) ...[
             const SizedBox(height: 16),
             Container(
@@ -1559,9 +1546,7 @@ class _OptiYouMeasurementReviewScreenState
               decoration: BoxDecoration(
                 color: Colors.blueGrey.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.blueGrey.withOpacity(0.16),
-                ),
+                border: Border.all(color: Colors.blueGrey.withOpacity(0.16)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1635,10 +1620,7 @@ class _OptiYouMeasurementReviewScreenState
           icon: Icons.height_outlined,
           title: 'Topuk Yüksekliği',
           values: [
-            _SideValue(
-              'Heel Cup',
-              '${_formatNumber(heelCupHeight)} mm',
-            ),
+            _SideValue('Heel Cup', '${_formatNumber(heelCupHeight)} mm'),
           ],
         ),
       );
@@ -1739,8 +1721,9 @@ class _OptiYouMeasurementReviewScreenState
     final legacyHeelPad = _asBool(_designForm?['heel_pad']);
     final legacyMetatarsalPad = _asBool(_designForm?['metatarsal_pad']);
     final legacyMedialArch = _asBool(_designForm?['medial_arch_support']);
-    final legacyTransverseArch =
-        _asBool(_designForm?['transverse_arch_support']);
+    final legacyTransverseArch = _asBool(
+      _designForm?['transverse_arch_support'],
+    );
 
     if (cards.isEmpty) {
       if (legacyHeelPad) {
@@ -1807,21 +1790,14 @@ class _OptiYouMeasurementReviewScreenState
       decoration: BoxDecoration(
         color: Colors.teal.withOpacity(0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.teal.withOpacity(0.18),
-        ),
+        border: Border.all(color: Colors.teal.withOpacity(0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: Colors.teal),
           const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           ...visibleValues.map((item) {
             return Padding(
@@ -1831,18 +1807,13 @@ class _OptiYouMeasurementReviewScreenState
                   Expanded(
                     child: Text(
                       item.label,
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     item.value,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -1921,11 +1892,12 @@ class _OptiYouMeasurementReviewScreenState
           ? _buildEmptyState('Bu oturum için referans fotoğraf bulunamadı.')
           : Column(
               children: _referencePhotos.map((photo) {
-                final title = (photo['file_name'] ??
-                        photo['title'] ??
-                        photo['photo_type'] ??
-                        'Referans fotoğraf')
-                    .toString();
+                final title =
+                    (photo['file_name'] ??
+                            photo['title'] ??
+                            photo['photo_type'] ??
+                            'Referans fotoğraf')
+                        .toString();
 
                 final subtitle = <String>[
                   if (photo['photo_type'] != null)
@@ -1977,10 +1949,7 @@ class _OptiYouMeasurementReviewScreenState
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontSize: 12),
                   ),
                 ],
               ],
@@ -2000,20 +1969,14 @@ class _OptiYouMeasurementReviewScreenState
     return BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 7),
-      ],
+      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 7)],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_errorMessage != null) {
@@ -2055,16 +2018,13 @@ class _OptiYouMeasurementReviewScreenState
           TextButton.icon(
             onPressed: _openSessionEditor,
             icon: const Icon(Icons.edit_note_outlined, color: Colors.white),
-            label: const Text(
-              'Düzenle',
-              style: TextStyle(color: Colors.white),
-            ),
+            label: const Text('Düzenle', style: TextStyle(color: Colors.white)),
           ),
           TextButton.icon(
             onPressed: _openAnalysisResults,
             icon: const Icon(Icons.analytics_outlined, color: Colors.white),
             label: const Text(
-              'Analiz',
+              'Değerlendirme',
               style: TextStyle(color: Colors.white),
             ),
           ),
@@ -2106,26 +2066,15 @@ class _OptiYouMeasurementReviewScreenState
                     );
 
                     if (!isWide) {
-                      return Column(
-                        children: [
-                          leftColumn,
-                          rightColumn,
-                        ],
-                      );
+                      return Column(children: [leftColumn, rightColumn]);
                     }
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 4,
-                          child: leftColumn,
-                        ),
+                        Expanded(flex: 4, child: leftColumn),
                         const SizedBox(width: 18),
-                        Expanded(
-                          flex: 6,
-                          child: rightColumn,
-                        ),
+                        Expanded(flex: 6, child: rightColumn),
                       ],
                     );
                   },
@@ -2157,10 +2106,7 @@ class _ClinicTypeOption {
   final String value;
   final String label;
 
-  const _ClinicTypeOption({
-    required this.value,
-    required this.label,
-  });
+  const _ClinicTypeOption({required this.value, required this.label});
 
   static const List<_ClinicTypeOption> values = [
     _ClinicTypeOption(value: 'clinic', label: 'Klinik'),

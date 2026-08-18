@@ -1,13 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:oy_site/data/repositories/supabase_analysis_repository.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/widgets/language_selector.dart';
 import 'package:video_player/video_player.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
 import 'package:oy_site/legal/legal_document_registry.dart';
 import 'package:oy_site/models/app_user.dart';
+import 'package:oy_site/models/customer_analysis_result_model.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
+import 'package:oy_site/screens/dashboard/analysis/analysis_results_view.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,8 +30,16 @@ EdgeInsets _sectionPadding(
 class WelcomeQrScreen extends StatefulWidget {
   final dynamic pressureRepository;
   final void Function(AppUser user)? onOpenApp;
+  final String? initialInviteToken;
+  final String? initialSource;
 
-  const WelcomeQrScreen({super.key, this.pressureRepository, this.onOpenApp});
+  const WelcomeQrScreen({
+    super.key,
+    this.pressureRepository,
+    this.onOpenApp,
+    this.initialInviteToken,
+    this.initialSource,
+  });
 
   @override
   State<WelcomeQrScreen> createState() => _WelcomeQrScreenState();
@@ -37,8 +48,12 @@ class WelcomeQrScreen extends StatefulWidget {
 class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _accessPanelKey = GlobalKey();
+  final GlobalKey _resultsSectionKey = GlobalKey();
+  final GlobalKey _inlineResultsKey = GlobalKey();
   final SupabasePatientInviteRepository _inviteRepository =
       SupabasePatientInviteRepository();
+  final SupabaseAnalysisRepository _analysisRepository =
+      SupabaseAnalysisRepository();
 
   String? _source;
   String? _inviteToken;
@@ -48,14 +63,20 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
   bool _isLoadingInvite = false;
   bool _accessPanelOpen = true;
   AppUser? _readyUser;
+  bool _showInlineResults = false;
+  bool _isLoadingInlineResults = false;
+  bool _hasLoadedInlineResults = false;
+  String? _inlineResultsError;
+  List<CustomerAnalysisResult> _inlineResults = [];
   double _scrollOffset = 0;
 
   @override
   void initState() {
     super.initState();
     final data = _parseRoute();
-    _source = data.source;
-    _inviteToken = data.inviteToken;
+    _source = _normalizedValue(widget.initialSource) ?? data.source;
+    _inviteToken =
+        _normalizedValue(widget.initialInviteToken) ?? data.inviteToken;
 
     _scrollController.addListener(() {
       if (!mounted) return;
@@ -65,6 +86,11 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
     if ((_inviteToken ?? '').trim().isNotEmpty) {
       _loadInvite(_inviteToken!.trim());
     }
+  }
+
+  String? _normalizedValue(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
   @override
@@ -115,8 +141,7 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
 
       if (invite == null) {
         setState(() {
-          _inviteError =
-              'Bu QR kod ile ilişkili ölçüm daveti bulunamadı. Yine de hesap oluşturup uygulamaya geçebilirsiniz.';
+          _inviteError = AppLocalizations.of(context).qrInviteNotFound;
           _isLoadingInvite = false;
         });
         return;
@@ -132,16 +157,19 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _inviteError = 'QR daveti kontrol edilirken hata oluştu: $e';
+        _inviteError = AppLocalizations.of(
+          context,
+        ).qrInviteCheckError(e.toString());
         _isLoadingInvite = false;
       });
     }
   }
 
   String? _validateInvite(PatientInviteModel invite) {
-    if (invite.isUsed) return 'Bu QR/davet bağlantısı daha önce kullanılmış.';
-    if (invite.isCancelled) return 'Bu QR/davet bağlantısı iptal edilmiş.';
-    if (!invite.isStillValid) return 'Bu QR/davet bağlantısının süresi dolmuş.';
+    final l10n = AppLocalizations.of(context);
+    if (invite.isUsed) return l10n.qrInviteAlreadyUsed;
+    if (invite.isCancelled) return l10n.qrInviteCancelled;
+    if (!invite.isStillValid) return l10n.qrInviteExpired;
     return null;
   }
 
@@ -186,7 +214,66 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
     setState(() {
       _readyUser = user;
       _accessPanelOpen = true;
+      _showInlineResults = false;
+      _isLoadingInlineResults = false;
+      _hasLoadedInlineResults = false;
+      _inlineResultsError = null;
+      _inlineResults = [];
     });
+  }
+
+  Future<void> _openInlineResults() async {
+    if (_readyUser == null) {
+      _openAccessPanel();
+      return;
+    }
+
+    if (!_showInlineResults) {
+      setState(() => _showInlineResults = true);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final resultsContext = _inlineResultsKey.currentContext;
+      if (resultsContext == null) return;
+      Scrollable.ensureVisible(
+        resultsContext,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeOutCubic,
+        alignment: 0.02,
+      );
+    });
+
+    if (!_hasLoadedInlineResults && !_isLoadingInlineResults) {
+      await _loadInlineResults();
+    }
+  }
+
+  Future<void> _loadInlineResults() async {
+    setState(() {
+      _isLoadingInlineResults = true;
+      _inlineResultsError = null;
+    });
+
+    try {
+      final results = await _analysisRepository
+          .getAnalysisHistoryForCurrentCustomer();
+      if (!mounted) return;
+
+      setState(() {
+        _inlineResults = results;
+        _isLoadingInlineResults = false;
+        _hasLoadedInlineResults = true;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingInlineResults = false;
+        _hasLoadedInlineResults = true;
+        _inlineResultsError = AppLocalizations.of(
+          context,
+        ).analysisResultsLoadError(error.toString());
+      });
+    }
   }
 
   void _openApp(AppUser user) {
@@ -203,10 +290,35 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
     return _scrollController.position.maxScrollExtent;
   }
 
+  double get _landingScrollExtent {
+    if (!_scrollController.hasClients) return 0;
+
+    final renderObject = _resultsSectionKey.currentContext?.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      final viewportHeight = _scrollController.position.viewportDimension;
+      final sectionTop =
+          renderObject.localToGlobal(Offset.zero).dy + _scrollOffset;
+      return math.max(
+        1,
+        sectionTop + renderObject.size.height - viewportHeight + 96,
+      );
+    }
+
+    return math.min(
+      _maxScrollExtent,
+      _scrollController.position.viewportDimension * 2.4,
+    );
+  }
+
   double get _scrollProgress {
-    final maxExtent = _maxScrollExtent;
+    final maxExtent = _landingScrollExtent;
     if (maxExtent <= 0) return 0;
     return (_scrollOffset / maxExtent).clamp(0.0, 1.0).toDouble();
+  }
+
+  double get _flowRailOpacity {
+    if (!_showInlineResults) return 1;
+    return (1 - ((_scrollProgress - .90) / .10)).clamp(0.0, 1.0).toDouble();
   }
 
   double _focusFromProgress({
@@ -261,8 +373,13 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
               ),
             ),
             Positioned.fill(
-              child: IgnorePointer(
-                child: _MeasurementFlowRail(progress: _scrollProgress),
+              child: AnimatedOpacity(
+                opacity: _flowRailOpacity,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+                child: IgnorePointer(
+                  child: _MeasurementFlowRail(progress: _scrollProgress),
+                ),
               ),
             ),
             Positioned.fill(
@@ -301,16 +418,28 @@ class _WelcomeQrScreenState extends State<WelcomeQrScreen> {
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: _FocusStage(
-                      focus: _mainSectionFocus(context, 2),
-                      child: _ResultsSection(
-                        isReady: _readyUser != null,
-                        onOpenResults: _readyUser == null
-                            ? _openAccessPanel
-                            : () => _openApp(_readyUser!),
+                    child: KeyedSubtree(
+                      key: _resultsSectionKey,
+                      child: _FocusStage(
+                        focus: _mainSectionFocus(context, 2),
+                        child: _ResultsSection(
+                          isReady: _readyUser != null,
+                          onOpenResults: _openInlineResults,
+                        ),
                       ),
                     ),
                   ),
+                  if (_showInlineResults && _readyUser != null)
+                    SliverToBoxAdapter(
+                      key: _inlineResultsKey,
+                      child: _InlineResultsSection(
+                        currentUser: _readyUser!,
+                        isLoading: _isLoadingInlineResults,
+                        errorMessage: _inlineResultsError,
+                        results: _inlineResults,
+                        onRetry: _loadInlineResults,
+                      ),
+                    ),
                   const SliverToBoxAdapter(child: SizedBox(height: 96)),
                 ],
               ),
@@ -466,7 +595,7 @@ class _ResultsSection extends StatelessWidget {
           onPressed: onOpenResults,
           icon: Icon(
             isReady
-                ? Icons.dashboard_customize_outlined
+                ? Icons.keyboard_arrow_down_rounded
                 : Icons.person_add_alt_1_outlined,
           ),
           label: Text(isReady ? l10n.qrOpenResults : l10n.qrGoToRegistration),
@@ -515,6 +644,225 @@ class _ResultsSection extends StatelessWidget {
                     ],
                   ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineResultsSection extends StatelessWidget {
+  final AppUser currentUser;
+  final bool isLoading;
+  final String? errorMessage;
+  final List<CustomerAnalysisResult> results;
+  final VoidCallback onRetry;
+
+  const _InlineResultsSection({
+    required this.currentUser,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.results,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final narrow = MediaQuery.of(context).size.width < 720;
+
+    Widget body;
+    if (isLoading) {
+      body = SizedBox(
+        height: 280,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 14),
+              Text(l10n.preparingAssessment),
+            ],
+          ),
+        ),
+      );
+    } else if (errorMessage != null) {
+      body = _InlineResultsMessage(
+        icon: Icons.error_outline,
+        title: l10n.dataUnavailable,
+        message: errorMessage!,
+        actionLabel: l10n.retry,
+        onAction: onRetry,
+      );
+    } else if (results.isEmpty) {
+      body = _InlineResultsMessage(
+        icon: Icons.fact_check_outlined,
+        title: l10n.noAnalysisResults,
+        message: l10n.analysisWillAppear,
+        actionLabel: l10n.checkAgain,
+        onAction: onRetry,
+      );
+    } else {
+      body = AnalysisResultsView(
+        key: ValueKey(results.map((result) => result.sessionId).join('-')),
+        currentUser: currentUser,
+        pageTitle: l10n.assessmentResults,
+        results: results,
+        embedded: true,
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(narrow ? 10 : 72, 8, narrow ? 10 : 36, 52),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.teal.withValues(alpha: .10), const Color(0xFFF5FAFA)],
+          stops: const [0, .16],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1320),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                margin: EdgeInsets.fromLTRB(narrow ? 8 : 20, 0, 8, 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .90),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: Colors.teal.withValues(alpha: .14)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: .11),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(
+                        Icons.fact_check_outlined,
+                        color: Colors.teal.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.qrInlineResultsEyebrow.toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.teal.shade700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: .8,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            l10n.qrInlineResultsTitle,
+                            style: const TextStyle(
+                              color: Color(0xFF10323B),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            l10n.qrInlineResultsDescription,
+                            style: TextStyle(
+                              color: Colors.blueGrey.shade700,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FCFC),
+                  borderRadius: BorderRadius.circular(narrow ? 22 : 32),
+                  border: Border.all(color: Colors.teal.withValues(alpha: .12)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blueGrey.withValues(alpha: .08),
+                      blurRadius: 28,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: body,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineResultsMessage extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  const _InlineResultsMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 280),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.teal.withOpacity(.12)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 48, color: Colors.teal.shade700),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.blueGrey.shade700, height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh),
+              label: Text(actionLabel),
+            ),
+          ],
         ),
       ),
     );
@@ -838,7 +1186,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       TextEditingController();
   final TextEditingController _registerPasswordConfirmController =
       TextEditingController();
-  final TextEditingController _loginEmailController = TextEditingController();
   final TextEditingController _loginPasswordController =
       TextEditingController();
 
@@ -885,7 +1232,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     final email = (_invite?.email ?? '').trim();
     if (email.isNotEmpty) {
       _registerEmailController.text = email;
-      _loginEmailController.text = email;
     }
   }
 
@@ -896,21 +1242,14 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     _registerEmailController.dispose();
     _registerPasswordController.dispose();
     _registerPasswordConfirmController.dispose();
-    _loginEmailController.dispose();
     _loginPasswordController.dispose();
     super.dispose();
   }
 
   bool get _hasInvite => _invite != null && (_inviteToken ?? '').isNotEmpty;
 
-  String? _validateInvite(PatientInviteModel invite) {
-    if (invite.isUsed) return 'Bu QR/davet bağlantısı daha önce kullanılmış.';
-    if (invite.isCancelled) return 'Bu QR/davet bağlantısı iptal edilmiş.';
-    if (!invite.isStillValid) return 'Bu QR/davet bağlantısının süresi dolmuş.';
-    return null;
-  }
-
   Future<void> _registerAndClaim() async {
+    final l10n = AppLocalizations.of(context);
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final email = _registerEmailController.text.trim();
@@ -918,22 +1257,22 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     final confirm = _registerPasswordConfirmController.text;
 
     if (firstName.isEmpty || lastName.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen adınızı ve soyadınızı girin.');
+      setState(() => _errorMessage = l10n.enterFirstAndLastName);
       return;
     }
 
     if (email.isEmpty) {
-      setState(() => _errorMessage = 'Lütfen e-posta adresinizi girin.');
+      setState(() => _errorMessage = l10n.enterEmail);
       return;
     }
 
     if (password.length < 6) {
-      setState(() => _errorMessage = 'Şifre en az 6 karakter olmalıdır.');
+      setState(() => _errorMessage = l10n.passwordMinSix);
       return;
     }
 
     if (password != confirm) {
-      setState(() => _errorMessage = 'Şifreler eşleşmiyor.');
+      setState(() => _errorMessage = l10n.passwordsDoNotMatch);
       return;
     }
 
@@ -941,8 +1280,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         _acceptedPrivacyPolicy &&
         _acceptedTermsOfUse)) {
       setState(() {
-        _errorMessage =
-            'Devam etmek için sözleşme ve bilgilendirme metinlerini kabul etmelisiniz.';
+        _errorMessage = l10n.qrAcceptRequiredDocuments;
       });
       return;
     }
@@ -979,8 +1317,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         setState(() {
           _isLoading = false;
           _emailConfirmationRequired = true;
-          _successMessage =
-              'Kayıt oluşturuldu. E-posta onayı aktifse, gönderilen onay bağlantısından sonra bu sayfadan giriş yapabilirsiniz.';
+          _successMessage = l10n.qrRegistrationEmailConfirmation;
         });
         return;
       }
@@ -989,8 +1326,8 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         _isLoading = false;
         _readyUser = user;
         _successMessage = _hasInvite
-            ? 'Hesabınız oluşturuldu ve sonuçlarınız hesabınıza bağlandı.'
-            : 'Hesabınız oluşturuldu. Uygulamaya geçebilirsiniz.';
+            ? l10n.qrAccountCreatedAndLinked
+            : l10n.qrAccountCreated;
       });
 
       widget.onAuthenticated(user);
@@ -1004,17 +1341,18 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Kayıt tamamlanamadı: $e';
+        _errorMessage = l10n.qrRegistrationFailed(e.toString());
       });
     }
   }
 
   Future<void> _loginAndClaim() async {
-    final email = _loginEmailController.text.trim();
+    final l10n = AppLocalizations.of(context);
+    final email = _registerEmailController.text.trim();
     final password = _loginPasswordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'E-posta ve şifre girin.');
+      setState(() => _errorMessage = l10n.qrEnterEmailAndPassword);
       return;
     }
 
@@ -1038,8 +1376,8 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         _isLoading = false;
         _readyUser = user;
         _successMessage = _hasInvite
-            ? 'Giriş yapıldı ve sonuçlarınız hesabınıza bağlandı.'
-            : 'Giriş yapıldı. Uygulamaya geçebilirsiniz.';
+            ? l10n.qrLoginAndLinked
+            : l10n.qrLoginSuccessful;
       });
 
       widget.onAuthenticated(user);
@@ -1053,7 +1391,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Giriş tamamlanamadı: $e';
+        _errorMessage = l10n.qrLoginFailed(e.toString());
       });
     }
   }
@@ -1081,8 +1419,8 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
 
     final currentAuthUserId = Supabase.instance.client.auth.currentUser?.id;
     if (currentAuthUserId == null || currentAuthUserId != authUserId) {
-      throw const AuthException(
-        'Davet hesabınıza bağlanmadan önce oturum açmanız gerekiyor.',
+      throw AuthException(
+        AppLocalizations.of(context).qrAuthenticationRequiredForInvite,
       );
     }
 
@@ -1090,27 +1428,28 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
   }
 
   String _localizeAuthError(String message) {
+    final l10n = AppLocalizations.of(context);
     final lower = message.toLowerCase();
 
     if (lower.contains('already registered') ||
         lower.contains('already been registered') ||
         lower.contains('user already registered')) {
-      return 'Bu e-posta adresi zaten kayıtlı. Giriş sekmesini kullanabilirsiniz.';
+      return l10n.qrEmailAlreadyRegistered;
     }
 
     if (lower.contains('invalid login') ||
         lower.contains('invalid credentials')) {
-      return 'E-posta veya şifre hatalı.';
+      return l10n.invalidCredentials;
     }
 
     if (lower.contains('email not confirmed')) {
-      return 'E-posta adresinizi onayladıktan sonra giriş yapabilirsiniz.';
+      return l10n.emailNotConfirmed;
     }
 
-    if (lower.contains('invalid email')) return 'Geçersiz e-posta adresi.';
+    if (lower.contains('invalid email')) return l10n.enterValidEmail;
 
     if (lower.contains('password should be')) {
-      return 'Şifre en az 6 karakter olmalıdır.';
+      return l10n.passwordMinSix;
     }
 
     return message;
@@ -1120,9 +1459,11 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
     final document = LegalDocumentRegistry.findByCode(code);
 
     if (document == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Belge bulunamadı.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).qrDocumentNotFound),
+        ),
+      );
       return;
     }
 
@@ -1143,7 +1484,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat'),
+            child: Text(AppLocalizations.of(context).close),
           ),
         ],
       ),
@@ -1181,7 +1522,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
           final narrow = constraints.maxWidth < 760;
           final intro = _AccessIntro(
             hasInvite: _hasInvite,
-            email: _invite?.email,
             emailConfirmationRequired: _emailConfirmationRequired,
             onGreenBackground: true,
           );
@@ -1296,8 +1636,6 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
 
   Widget _buildRegisterForm() {
     final l10n = AppLocalizations.of(context);
-    final inviteEmailLocked =
-        _hasInvite && (_invite?.email ?? '').trim().isNotEmpty;
 
     return Column(
       key: const ValueKey('register'),
@@ -1327,9 +1665,12 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
         const SizedBox(height: 12),
         TextField(
           controller: _registerEmailController,
-          enabled: !_isLoading && !inviteEmailLocked,
+          enabled: !_isLoading,
           keyboardType: TextInputType.emailAddress,
-          decoration: _inputDecoration(l10n.email),
+          decoration: _inputDecoration(l10n.email).copyWith(
+            helperText: _hasInvite ? l10n.qrInviteEmailEditable : null,
+            suffixIcon: const Icon(Icons.edit_outlined, size: 19),
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -1410,7 +1751,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
-          controller: _loginEmailController,
+          controller: _registerEmailController,
           enabled: !_isLoading,
           keyboardType: TextInputType.emailAddress,
           decoration: _inputDecoration(l10n.email),
@@ -1522,6 +1863,7 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
   }
 
   Widget _buildLegalCheckboxes() {
+    final l10n = AppLocalizations.of(context);
     final acceptedRequiredDocuments =
         _acceptedMembershipAgreement &&
         _acceptedPrivacyPolicy &&
@@ -1546,13 +1888,13 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
       title: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Text('Devam ederek '),
+          Text(l10n.qrLegalConsentPrefix),
           InkWell(
             onTap: () =>
                 _showLegalDocument(LegalDocumentCodes.uyelikSozlesmesi),
-            child: const Text(
-              'Üyelik Sözleşmesi',
-              style: TextStyle(
+            child: Text(
+              l10n.qrMembershipAgreement,
+              style: const TextStyle(
                 color: Colors.teal,
                 fontWeight: FontWeight.w700,
                 decoration: TextDecoration.underline,
@@ -1562,29 +1904,29 @@ class _InlineCustomerAccessPanelState extends State<InlineCustomerAccessPanel> {
           const Text(', '),
           InkWell(
             onTap: () => _showLegalDocument(LegalDocumentCodes.aydinlatmaMetni),
-            child: const Text(
-              'Aydınlatma Metni',
-              style: TextStyle(
+            child: Text(
+              l10n.qrPrivacyNotice,
+              style: const TextStyle(
                 color: Colors.teal,
                 fontWeight: FontWeight.w700,
                 decoration: TextDecoration.underline,
               ),
             ),
           ),
-          const Text(' ve '),
+          Text(l10n.qrLegalAnd),
           InkWell(
             onTap: () =>
                 _showLegalDocument(LegalDocumentCodes.kullanimKosullari),
-            child: const Text(
-              'Kullanım Koşulları',
-              style: TextStyle(
+            child: Text(
+              l10n.qrTermsOfUse,
+              style: const TextStyle(
                 color: Colors.teal,
                 fontWeight: FontWeight.w700,
                 decoration: TextDecoration.underline,
               ),
             ),
           ),
-          const Text('’nı okuduğumu ve kabul ettiğimi onaylıyorum.'),
+          Text(l10n.qrLegalConsentSuffix),
         ],
       ),
     );
@@ -1786,21 +2128,23 @@ class _HeroVisualState extends State<_HeroVisual> {
   void initState() {
     super.initState();
 
-    _controller = VideoPlayerController.asset(_heroVideoAssetPath)
-      ..setLooping(true)
-      ..setVolume(0);
+    _controller = VideoPlayerController.asset(_heroVideoAssetPath);
+    _initializeVideo();
+  }
 
-    _controller
-        .initialize()
-        .then((_) {
-          if (!mounted) return;
-          setState(() => _isVideoReady = true);
-          _controller.play();
-        })
-        .catchError((_) {
-          if (!mounted) return;
-          setState(() => _hasVideoError = true);
-        });
+  Future<void> _initializeVideo() async {
+    try {
+      await _controller.initialize();
+      await _controller.setLooping(true);
+      await _controller.setVolume(0);
+      await _controller.play();
+
+      if (!mounted) return;
+      setState(() => _isVideoReady = true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _hasVideoError = true);
+    }
   }
 
   @override
@@ -1839,7 +2183,7 @@ class _HeroVisualState extends State<_HeroVisual> {
                           child: VideoPlayer(_controller),
                         ),
                       )
-                    : const _HeroVideoFallback(),
+                    : _HeroVideoPlaceholder(hasError: _hasVideoError),
               ),
               Positioned.fill(
                 child: DecoratedBox(
@@ -1863,48 +2207,51 @@ class _HeroVisualState extends State<_HeroVisual> {
   }
 }
 
-class _HeroVideoFallback extends StatefulWidget {
-  const _HeroVideoFallback();
+class _HeroVideoPlaceholder extends StatelessWidget {
+  final bool hasError;
 
-  @override
-  State<_HeroVideoFallback> createState() => _HeroVideoFallbackState();
-}
-
-class _HeroVideoFallbackState extends State<_HeroVideoFallback>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  const _HeroVideoPlaceholder({required this.hasError});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.teal.shade900,
-                const Color(0xFF072B36),
-                Colors.blueGrey.shade900,
-              ],
-            ),
-          ),
-          child: CustomPaint(
-            painter: _DataFootPainter(progress: _controller.value),
-          ),
-        );
-      },
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.teal.shade900,
+            const Color(0xFF072B36),
+            Colors.blueGrey.shade900,
+          ],
+        ),
+      ),
+      child: Center(
+        child: hasError
+            ? const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.video_file_outlined,
+                    color: Colors.white70,
+                    size: 42,
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Tanıtım videosu yüklenemedi',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              )
+            : const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              ),
+      ),
     );
   }
 }
@@ -2283,7 +2630,7 @@ class _AiEvaluationSection extends StatelessWidget {
                     title:
                         'Ölçüm verisi uzman kararını destekleyen içgörüye dönüşür.',
                     subtitle:
-                        'Dijital tarama, basınç verisi ve kullanım ihtiyacı birlikte yorumlanır. Yapay zeka destekli analiz; risk sinyallerini, destek ihtiyacını ve ürün uyumunu uzman değerlendirmesine hazır hale getirir.',
+                        'Dijital tarama, basınç verisi ve kullanım ihtiyacı birlikte yorumlanır. Yapay zeka destekli değerlendirme; risk sinyallerini, destek ihtiyacını ve ürün uyumunu uzman incelemesine hazır hale getirir.',
                   ),
                   SizedBox(height: 18),
                   _ReportPreviewTile(
@@ -2341,6 +2688,7 @@ class _ClosedAccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -2364,9 +2712,7 @@ class _ClosedAccessCard extends StatelessWidget {
                 : CrossAxisAlignment.start,
             children: [
               Text(
-                hasInvite
-                    ? 'Sonuçlarınıza erişim hazır.'
-                    : 'Sonuçlarınıza erişin.',
+                hasInvite ? l10n.qrAccessReadyTitle : l10n.qrAccessTitle,
                 textAlign: narrow ? TextAlign.center : TextAlign.left,
                 style: const TextStyle(
                   color: Colors.white,
@@ -2376,8 +2722,7 @@ class _ClosedAccessCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                inviteError ??
-                    'Kayıt veya giriş işlemini bu sayfadan tamamlayıp uygulamaya geçebilirsiniz.',
+                inviteError ?? l10n.qrAccessDescription,
                 textAlign: narrow ? TextAlign.center : TextAlign.left,
                 style: TextStyle(
                   color: Colors.white.withOpacity(.82),
@@ -2390,7 +2735,7 @@ class _ClosedAccessCard extends StatelessWidget {
           final button = ElevatedButton.icon(
             onPressed: onOpen,
             icon: const Icon(Icons.lock_open_outlined),
-            label: const Text('Güvenli Erişimi Başlat'),
+            label: Text(l10n.qrStartSecureAccess),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Colors.teal.shade800,
@@ -2420,20 +2765,18 @@ class _ClosedAccessCard extends StatelessWidget {
 
 class _AccessIntro extends StatelessWidget {
   final bool hasInvite;
-  final String? email;
   final bool emailConfirmationRequired;
   final bool onGreenBackground;
 
   const _AccessIntro({
     required this.hasInvite,
-    required this.email,
     required this.emailConfirmationRequired,
     this.onGreenBackground = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final emailText = (email ?? '').trim();
+    final l10n = AppLocalizations.of(context);
 
     final titleColor = onGreenBackground
         ? Colors.white
@@ -2449,7 +2792,7 @@ class _AccessIntro extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Kullanıcı kaydı'.toUpperCase(),
+          l10n.qrRegistrationEyebrow.toUpperCase(),
           style: TextStyle(
             color: eyebrowColor,
             fontWeight: FontWeight.w800,
@@ -2459,7 +2802,7 @@ class _AccessIntro extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Hesabınızı oluşturun ve sonuçlarınıza bağlanın.',
+          l10n.qrAccessIntroTitle,
           style: TextStyle(
             color: titleColor,
             fontSize: 28,
@@ -2469,43 +2812,40 @@ class _AccessIntro extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Kişisel sonuçlarınızı güvenli şekilde görüntüleyebilmeniz için ölçüm kaydınızı size ait kullanıcı hesabıyla ilişkilendiriyoruz.',
+          l10n.qrAccessIntroDescription,
           style: TextStyle(color: mutedColor, height: 1.45),
         ),
         const SizedBox(height: 18),
         _AccessBenefit(
           icon: Icons.analytics_outlined,
-          title: 'Analiz raporunuz',
-          text: 'Basınç, denge ve destek bilgilerini uygulamada görüntüleyin.',
+          title: l10n.qrAnalysisSummary,
+          text: l10n.qrAnalysisSummaryText,
           onGreenBackground: onGreenBackground,
         ),
         _AccessBenefit(
           icon: Icons.recommend_outlined,
-          title: 'Ürün öneriniz',
-          text: 'Değerlendirme sonucuna göre size uygun ürün seçimine ulaşın.',
+          title: l10n.qrSuitableProduct,
+          text: l10n.qrSuitableProductText,
           onGreenBackground: onGreenBackground,
         ),
         _AccessBenefit(
           icon: Icons.timeline_outlined,
-          title: 'Takip geçmişiniz',
-          text: 'Sonraki ölçümlerde gelişimi ve kullanım notlarını takip edin.',
+          title: l10n.qrTrackingHistory,
+          text: l10n.qrTrackingHistoryText,
           onGreenBackground: onGreenBackground,
         ),
         const SizedBox(height: 12),
         if (hasInvite)
           _InfoBanner(
             icon: Icons.verified_outlined,
-            text: emailText.isEmpty
-                ? 'Davet doğrulandı. Hesap oluşturunca sonuçlarınız bu hesaba bağlanacak.'
-                : 'Davet doğrulandı. E-posta: $emailText',
+            text: l10n.qrInviteVerified,
             color: Colors.teal,
           ),
         if (emailConfirmationRequired) ...[
           const SizedBox(height: 10),
-          const _InfoBanner(
+          _InfoBanner(
             icon: Icons.mark_email_read_outlined,
-            text:
-                'E-posta onayı aktif görünüyor. Onaydan sonra aynı sayfadan giriş yapabilirsiniz.',
+            text: l10n.qrEmailConfirmationHint,
             color: Colors.blue,
           ),
         ],
@@ -2820,6 +3160,7 @@ class _MeasurementFlowRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final showLabels = screenWidth >= 980;
     final railWidth = showLabels ? 230.0 : 46.0;
@@ -2840,6 +3181,11 @@ class _MeasurementFlowRail extends StatelessWidget {
               painter: _MeasurementFlowRailPainter(
                 progress: safeProgress,
                 showLabels: showLabels,
+                labels: [
+                  l10n.qrFootHealthEcosystem,
+                  l10n.qrRegistrationEyebrow,
+                  l10n.qrResults,
+                ],
               ),
             ),
           ),
@@ -2852,13 +3198,13 @@ class _MeasurementFlowRail extends StatelessWidget {
 class _MeasurementFlowRailPainter extends CustomPainter {
   final double progress;
   final bool showLabels;
+  final List<String> labels;
 
   const _MeasurementFlowRailPainter({
     required this.progress,
     required this.showLabels,
+    required this.labels,
   });
-
-  static const _labels = ['Optiyou ekosistemi', 'Kullanıcı kaydı', 'Sonuçlar'];
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2885,11 +3231,11 @@ class _MeasurementFlowRailPainter extends CustomPainter {
     canvas.drawLine(Offset(lineX, top), Offset(lineX, bottom), basePaint);
     canvas.drawLine(Offset(lineX, top), Offset(lineX, activeEnd), activePaint);
 
-    for (var i = 0; i < _labels.length; i++) {
-      final itemAnchor = i / (_labels.length - 1);
+    for (var i = 0; i < labels.length; i++) {
+      final itemAnchor = i / (labels.length - 1);
       final y = top + lineHeight * itemAnchor;
       final distance = (progress - itemAnchor).abs();
-      final pulse = (1 - distance * (_labels.length - 1)).clamp(0.0, 1.0);
+      final pulse = (1 - distance * (labels.length - 1)).clamp(0.0, 1.0);
       final isCompleted = progress + .012 >= itemAnchor;
       final isCurrent = distance <= .17;
 
@@ -2920,7 +3266,7 @@ class _MeasurementFlowRailPainter extends CustomPainter {
       if (showLabels) {
         final tp = TextPainter(
           text: TextSpan(
-            text: _labels[i],
+            text: labels[i],
             style: TextStyle(
               color: isCurrent || isCompleted
                   ? const Color(0xFF0F3A42)
@@ -2944,7 +3290,8 @@ class _MeasurementFlowRailPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MeasurementFlowRailPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.showLabels != showLabels;
+        oldDelegate.showLabels != showLabels ||
+        oldDelegate.labels.join('\u0000') != labels.join('\u0000');
   }
 }
 
@@ -3120,82 +3467,6 @@ class _WelcomeBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WelcomeBackgroundPainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}
-
-class _DataFootPainter extends CustomPainter {
-  final double progress;
-
-  const _DataFootPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * .52, size.height * .45);
-    final footPaint = Paint()
-      ..color = Colors.white.withOpacity(.13)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-
-    final path = Path()
-      ..moveTo(center.dx - size.width * .12, center.dy + size.height * .34)
-      ..cubicTo(
-        center.dx - size.width * .22,
-        center.dy + size.height * .12,
-        center.dx - size.width * .16,
-        center.dy - size.height * .18,
-        center.dx - size.width * .05,
-        center.dy - size.height * .34,
-      )
-      ..cubicTo(
-        center.dx + size.width * .05,
-        center.dy - size.height * .45,
-        center.dx + size.width * .26,
-        center.dy - size.height * .28,
-        center.dx + size.width * .22,
-        center.dy - size.height * .03,
-      )
-      ..cubicTo(
-        center.dx + size.width * .18,
-        center.dy + size.height * .22,
-        center.dx + size.width * .05,
-        center.dy + size.height * .40,
-        center.dx - size.width * .12,
-        center.dy + size.height * .34,
-      );
-
-    canvas.drawPath(path, footPaint);
-
-    final dotPaint = Paint()..style = PaintingStyle.fill;
-
-    for (int i = 0; i < 22; i++) {
-      final angle = i * .82 + progress * 1.8;
-      final radius = size.shortestSide * (.12 + (i % 5) * .028);
-      final x = center.dx + math.cos(angle) * radius * .8;
-      final y = center.dy + math.sin(angle * 1.25) * radius * 1.25;
-      final alpha =
-          .25 + .45 * ((math.sin(progress * math.pi * 2 + i) + 1) / 2);
-
-      dotPaint.color = Colors.tealAccent.withOpacity(alpha);
-      canvas.drawCircle(Offset(x, y), 3.5 + (i % 4), dotPaint);
-    }
-
-    final linePaint = Paint()
-      ..color = Colors.tealAccent.withOpacity(.18)
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 9; i++) {
-      final y = size.height * (.18 + i * .075);
-      canvas.drawLine(
-        Offset(size.width * .08, y),
-        Offset(size.width * (.52 + .16 * math.sin(progress * math.pi + i)), y),
-        linePaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DataFootPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
 }

@@ -22,8 +22,7 @@ class SessionAnalysisResultsScreen extends StatefulWidget {
 
 class _SessionAnalysisResultsScreenState
     extends State<SessionAnalysisResultsScreen> {
-  final SupabaseAnalysisRepository _repository =
-      SupabaseAnalysisRepository();
+  final SupabaseAnalysisRepository _repository = SupabaseAnalysisRepository();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -63,7 +62,7 @@ class _SessionAnalysisResultsScreenState
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Analiz sonuçları yüklenirken hata oluştu: $e';
+        _errorMessage = 'Değerlendirme sonuçları yüklenirken hata oluştu: $e';
         _isLoading = false;
       });
     }
@@ -83,20 +82,14 @@ class _SessionAnalysisResultsScreenState
             ),
             const SizedBox(height: 16),
             const Text(
-              'Bu oturum için analiz sonucu bulunamadı.',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              'Bu oturum için değerlendirme sonucu bulunamadı.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              '3D scan klasörü yüklendikten ve analiz sonucu kaydedildikten sonra burada görünecektir.',
+              '3D tarama klasörü yüklendikten ve değerlendirme sonucu kaydedildikten sonra burada görünecektir.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey[700],
-                height: 1.4,
-              ),
+              style: TextStyle(color: Colors.grey[700], height: 1.4),
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
@@ -116,20 +109,18 @@ class _SessionAnalysisResultsScreenState
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'Analiz Sonuçları - ${widget.session.sessionCode}',
+            'Değerlendirme Sonuçları - ${widget.session.sessionCode}',
           ),
           backgroundColor: Colors.teal,
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Ayak Sağlığı Analiz Sonuçları'),
+          title: const Text('Ayak Sağlığı Değerlendirme Sonuçları'),
           backgroundColor: Colors.teal,
         ),
         body: Center(
@@ -147,16 +138,14 @@ class _SessionAnalysisResultsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Analiz Sonuçları - ${widget.session.sessionCode}',
-        ),
+        title: Text('Değerlendirme Sonuçları - ${widget.session.sessionCode}'),
         backgroundColor: Colors.teal,
       ),
       body: _results.isEmpty
           ? _buildEmptyState()
           : AnalysisResultsView(
               currentUser: widget.currentUser,
-              pageTitle: 'Ayak Sağlığı Analiz Sonuçları',
+              pageTitle: 'Ayak Sağlığı Değerlendirme Sonuçları',
               results: _results,
             ),
     );
