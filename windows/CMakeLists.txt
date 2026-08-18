@@ -86,6 +86,17 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# MSVC çalışma zamanı kitaplıklarını pakete dahil et.
+#
+# media_kit_video_plugin.dll, MSVCP140/VCRUNTIME140'a bağlı; bunlar temiz bir
+# Windows kurulumunda bulunmaz, "Visual C++ Redistributable" ile gelir. Yanına
+# kopyalanmazsa uygulama başka bir bilgisayarda eksik DLL hatasıyla açılmaz.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+install(FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
