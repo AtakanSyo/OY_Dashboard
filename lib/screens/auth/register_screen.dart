@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/widgets/language_selector.dart';
 import 'package:oy_site/data/repositories/supabase_patient_invite_repository.dart';
-import 'package:oy_site/data/repositories/supabase_patient_repository.dart';
 import 'package:oy_site/legal/legal_document_registry.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/patient_invite_model.dart';
@@ -31,8 +30,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final AuthService _authService = AuthService();
   final SupabasePatientInviteRepository _inviteRepository =
       SupabasePatientInviteRepository();
-  final SupabasePatientRepository _patientRepository =
-      SupabasePatientRepository();
 
   String? _activeInviteToken;
   PatientInviteModel? _invite;
@@ -232,15 +229,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final invite = _invite;
 
       if (invite != null) {
-        await _patientRepository.linkAuthUserToPatient(
-          patientId: invite.patientId,
-          authUserId: authUserId,
-        );
-
-        final inviteId = invite.inviteId;
-        if (inviteId != null) {
-          await _inviteRepository.markInviteAsUsed(inviteId: inviteId);
+        final currentAuthUserId = Supabase.instance.client.auth.currentUser?.id;
+        if (currentAuthUserId == null || currentAuthUserId != authUserId) {
+          throw const AuthException(
+            'Davet hesabınıza bağlanmadan önce oturum açmanız gerekiyor.',
+          );
         }
+
+        await _inviteRepository.claimInvite(token: invite.token);
       }
 
       if (!mounted) return;

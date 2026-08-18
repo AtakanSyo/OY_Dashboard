@@ -52,13 +52,9 @@ class SupabasePatientInviteRepository {
     );
   }
 
-  Future<PatientInviteModel?> getInviteByToken({
-    required String token,
-  }) async {
+  Future<PatientInviteModel?> getInviteByToken({required String token}) async {
     final response = await _client
-        .from('patient_invites')
-        .select()
-        .eq('token', token)
+        .rpc('get_patient_invite_by_token', params: {'p_token': token.trim()})
         .maybeSingle();
 
     if (response == null) return null;
@@ -68,21 +64,31 @@ class SupabasePatientInviteRepository {
     );
   }
 
-  Future<void> markInviteAsUsed({
-    required int inviteId,
-  }) async {
-    await _client.from('patient_invites').update({
-      'status': PatientInviteStatuses.used,
-      'used_at': DateTime.now().toIso8601String(),
-    }).eq('id', inviteId);
+  Future<PatientInviteModel> claimInvite({required String token}) async {
+    final response = await _client
+        .rpc('claim_patient_invite', params: {'p_token': token.trim()})
+        .single();
+
+    return PatientInviteModel.fromMap(
+      Map<String, dynamic>.from(response as Map),
+    );
   }
 
-  Future<void> cancelInvite({
-    required int inviteId,
-  }) async {
-    await _client.from('patient_invites').update({
-      'status': PatientInviteStatuses.cancelled,
-    }).eq('id', inviteId);
+  Future<void> markInviteAsUsed({required int inviteId}) async {
+    await _client
+        .from('patient_invites')
+        .update({
+          'status': PatientInviteStatuses.used,
+          'used_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', inviteId);
+  }
+
+  Future<void> cancelInvite({required int inviteId}) async {
+    await _client
+        .from('patient_invites')
+        .update({'status': PatientInviteStatuses.cancelled})
+        .eq('id', inviteId);
   }
 
   String _generateToken() {
