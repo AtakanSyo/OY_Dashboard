@@ -93,3 +93,10 @@ app.*.symbols
 # ------------------------
 app.*.map.json
 .vercel
+
+# ------------------------
+# Dagitim ciktilari
+# ------------------------
+# installer/build_release.ps1 buraya uretim yapar: kurulum exe'si ve acilmis
+# uygulama klasoru, toplam ~270 MB. Derlemeden yeniden uretilir, surumlenmez.
+dist/
