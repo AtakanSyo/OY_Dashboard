@@ -1,16 +1,34 @@
-# oy_site
+# OPTIYOU — Public Site (`public-site-only`)
 
-A new Flutter project.
+Bu dal, OPTIYOU Flutter uygulamasının **yalnızca herkese açık site** kısmını içerir:
+karşılama (ana) sayfası, üst bar / mega-menü, menü altındaki içerik sayfaları,
+footer ve site tasarım sistemi.
 
-## Getting Started
+**Kapsam dışı (bu dalda yok):** giriş (`/giris`, `/login`), kayıt, şifre sıfırlama,
+yasal onay, ödeme akışı ve giriş sonrası tüm dashboard ekranları (hasta, ölçüm,
+analiz, sipariş, operasyon, kurumsal paneller), bunlara ait servisler, modeller,
+repository'ler, Supabase yapılandırması/migration'ları ve dashboard'a özel asset'ler.
+Bu kısımlar `main` dalında durmaktadır.
 
-This project is a starting point for a Flutter application.
+Üst bardaki "Giriş" bağlantısı bu dalda tanımlı olmadığı için ana sayfaya döner.
 
-A few resources to get you started if this is your first Flutter project:
+## Yapı
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+| Klasör | İçerik |
+| --- | --- |
+| `lib/site/` | Site route'ları, sayfalar, bileşenler, tema (Superspec §6–§8) |
+| `lib/legal/` | Footer'dan açılan yasal belge metinleri |
+| `lib/l10n/` | Dil seçimi altyapısı (site içeriği Türkçe) |
+| `lib/main.dart` | Site-only uygulama girişi ve route üretimi |
+| `test/` | Site yerleşim ve genişlik testleri |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Çalıştırma
+
+```bash
+flutter pub get
+flutter run -d chrome        # web
+flutter run -d windows       # masaüstü
+flutter test                 # site testleri
+```
+
+Referans spesifikasyon: [docs/OPTIYOU_CLAUDE_CODE_MASTER_SUPERSPEC.md](docs/OPTIYOU_CLAUDE_CODE_MASTER_SUPERSPEC.md)
