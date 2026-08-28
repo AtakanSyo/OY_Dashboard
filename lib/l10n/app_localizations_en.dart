@@ -63,13 +63,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get home => 'Home';
 
   @override
-  String get myAnalysisResults => 'My Analysis Results';
+  String get myAnalysisResults => 'My Results';
 
   @override
   String get store => 'Store';
 
   @override
-  String get departmentAnalysis => 'Department Analysis';
+  String get departmentAnalysis => 'Department Assessment';
 
   @override
   String get trends => 'Trends';
@@ -451,6 +451,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'This link is ready for personal results access. You can create an account or log in on this page.';
 
   @override
+  String get qrInviteNotFound =>
+      'No measurement invitation was found for this QR code. You can still create an account and continue to the app.';
+
+  @override
+  String qrInviteCheckError(String error) {
+    return 'An error occurred while checking the QR invitation: $error';
+  }
+
+  @override
+  String get qrInviteAlreadyUsed =>
+      'This QR/invitation link has already been used.';
+
+  @override
+  String get qrInviteCancelled => 'This QR/invitation link has been cancelled.';
+
+  @override
+  String get qrInviteExpired => 'This QR/invitation link has expired.';
+
+  @override
   String get qrGoToRegistration => 'Go to User Registration';
 
   @override
@@ -462,7 +481,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get qrRegistrationDescription =>
-      'The QR link identifies your measurement record. When you create an account or log in, your analysis report and product recommendation are linked to your application account.';
+      'The QR link identifies your measurement record. When you create an account or log in, your assessment results and product recommendation are linked to your application account.';
 
   @override
   String get qrCreateAccount => 'Create Account';
@@ -480,11 +499,112 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrLoginAndContinue => 'Log In and Open the App';
 
   @override
+  String get qrAcceptRequiredDocuments =>
+      'You must accept the agreements and information notices to continue.';
+
+  @override
+  String get qrRegistrationEmailConfirmation =>
+      'Your account has been created. If email confirmation is enabled, you can log in on this page after using the confirmation link sent to you.';
+
+  @override
+  String get qrAccountCreatedAndLinked =>
+      'Your account has been created and your results have been linked to it.';
+
+  @override
+  String get qrAccountCreated =>
+      'Your account has been created. You can continue to the app.';
+
+  @override
+  String qrRegistrationFailed(String error) {
+    return 'Registration could not be completed: $error';
+  }
+
+  @override
+  String get qrEnterEmailAndPassword =>
+      'Enter your email address and password.';
+
+  @override
+  String get qrLoginAndLinked =>
+      'You are logged in and your results have been linked to your account.';
+
+  @override
+  String get qrLoginSuccessful =>
+      'You are logged in. You can continue to the app.';
+
+  @override
+  String qrLoginFailed(String error) {
+    return 'Login could not be completed: $error';
+  }
+
+  @override
+  String get qrAuthenticationRequiredForInvite =>
+      'You must be logged in before the invitation can be linked to your account.';
+
+  @override
+  String get qrEmailAlreadyRegistered =>
+      'This email address is already registered. Please use the Log In tab.';
+
+  @override
+  String get qrDocumentNotFound => 'The document could not be found.';
+
+  @override
+  String get qrInviteEmailEditable =>
+      'You can change the email address provided with the invitation if needed.';
+
+  @override
+  String get qrAccessReadyTitle => 'Your results are ready to access.';
+
+  @override
+  String get qrAccessTitle => 'Access your results.';
+
+  @override
+  String get qrAccessDescription =>
+      'Complete registration or login on this page to securely access your results.';
+
+  @override
+  String get qrStartSecureAccess => 'Start Secure Access';
+
+  @override
+  String get qrAccessIntroTitle =>
+      'Create your account and connect to your results.';
+
+  @override
+  String get qrAccessIntroDescription =>
+      'We link your measurement record to your personal account so you can securely view your results.';
+
+  @override
+  String get qrInviteVerified =>
+      'Invitation verified. Check the email address in the form and change it if needed.';
+
+  @override
+  String get qrEmailConfirmationHint =>
+      'Email confirmation appears to be enabled. You can log in on this page after confirming your email.';
+
+  @override
+  String get qrLegalConsentPrefix =>
+      'By continuing, I confirm that I have read and accept the ';
+
+  @override
+  String get qrMembershipAgreement => 'Membership Agreement';
+
+  @override
+  String get qrPrivacyNotice => 'Privacy Notice';
+
+  @override
+  String get qrLegalAnd => ' and ';
+
+  @override
+  String get qrTermsOfUse => 'Terms of Use';
+
+  @override
+  String get qrLegalConsentSuffix => '.';
+
+  @override
   String get qrReady => 'You\'re all set.';
 
   @override
   String get qrClaimSuccess =>
-      'Your results have been linked to your account. You can view your analysis report, usage recommendations, and support options in the app.';
+      'Your results have been linked to your account. You can view your assessment results, usage recommendations, and support options in the app.';
 
   @override
   String get qrAccountReady =>
@@ -498,14 +618,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get qrResultsTitle =>
-      'Your analysis report, product recommendation, and follow-up information in one place.';
+      'Your assessment results, product recommendation, and follow-up information in one place.';
 
   @override
   String get qrResultsDescription =>
-      'Once registration is complete, you can view your measurement history, specialist assessment, and recommended product from your Optiyou account.';
+      'Once registration or login is complete, you can view your measurement history, specialist assessment, and recommended product further down this page.';
 
   @override
-  String get qrAnalysisSummary => 'Analysis summary';
+  String get qrAnalysisSummary => 'Assessment summary';
 
   @override
   String get qrAnalysisSummaryText =>
@@ -532,7 +652,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrPersonalResults => 'Personal results overview';
 
   @override
-  String get qrAnalysisScore => 'Analysis score';
+  String get qrAnalysisScore => 'Assessment score';
 
   @override
   String get qrSupportNeed => 'Support need';
@@ -544,12 +664,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrPersonalInsole => 'Personalized insole';
 
   @override
+  String get qrInlineResultsEyebrow => 'Secure personal area';
+
+  @override
+  String get qrInlineResultsTitle => 'Your assessment results';
+
+  @override
+  String get qrInlineResultsDescription =>
+      'Your measurement findings and images are securely presented further down this page.';
+
+  @override
   String analysisResultsLoadError(String error) {
-    return 'An error occurred while loading analysis results: $error';
+    return 'An error occurred while loading assessment results: $error';
   }
 
   @override
-  String get noAnalysisResults => 'No analysis results found.';
+  String get noAnalysisResults => 'No assessment results found.';
 
   @override
   String get analysisWillAppear =>
@@ -580,7 +710,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortSummary => 'Summary';
 
   @override
-  String get totalAnalyses => 'Total Analyses';
+  String get totalAnalyses => 'Total Assessments';
 
   @override
   String get myInsoleImages => 'My Insole Images';
@@ -1471,7 +1601,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get technicalIssue => 'Technical Issue';
 
   @override
-  String get measurementIssue => 'Measurement / Analysis Issue';
+  String get measurementIssue => 'Measurement / Assessment Issue';
 
   @override
   String get orderIssue => 'Order Process';
