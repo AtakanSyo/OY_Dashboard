@@ -37,10 +37,12 @@ dependencies:
   qr_flutter: ^4.1.0
   archive: ^4.0.9
   video_player: ^2.13.0
+  video_player_win: ^3.2.2
   shared_preferences: ^2.5.3
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
+  flutter_svg: ^2.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -55,7 +57,57 @@ flutter:
     - assets/fonts/
     - assets/video/
     - assets/images/hero/
+    # Sürecimiz bölümü — pakete yalnızca WebP türevleri girer; 1672x941 PNG
+    # kaynakları aynı klasörde durur (her biri ~1.8 MB, bundle'a alınmaz).
+    - assets/images/surec/01-3d-biyomekanik-tarama.webp
+    - assets/images/surec/02-plantar-basinc-olcumu.webp
+    - assets/images/surec/03-yapay-zeka-anatomik-kategorileme.webp
+    - assets/images/surec/04-dijital-uretim-teslimat.webp
+    - assets/icons/
     - assets/images/branding/
+    - assets/images/services/
     - assets/images/products/
+    # Tabanlık teknolojileri kartları — pakete yalnızca WebP türevleri girer;
+    # kaynak PNG'ler aynı klasörde durur (her biri ~1.7-2 MB, bundle'a
+    # alınmaz). Klasör olarak bildirmek PNG'leri de pakete alırdı.
+    - assets/images/products/technology/oy-orthopedic-normal.webp
+    - assets/images/products/technology/oy-orthopedic-exploded.webp
+    - assets/images/products/technology/oy-sports-normal.webp
+    - assets/images/products/technology/oy-sports-exploded.webp
+    - assets/images/products/technology/oy-recovery-normal.webp
+    - assets/images/products/technology/oy-recovery-exploded.webp
+    - assets/images/addons/
     - assets/images/analysis/
+    - assets/images/systems/
+    - assets/images/orthotic_design/
+    - assets/images/dml/
+    - assets/images/dml/catalog/
+    - assets/images/dml/methods/
+    - assets/images/dml/services/
+    # Public site sayfa paketi (CLAUDE_CODE_IMPLEMENTATION.md).
+    # Hero / lifestyle görsellerinden yalnızca WebP türevleri bundle'a girer;
+    # PNG master'lar aynı klasörde durur ama pakete alınmaz (web build ağırlığı).
+    - assets/site/generated/hero-biomechanical-scan.webp
+    - assets/site/generated/dml-cnc-lab.webp
+    - assets/site/generated/anatomical-arch-categories.webp
+    - assets/site/generated/solution-retail-scan.webp
+    - assets/site/generated/solution-workplace-scan.webp
+    # Şeffaf ürün / cihaz varlıkları PNG olmak zorunda.
+    - assets/site/generated/product-daily-assembled.png
+    - assets/site/generated/product-daily-exploded.png
+    - assets/site/generated/product-sports-exploded.png
+    - assets/site/generated/product-recovery-exploded.png
+    - assets/site/generated/scanner-device-cutout.png
+    # Gerçek OPTIYOU tarama / sonuç kaynak görselleri (küçük PNG'ler).
+    - assets/site/source/
+    # Ana sayfa V3 revizyonu — yalnızca WebP web sürümleri bundle'a girer.
+    - assets/site/v3/generated/
+    - assets/site/v3/source/
+    - assets/mock_data/
+    - assets/scans/
+    - assets/Results1.csv
+    - assets/foot_measurements.csv
+    - assets/orders.csv
+    - assets/products.csv
+    - assets/images/
     - assets/heatmaps/

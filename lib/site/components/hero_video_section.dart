@@ -123,9 +123,7 @@ class _HeroVideoSectionState extends State<HeroVideoSection> {
           // içerik dikeyde ortalanıp hafif yukarı alınıyor.
           alignment: const Alignment(0, -0.08),
           children: [
-            Positioned.fill(
-              child: _HeroPoster(asset: widget.posterAsset),
-            ),
+            Positioned.fill(child: _HeroPoster(asset: widget.posterAsset)),
             if (showVideo)
               Positioned.fill(
                 child: ExcludeSemantics(
@@ -187,10 +185,12 @@ class _HeroScrim extends StatelessWidget {
                   end: Alignment.centerRight,
                   colors: [
                     SiteColors.surfaceInverse.withValues(alpha: 0.94),
-                    SiteColors.surfaceInverse
-                        .withValues(alpha: isCompact ? 0.80 : 0.62),
-                    SiteColors.surfaceInverse
-                        .withValues(alpha: isCompact ? 0.62 : 0.22),
+                    SiteColors.surfaceInverse.withValues(
+                      alpha: isCompact ? 0.80 : 0.62,
+                    ),
+                    SiteColors.surfaceInverse.withValues(
+                      alpha: isCompact ? 0.62 : 0.22,
+                    ),
                   ],
                   stops: const [0.0, 0.5, 1.0],
                 ),
@@ -226,7 +226,8 @@ class _HeroPoster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Yürüyüş sırasında eklem noktalarının izlendiği biyomekanik '
+      label:
+          'Yürüyüş sırasında eklem noktalarının izlendiği biyomekanik '
           'ölçüm görüntüsü.',
       image: true,
       child: Image.asset(

@@ -24,10 +24,7 @@ Future<void> _pumpSite(WidgetTester tester, Widget page, Size size) async {
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    MaterialApp(
-      home: page,
-      onGenerateRoute: generateSiteRoute,
-    ),
+    MaterialApp(home: page, onGenerateRoute: generateSiteRoute),
   );
 
   // Hero'daki ölçüm animasyonunun tamamlanması için.
@@ -50,8 +47,9 @@ void main() {
 
   group('Ana sayfa', () {
     for (final entry in _breakpoints.entries) {
-      testWidgets('${entry.key} genişliğinde taşma vermeden çizilir',
-          (tester) async {
+      testWidgets('${entry.key} genişliğinde taşma vermeden çizilir', (
+        tester,
+      ) async {
         await _pumpSite(tester, const SiteHomePage(), entry.value);
 
         expect(tester.takeException(), isNull);
@@ -64,7 +62,6 @@ void main() {
       final texts = _visibleTexts(tester).join(' | ');
 
       // Hero
-      expect(texts, contains('DİJİTAL AYAK DENEYİMİ'));
       expect(
         texts,
         contains('Ayağınız tek bir kategoriye sığmayacak kadar eşsiz.'),
@@ -72,33 +69,27 @@ void main() {
       expect(
         texts,
         contains(
-          'Anatomik kategorilemeyle doğru tabanlıkla konforu hissedin.',
+          'Yapay Zeka Destekli Anatomik Kategorilemeyle doğru '
+          'tabanlıkla konforu hissedin.',
         ),
       );
       expect(texts, contains('Sürecimiz'));
-      expect(texts, contains('Randevu Al'));
+      expect(texts, contains('3D Tarama İçin Randevu Al'));
 
-      // §7.4 tabanlık teknolojileri — üç zorunlu kart
-      expect(texts, contains('Tabanlık Teknolojilerimiz'));
-      expect(texts, contains('Veri Güdümlü Anatomik Tabanlık'));
-      expect(texts, contains('Sporcular İçin Karbon Fiber Tabanlık'));
-      expect(texts, contains('OY Recovery Anatomik Toparlayıcı Sandalet'));
-      expect(texts, contains('SLA 3B'));
+      // Ürün bölümü — dört kart (V3: OY Sports Carbon eklendi)
+      expect(texts, contains('Veri Güdümlü Ayak Giyim Teknolojileri'));
+      expect(texts, contains('OY Orthopedic'));
+      expect(texts, contains('OY Sports'));
+      expect(texts, contains('OY Recovery'));
+      expect(texts, contains('OY Sports Carbon'));
 
-      // §7.6 önerilen model
-      expect(texts, contains('Balance Pro'));
-      expect(texts, contains('1.499 TL'));
+      // B2B — V3 "Kurumlara Özel Çözümler"
+      expect(texts, contains('KURUMLARA ÖZEL ÇÖZÜMLER'));
+      expect(texts, contains('KLİNİKLER'));
+      expect(texts, contains('SPOR KULÜPLERİ'));
+      expect(texts, contains('İŞ YERLERİ'));
 
-      // §7.7 üretim ve teslimat
-      expect(texts, contains('Üretim ve Teslimat Süreci'));
-      expect(texts, contains('Kapında'));
-
-      // §6.1 / §14 sağ aksiyon alanı — dar barda CTA kısa etiketle kalır.
       expect(texts, contains('Giriş Yap'));
-      expect(
-        texts,
-        anyOf(contains('Tarama İçin Randevu Al'), contains('Randevu Al')),
-      );
     });
 
     testWidgets('public dilde yasak kelimeleri kullanmaz', (tester) async {
@@ -153,17 +144,27 @@ void main() {
 
   group('Navigasyon', () {
     test('her menü bağlantısı tanımlı bir route’a gider', () {
+      // generateSiteRoute içinde ele alınan, sitePageContent'te olması
+      // gerekmeyen interaktif route'lar.
       final knownRoutes = {
         ...sitePageContent.keys,
         SiteRoutes.home,
         SiteRoutes.login,
+        SiteRoutes.taramaRandevusu,
+        SiteRoutes.taramaStandiBasvuru,
+        SiteRoutes.olcumMerkezleri,
+        SiteRoutes.iletisim,
+        SiteRoutes.haberler,
       };
+
+      // Sayfa içi çapa (#id) linklerinde yol kısmı karşılaştırılır.
+      String pathOf(String route) => Uri.parse(route).path;
 
       for (final item in siteNavigation) {
         if (item.route != null) {
           expect(
             knownRoutes,
-            contains(item.route),
+            contains(pathOf(item.route!)),
             reason: '${item.label} tanımsız route’a gidiyor: ${item.route}',
           );
         }
@@ -171,7 +172,7 @@ void main() {
         for (final link in item.children) {
           expect(
             knownRoutes,
-            contains(link.route),
+            contains(pathOf(link.route)),
             reason: '${link.label} tanımsız route’a gidiyor: ${link.route}',
           );
         }

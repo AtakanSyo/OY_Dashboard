@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../components/hero_video_section.dart';
-import '../components/selection_wizard.dart';
+import '../components/process_showcase.dart';
+import '../components/product_technology_card.dart';
 import '../components/site_buttons.dart';
-import '../components/site_cards.dart';
 import '../components/site_scaffold.dart';
 import '../components/site_section.dart';
 import '../site_routes.dart';
@@ -22,9 +23,7 @@ class SiteHomePage extends StatelessWidget {
         _HeroSection(),
         _ProcessSection(),
         _InsoleTechnologiesSection(),
-        _ModelFinderSection(),
-        _ProductionTimelineSection(),
-        _TestimonialsSection(),
+        _B2bServicesSection(),
       ],
     );
   }
@@ -54,33 +53,16 @@ class _HeroSection extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CaliperRule(color: SiteColors.primaryOnDark),
-                const SizedBox(width: SiteSpacing.md),
-                Flexible(
-                  child: Text(
-                    'DİJİTAL AYAK DENEYİMİ',
-                    overflow: TextOverflow.ellipsis,
-                    style: SiteType.dataLabel(
-                      context,
-                      color: SiteColors.primaryOnDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: SiteSpacing.x2),
             Text(
               'Ayağınız tek bir kategoriye sığmayacak kadar eşsiz.',
-              style: SiteType.hero(context).copyWith(
-                color: SiteColors.textInverse,
-              ),
+              style: SiteType.hero(
+                context,
+              ).copyWith(color: SiteColors.textInverse),
             ),
             const SizedBox(height: SiteSpacing.lg),
             Text(
-              'Anatomik kategorilemeyle doğru tabanlıkla konforu hissedin.',
+              'Yapay Zeka Destekli Anatomik Kategorilemeyle doğru '
+              'tabanlıkla konforu hissedin.',
               style: SiteType.h2(context).copyWith(
                 color: SiteColors.primaryOnDark,
                 fontWeight: FontWeight.w600,
@@ -93,9 +75,9 @@ class _HeroSection extends StatelessWidget {
                 '3D ayak tarama, basınç ölçümü ve akıllı değerlendirme ile '
                 'yürüyüşüne en uygun tabanlık yapısını keşfet. Teknolojiyle '
                 'desteklenen konforu deneyimle.',
-                style: SiteType.bodyLarge(context).copyWith(
-                  color: SiteColors.textOnMedia,
-                ),
+                style: SiteType.bodyLarge(
+                  context,
+                ).copyWith(color: SiteColors.textOnMedia),
               ),
             ),
             SizedBox(height: device.isMobile ? SiteSpacing.x3 : SiteSpacing.x4),
@@ -110,8 +92,7 @@ class _HeroSection extends StatelessWidget {
                   onPressed: () => SiteNav.go(context, SiteRoutes.nasilCalisir),
                 ),
                 PrimaryButton(
-                  label: 'Randevu Al',
-                  icon: Icons.event_available_outlined,
+                  label: '3D Tarama İçin Randevu Al',
                   size: SiteButtonSize.large,
                   onPressed: () =>
                       SiteNav.go(context, SiteRoutes.taramaRandevusu),
@@ -130,354 +111,653 @@ class _HeroSection extends StatelessWidget {
 class _ProcessSection extends StatelessWidget {
   const _ProcessSection();
 
-  static const List<({String title, String description, IconData icon})> _steps =
-      [
-    (
-      title: '3D Ayak Tarama',
-      description:
-          'Telefon kamerası ile ayağını 3 boyutlu olarak tararız.',
-      icon: Icons.center_focus_strong_outlined,
+  /// Patent bandı anahtarı.
+  ///
+  /// Başvuru 29.08.2026'da yapıldı; başvuru numarası henüz yok. Başvuru geri
+  /// çekilirse ya da tescil tamamlanıp metin değişirse burası tek satırda
+  /// kapatılır. Tescil öncesi "patentli teknoloji" ifadesi kullanılmaz.
+  static const bool _showPatentNotice = true;
+
+  /// Dört sahne. V3: her adım kartın tamamını dolduran bir görsel.
+  static const List<ProcessStep> _steps = [
+    ProcessStep(
+      number: '01',
+      category: '01 · Tarama',
+      title: '3D Biyomekanik Tarama',
+      body:
+          'Ayak geometrisi ve yük altındaki plantar basınç dağılımı aynı '
+          'ölçüm oturumunda dijitalleştirilir.',
+      image: 'assets/site/v3/source/process-real-scan-session.webp',
+      imageAlt: 'Gerçek bir 3D ayak tarama oturumu',
     ),
-    (
-      title: 'Basınç Ölçümü',
-      description:
-          'Basınç dağılımını ölçer, yürüme verilerini toplarız.',
-      icon: Icons.grain_outlined,
+    ProcessStep(
+      number: '02',
+      category: '02 · Değerlendirme',
+      title: 'Yapay Zekâ Destekli Anatomik Kategorileme',
+      body:
+          'Ölçüm verileri uzman etiketleriyle birlikte değerlendirilir; '
+          'anatomik kategori ve uyum skoru oluşturulur.',
+      image: 'assets/site/v3/generated/process-ai-categorization.webp',
+      imageAlt: '3D ayak ve basınç verisinin anatomik kategorilere ayrılması',
     ),
-    (
-      title: 'Akıllı Değerlendirme',
-      description:
-          'Verileri değerlendirerek senin için en uygun tabanlık yapısını belirleriz.',
-      icon: Icons.insights_outlined,
+    ProcessStep(
+      number: '03',
+      category: '03 · Üretim',
+      title: 'Veri Güdümlü Dijital Üretim',
+      body:
+          'Seçilen kategori ve ürün ailesine göre üretim geometrisi '
+          'hazırlanır; dijital üretim süreci başlatılır.',
+      image: 'assets/site/v3/generated/process-digital-production.webp',
+      imageAlt: 'Veri güdümlü dijital tabanlık üretimi',
     ),
-    (
-      title: 'Uygun Tabanlık ve Kargo',
-      description:
-          'Senin için üretilen tabanlığın kargoya verilir, kapına ulaştırılır.',
-      icon: Icons.inventory_2_outlined,
+    ProcessStep(
+      number: '04',
+      category: '04 · Takip',
+      title: 'Teslimat ve Dijital Takip',
+      body:
+          'Ürün kullanıcıya ulaştırılır; sonraki ölçümler aynı profil '
+          'üzerinden karşılaştırmalı olarak takip edilir.',
+      image: 'assets/site/v3/generated/process-delivery-tracking.webp',
+      imageAlt: 'Ürün teslimatı ve dijital takip ekranı',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final device = context.device;
+
     return SiteSection(
+      dense: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeading(
-            eyebrow: 'Süreç',
-            title: 'Dört adımda ayak profilinden ürüne',
-            description:
-                'Ölçümden teslimata kadar her adım aynı veri üzerinde ilerler. '
-                'Süreç boyunca hangi aşamada olduğunu görürsün.',
+          const _ProcessIntro(),
+          const SizedBox(height: SiteSpacing.x4),
+          const ProcessShowcase(
+            steps: _steps,
+            showPatentNotice: _showPatentNotice,
+            patentTitle:
+                'Anatomik kategorileme sistemimiz için patent başvurusu '
+                'yapıldı',
+            patentText:
+                '3D ayak geometrisi ve plantar basınç verilerinden anatomik '
+                'kategori ve uyum skoru oluşturan sistem için 29.08.2026 '
+                'tarihinde patent başvurusu gerçekleştirilmiştir.',
           ),
-          const SizedBox(height: SiteSpacing.x5),
-          SiteResponsiveGrid(
-            columns: 4,
-            tabletColumns: 2,
-            children: [
-              for (var i = 0; i < _steps.length; i++)
-                ProcessStepCard(
-                  index: i + 1,
-                  title: _steps[i].title,
-                  description: _steps[i].description,
-                  icon: _steps[i].icon,
-                ),
-            ],
-          ),
+          SizedBox(height: device.isCompact ? SiteSpacing.x2 : SiteSpacing.x3),
+          const _ProcessCta(),
         ],
       ),
+    );
+  }
+}
+
+/// Sürecimiz bölümü giriş bloğu (V3 metinleri).
+class _ProcessIntro extends StatelessWidget {
+  const _ProcessIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CaliperRule(),
+            const SizedBox(width: SiteSpacing.md),
+            Text('SÜRECİMİZ', style: SiteType.dataLabel(context)),
+          ],
+        ),
+        const SizedBox(height: SiteSpacing.lg),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Text(
+            'Eşsiz ayak yapınıza en uygun ortopedik tabanlığı bulun.',
+            style: SiteType.h2(context),
+          ),
+        ),
+        const SizedBox(height: SiteSpacing.lg),
+        RichText(
+          text: TextSpan(
+            style: SiteType.bodyLarge(context),
+            children: [
+              TextSpan(
+                text: 'Sole Doctor',
+                style: TextStyle(
+                  color: SiteColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const TextSpan(
+                text: ' - Ayak Sağlığı için Dijital Takip Üretim Hizmeti',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: SiteSpacing.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: Text(
+            '3D ayak geometrisi ve plantar basınç verileri tek bir dijital '
+            'profilde bir araya getirilir. Yapay zekâ destekli anatomik '
+            'kategorileme ve uzman değerlendirmesiyle ayak yapınıza en uygun '
+            'iç taban belirlenir; üretim, teslimat ve sonraki ölçümler aynı '
+            'sistem üzerinden takip edilir.',
+            style: SiteType.body(
+              context,
+            ).copyWith(color: SiteColors.textSecondary, height: 1.65),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bölüm sonu eylem alanı.
+class _ProcessCta extends StatelessWidget {
+  const _ProcessCta();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: SiteSpacing.md,
+          runSpacing: SiteSpacing.md,
+          children: [
+            PrimaryButton(
+              label: 'Ölçüm Noktalarını Gör',
+              icon: Icons.place_outlined,
+              size: SiteButtonSize.large,
+              onPressed: () => SiteNav.go(context, SiteRoutes.olcumMerkezleri),
+            ),
+            SecondaryButton(
+              label: 'Süreci İncele',
+              size: SiteButtonSize.large,
+              onPressed: () => SiteNav.go(context, SiteRoutes.nasilCalisir),
+            ),
+          ],
+        ),
+        const SizedBox(height: SiteSpacing.md),
+        Text(
+          'Ölçüm, değerlendirme ve ürün seçenekleri hakkında bilgi alın.',
+          style: SiteType.small(context),
+        ),
+      ],
     );
   }
 }
 
 // ── Tabanlık teknolojileri ───────────────────────────────────────────────────
 
-class _InsoleTechnologiesSection extends StatelessWidget {
+class _InsoleTechnologiesSection extends StatefulWidget {
   const _InsoleTechnologiesSection();
 
   @override
-  Widget build(BuildContext context) {
-    return SiteSection(
-      background: SiteColors.surfaceRaised,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeading(
-            eyebrow: 'Ürün Aileleri',
-            title: 'Tabanlık Teknolojilerimiz',
-            description:
-                'Farklı kullanım senaryoları için geliştirilen üç ana yapı. '
-                'Hangisinin size uygun olduğu ölçüm sonucuna göre belirlenir.',
-          ),
-          const SizedBox(height: SiteSpacing.x5),
-          SiteResponsiveGrid(
-            columns: 3,
-            tabletColumns: 2,
-            children: [
-              TechnologyCard(
-                imageAsset: 'assets/images/products/custom_insole.png',
-                title: 'Veri Güdümlü Anatomik Tabanlık',
-                description:
-                    'Günlük kullanım için tasarlandı. Ayak yapına uyum sağlar, '
-                    'gün boyu konfor sunar.',
-                onPressed: () =>
-                    SiteNav.go(context, SiteRoutes.tabanliklarGunluk),
-              ),
-              TechnologyCard(
-                imageAsset: 'assets/images/products/sport_insole.png',
-                title: 'Sporcular İçin Karbon Fiber Tabanlık',
-                description:
-                    'Hafif karbon fiber tabanla performansını artırır, darbe '
-                    'emilimini destekler.',
-                onPressed: () => SiteNav.go(context, SiteRoutes.tabanliklarSpor),
-              ),
-              TechnologyCard(
-                imageAsset: 'assets/images/products/recovery_sandal.png',
-                title: 'OY Recovery Anatomik Toparlayıcı Sandalet',
-                description:
-                    'SLA 3B teknolojisiyle kafes yapılı tasarım, hafiflik ve '
-                    'toparlayıcı destek sağlar.',
-                onPressed: () =>
-                    SiteNav.go(context, SiteRoutes.tabanliklarRecovery),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  State<_InsoleTechnologiesSection> createState() =>
+      _InsoleTechnologiesSectionState();
 }
 
-// ── Model bulucu ─────────────────────────────────────────────────────────────
+class _InsoleTechnologiesSectionState
+    extends State<_InsoleTechnologiesSection> {
+  static const String _v3 = 'assets/site/v3';
 
-class _ModelFinderSection extends StatefulWidget {
-  const _ModelFinderSection();
+  int? _flipped;
 
-  @override
-  State<_ModelFinderSection> createState() => _ModelFinderSectionState();
-}
-
-class _ModelFinderSectionState extends State<_ModelFinderSection> {
-  int _size = 42;
-  String _arch = 'Orta';
-  String _balance = 'Nötr';
-
-  void _showCartNotice() {
-    // TODO(entegrasyon): sepet akışı bağlanacak.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sepet akışı yakında bu sayfaya bağlanacak.'),
-        backgroundColor: SiteColors.surfaceInverse,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final device = context.device;
-
-    final wizard = SelectionWizard(
-      size: _size,
-      arch: _arch,
-      balance: _balance,
-      onSizeChanged: (value) => setState(() => _size = value),
-      onArchChanged: (value) => setState(() => _arch = value),
-      onBalanceChanged: (value) => setState(() => _balance = value),
-    );
-
-    final card = RecommendedProductCard(
-      badge: 'Sana Önerilen Model',
-      name: 'Balance Pro',
-      description:
-          'Dengeli yürüyüş için tasarlandı. Gün boyu konfor ve destek sağlar.',
-      features: const [
-        'Orta kemer desteği',
-        'Darbe emici yapı',
-        'Nefes alabilir üst yüzey',
+  static const List<ProductTechnology> _products = [
+    ProductTechnology(
+      category: 'VERİ GÜDÜMLÜ ANATOMİK TABANLIK',
+      name: 'OY Orthopedic',
+      slogan: 'Gün boyu dengeli destek.',
+      description: 'Günlük kullanımda konfor, denge ve anatomik uyum.',
+      frontImage: '$_v3/generated/product-daily-assembled.webp',
+      frontImageAlt: 'OY Orthopedic günlük anatomik tabanlık',
+      backImage: '$_v3/generated/product-daily-exploded.webp',
+      layers: [
+        ProductLayer(
+          'Antibakteriyel üst yüzey',
+          'Nemi yönetir, hijyeni destekleyen temas yüzeyi.',
+        ),
+        ProductLayer('Konfor katmanı', 'Temas basıncını yumuşatan yastıklama.'),
+        ProductLayer(
+          'Anatomik destek',
+          'Kavisi tarama verisine göre destekleyen çekirdek.',
+        ),
+        ProductLayer(
+          'Stabil taban',
+          'Adımda yanal salınımı sınırlayan alt yüzey.',
+        ),
       ],
-      price: '1.499 TL',
-      priceNote: 'KDV dahil',
-      imageAsset: 'assets/images/products/personal_insole.png',
-      onDetails: () => SiteNav.go(context, SiteRoutes.tabanliklarGunluk),
-      onAddToCart: _showCartNotice,
+    ),
+    ProductTechnology(
+      category: 'VERİ GÜDÜMLÜ SPORCU TABANLIĞI',
+      name: 'OY Sports',
+      slogan: 'Hareket için tasarlanan tepki.',
+      description: 'Darbe yönetimi ve stabilite odaklı performans yapısı.',
+      frontImage: '$_v3/source/product-sports-assembled.webp',
+      frontImageAlt: 'OY Sports performans tabanlığı',
+      backImage: '$_v3/generated/product-sports-exploded.webp',
+      layers: [
+        ProductLayer('Teknik üst yüzey', 'Teri ve sürtünmeyi yöneten kaplama.'),
+        ProductLayer(
+          'Tepkisel yastıklama',
+          'İniş kuvvetini emip adıma geri veren katman.',
+        ),
+        ProductLayer('Enerji yönetimi', 'Yükü tabana yayan ara katman.'),
+        ProductLayer(
+          'Stabilizasyon plakası',
+          'Hızlı yön değişiminde ayağı hizada tutan yapı.',
+        ),
+      ],
+    ),
+    ProductTechnology(
+      category: 'TOPARLAYICI SANDALET',
+      name: 'OY Recovery',
+      slogan: 'Günün sonunda daha yumuşak bir zemin.',
+      description: 'Konfor ve basınç dağılımı odaklı toparlanma yapısı.',
+      frontImage: '$_v3/source/product-recovery-assembled.webp',
+      frontImageAlt: 'OY Recovery toparlayıcı sandalet',
+      backImage: '$_v3/generated/product-recovery-exploded.webp',
+      layers: [
+        ProductLayer(
+          'Nefes alan üst bant',
+          'Ayağı saran, temas basıncını dağıtan bant.',
+        ),
+        ProductLayer(
+          'Konturlu ayak yatağı',
+          'Tabanı geniş alana yayan temas yüzeyi.',
+        ),
+        ProductLayer('Yumuşak ara taban', 'Adım yükünü yumuşatan katman.'),
+        ProductLayer('Dayanıklı dış taban', 'Kaymaz, esnek zemin teması.'),
+      ],
+    ),
+    ProductTechnology(
+      category: 'KARBON DESTEK MİMARİSİ',
+      name: 'OY Sports Carbon',
+      slogan: 'Karbon stabilite. Kontrollü enerji.',
+      description:
+          'Yüksek tempolu kullanım için hafif ve rijit destek mimarisi.',
+      frontImage: '$_v3/generated/product-carbon-assembled.webp',
+      frontImageAlt: 'Karbon fiberli sporcu tabanlığı',
+      backImage: '$_v3/generated/product-carbon-exploded.webp',
+      carbon: true,
+      layers: [
+        ProductLayer(
+          'Nefes alan üst yüzey',
+          'Nemi uzaklaştıran ince temas katmanı.',
+        ),
+        ProductLayer(
+          'Tepkisel yastıklama',
+          'Darbeyi emip enerjiyi geri veren katman.',
+        ),
+        ProductLayer(
+          'Karbon fiber plaka',
+          'Burulmaya direnç veren rijit orta katman.',
+        ),
+        ProductLayer('Grafit taban gövdesi', 'Hafif, dayanıklı alt gövde.'),
+      ],
+    ),
+  ];
+
+  void _toggle(int index) {
+    setState(() => _flipped = _flipped == index ? null : index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = context.device.isCompact;
+
+    final textBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CaliperRule(),
+            const SizedBox(width: SiteSpacing.md),
+            Flexible(
+              child: Text(
+                'OPTIYOU TEKNOLOJİ GİYİM ÜRÜNLERİ',
+                overflow: TextOverflow.ellipsis,
+                style: SiteType.dataLabel(context),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: SiteSpacing.lg),
+        Text(
+          'Veri Güdümlü Ayak Giyim Teknolojileri',
+          style: SiteType.h2(context),
+        ),
+        const SizedBox(height: SiteSpacing.lg),
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: SiteBreakpoints.proseMaxWidth,
+          ),
+          child: Text(
+            'Her kullanım senaryosuna farklı bir katman mimarisi. Karta '
+            'dokunarak katmanlı görünüme geçin.',
+            style: SiteType.bodyLarge(context),
+          ),
+        ),
+      ],
     );
 
+    final cta = SecondaryButton(
+      label: 'Tüm ürünleri incele',
+      size: SiteButtonSize.large,
+      onPressed: () => SiteNav.go(context, SiteRoutes.tabanliklar),
+    );
+
+    final cardHeight = compact ? 620.0 : 600.0;
+
     return SiteSection(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeading(
-            eyebrow: 'Model Bulucu',
-            title: 'Sana En Uygun Modeli Bulalım',
-            description:
-                'Numara, kemer tipi ve yürüme dengeni seç; hangi yapının öne '
-                'çıktığını gör. Kesin uyum taramadan sonra netleşir.',
+      dense: true,
+      background: SiteColors.surfaceRaised,
+      child: FocusableActionDetector(
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
+        },
+        actions: <Type, Action<Intent>>{
+          DismissIntent: CallbackAction<DismissIntent>(
+            onInvoke: (_) {
+              if (_flipped != null) setState(() => _flipped = null);
+              return null;
+            },
           ),
-          const SizedBox(height: SiteSpacing.x5),
-          if (device.isMobile)
-            Column(
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (compact)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  textBlock,
+                  const SizedBox(height: SiteSpacing.lg),
+                  cta,
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(child: textBlock),
+                  const SizedBox(width: SiteSpacing.x2),
+                  cta,
+                ],
+              ),
+            const SizedBox(height: SiteSpacing.x3),
+            SiteResponsiveGrid(
+              columns: 4,
+              tabletColumns: 2,
               children: [
-                wizard,
-                const SizedBox(height: SiteSpacing.x2),
-                card,
-              ],
-            )
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: wizard),
-                const SizedBox(width: SiteSpacing.x3),
-                Expanded(flex: 6, child: card),
+                for (var i = 0; i < _products.length; i++)
+                  SizedBox(
+                    height: cardHeight,
+                    child: ProductTechnologyCard(
+                      data: _products[i],
+                      flipped: _flipped == i,
+                      onToggle: () => _toggle(i),
+                    ),
+                  ),
               ],
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Üretim ve teslimat ───────────────────────────────────────────────────────
+// ── B2B: Kurumlara özel çözümler ─────────────────────────────────────────────
 
-class _ProductionTimelineSection extends StatelessWidget {
-  const _ProductionTimelineSection();
+class _B2bSegment {
+  const _B2bSegment({
+    required this.eyebrow,
+    required this.title,
+    required this.detail,
+    required this.ctaLabel,
+    required this.route,
+    required this.image,
+    required this.imageAlt,
+  });
 
-  static const List<({String label, IconData icon})> _steps = [
-    (label: 'Siparişin Alınır', icon: Icons.receipt_long_outlined),
-    (label: 'Üretime Hazırlanır', icon: Icons.tune_outlined),
-    (label: 'Üretim Tamamlanır', icon: Icons.precision_manufacturing_outlined),
-    (label: 'Kargoya Verilir', icon: Icons.local_shipping_outlined),
-    (label: 'Kapında', icon: Icons.home_outlined),
+  final String eyebrow;
+  final String title;
+  final String detail;
+  final String ctaLabel;
+  final String route;
+  final String image;
+  final String imageAlt;
+}
+
+class _B2bServicesSection extends StatelessWidget {
+  const _B2bServicesSection();
+
+  static const String _v3 = 'assets/site/v3/generated';
+
+  static const List<_B2bSegment> _segments = [
+    _B2bSegment(
+      eyebrow: 'KLİNİKLER',
+      title: 'Ölçümden ürün teslimine kadar tek dijital iş akışı.',
+      detail:
+          'Uzman görüşünü 3D ayak ve plantar basınç verileriyle aynı kullanıcı '
+          'profilinde yönetin.',
+      ctaLabel: 'Klinik çözümünü incele',
+      route: SiteRoutes.cozumlerKlinikler,
+      image: '$_v3/b2b-clinics.webp',
+      imageAlt: 'Klinikte düşük tarama platformunda ayak taraması',
+    ),
+    _B2bSegment(
+      eyebrow: 'SPOR KULÜPLERİ',
+      title: 'Her sporcuyu aynı ölçüm standardıyla takip edin.',
+      detail:
+          'Sporcu bazlı ölçüm, ürün yönlendirmesi ve dönemsel karşılaştırma '
+          'akışı.',
+      ctaLabel: 'Spor kulübü çözümünü incele',
+      route: SiteRoutes.iletisim,
+      image: '$_v3/b2b-sports-clubs.webp',
+      imageAlt: 'Spor bilimleri ortamında ayak tarama platformu',
+    ),
+    _B2bSegment(
+      eyebrow: 'İŞ YERLERİ',
+      title: 'Ayakta çalışan ekipler için planlı toplu tarama.',
+      detail:
+          'İş yerinde mobil ölçüm, kullanıcı gruplama ve ürün teslimini tek '
+          'programda yönetin.',
+      ctaLabel: 'Kurumsal programı incele',
+      route: SiteRoutes.cozumlerIsYerleri,
+      image: '$_v3/b2b-workplaces.webp',
+      imageAlt: 'İş yerinde planlı toplu ayak tarama',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final device = context.device;
-    final horizontal = device.isDesktop;
-
     return SiteSection(
       inverse: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeading(
-            eyebrow: 'Üretim',
-            title: 'Üretim ve Teslimat Süreci',
+          const SectionHeading(
+            eyebrow: 'KURUMLARA ÖZEL ÇÖZÜMLER',
+            title:
+                'Ayak sağlığı verisini kurumunuz için ölçülebilir bir '
+                'hizmete dönüştürün.',
             description:
-                'Siparişin hangi aşamada olduğunu takip edebilirsin. Üretim '
-                'kendi laboratuvarımızda yapılır.',
+                'Klinikler, spor kulüpleri ve iş yerleri için tarama, ürün '
+                'yönlendirme ve dijital takip süreçlerini tek hizmet modelinde '
+                'birleştiriyoruz. Kuruma özel ölçüm planı ve düzenli takip '
+                'akışıyla süreci ölçeklenebilir hâle getiriyoruz.',
             inverse: true,
           ),
-          const SizedBox(height: SiteSpacing.x5),
-          if (horizontal)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < _steps.length; i++) ...[
-                  if (i > 0)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 26),
-                        child: Container(
-                          height: 1,
-                          color: SiteColors.borderInverse,
-                        ),
-                      ),
-                    ),
-                  SizedBox(
-                    width: 150,
-                    child: TimelineStep(
-                      index: i + 1,
-                      total: _steps.length,
-                      label: _steps[i].label,
-                      icon: _steps[i].icon,
-                      horizontal: true,
-                    ),
-                  ),
-                ],
-              ],
-            )
-          else
-            Column(
-              children: [
-                for (var i = 0; i < _steps.length; i++) ...[
-                  if (i > 0) const SizedBox(height: SiteSpacing.xl),
-                  TimelineStep(
-                    index: i + 1,
-                    total: _steps.length,
-                    label: _steps[i].label,
-                    icon: _steps[i].icon,
-                    horizontal: false,
-                  ),
-                ],
-              ],
-            ),
+          const SizedBox(height: SiteSpacing.x4),
+          SiteResponsiveGrid(
+            columns: 3,
+            tabletColumns: 1,
+            children: [
+              for (final segment in _segments) _B2bImageCard(segment: segment),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Yorumlar ─────────────────────────────────────────────────────────────────
+class _B2bImageCard extends StatefulWidget {
+  const _B2bImageCard({required this.segment});
 
-class _TestimonialsSection extends StatelessWidget {
-  const _TestimonialsSection();
+  final _B2bSegment segment;
 
-  static const List<({String name, int rating, String comment, String role})>
-      _testimonials = [
-    (
-      name: 'Mert K.',
-      rating: 5,
-      comment:
-          'Gün boyu ayaktayım. Ölçümden sonra önerilen tabanlıkla akşam '
-          'yorgunluğunun belirgin şekilde azaldığını fark ettim.',
-      role: 'Günlük tabanlık kullanıcısı',
-    ),
-    (
-      name: 'Seda A.',
-      rating: 5,
-      comment:
-          'Tarama iki dakika sürdü. Basış dağılımımı ekranda görmek, doğru '
-          'ürünü seçerken çok işime yaradı.',
-      role: 'Ölçüm merkezi ziyaretçisi',
-    ),
-    (
-      name: 'Emre T.',
-      rating: 4,
-      comment:
-          'Koşu sonrası toparlanmam hızlandı. Karbon fiber taban hafif ve '
-          'destek hissi net.',
-      role: 'Spor tabanlığı kullanıcısı',
-    ),
-  ];
+  @override
+  State<_B2bImageCard> createState() => _B2bImageCardState();
+}
+
+class _B2bImageCardState extends State<_B2bImageCard> {
+  bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
-    return SiteSection(
-      background: SiteColors.surfaceRaised,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeading(
-            eyebrow: 'Kullanıcılar',
-            title: 'Deneyimi yaşayanlar ne diyor?',
+    final s = widget.segment;
+    final lifted = _hovered || _focused;
+    final motion = SiteMotion.duration(
+      context,
+      const Duration(milliseconds: 420),
+    );
+
+    return Semantics(
+      button: true,
+      label: '${s.eyebrow}: ${s.title}',
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: (v) => setState(() => _hovered = v),
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              SiteNav.go(context, s.route);
+              return null;
+            },
           ),
-          const SizedBox(height: SiteSpacing.x5),
-          SiteResponsiveGrid(
-            columns: 3,
-            tabletColumns: 2,
-            children: [
-              for (final item in _testimonials)
-                TestimonialCard(
-                  name: item.name,
-                  rating: item.rating,
-                  comment: item.comment,
-                  context_: item.role,
-                ),
-            ],
+        },
+        child: GestureDetector(
+          onTap: () => SiteNav.go(context, s.route),
+          child: Container(
+            height: 560,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.circular(28)),
+              border: Border.all(
+                color: _focused ? SiteColors.focus : SiteColors.borderInverse,
+                width: _focused ? 2 : 1,
+              ),
+              boxShadow: lifted ? SiteShadows.cardHover : SiteShadows.card,
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(28)),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Semantics(
+                    image: true,
+                    label: s.imageAlt,
+                    child: AnimatedScale(
+                      duration: motion,
+                      scale: lifted ? 1.035 : 1,
+                      child: Image.asset(
+                        s.image,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (context, error, stack) =>
+                            const ColoredBox(
+                              color: SiteColors.surfaceInverseRaised,
+                            ),
+                      ),
+                    ),
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0.25, 0.77, 1.0],
+                        colors: [
+                          Color(0x0D0E1F22),
+                          Color(0xED0E1F22),
+                          Color(0xFC0E1F22),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: SiteSpacing.xl,
+                    right: SiteSpacing.xl,
+                    bottom: SiteSpacing.xl,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          s.eyebrow,
+                          style: SiteType.dataLabel(
+                            context,
+                            color: SiteColors.primaryOnDark,
+                          ),
+                        ),
+                        const SizedBox(height: SiteSpacing.sm),
+                        Text(
+                          s.title,
+                          style: SiteType.h3(context).copyWith(
+                            color: SiteColors.textInverse,
+                            fontSize: 22,
+                          ),
+                        ),
+                        const SizedBox(height: SiteSpacing.sm),
+                        Text(
+                          s.detail,
+                          style: SiteType.body(context).copyWith(
+                            color: SiteColors.textOnMedia,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: SiteSpacing.lg),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  s.ctaLabel,
+                                  style: SiteType.action(context, strong: true)
+                                      .copyWith(
+                                        color: lifted
+                                            ? SiteColors.primaryOnDark
+                                            : SiteColors.textInverse,
+                                      ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward,
+                                size: 18,
+                                color: lifted
+                                    ? SiteColors.primaryOnDark
+                                    : SiteColors.textInverse,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,0 +1,5 @@
+product_id,name,price,category,description,image,recommended_for,in_stock,popularity_score,tags
+PRD001,Ortopedik Tabanlık 1,349.00,tabanlik,Yüksek konforlu tabanlık,assets/images/tb1.png,flatfoot,true,87,"ortopedik, konfor"
+PRD002,Halluks Gecesi Ateli,199.00,ateller,Halluks valgus düzeltici aparat,assets/images/hallux1.png,hallux,true,82,"hallux, atel"
+PRD003,Topuk Destek Pedi,129.00,ped,Topuk ağrısı için yumuşak jel destek,assets/images/heel_pad.png,heelpain,true,74,"topuk, destek"
+PRD004,Çocuk Ortopedik Set,299.00,cocuk,Çocuklara özel destekleyici tabanlık seti,assets/images/kidset.png,children,true,91,"çocuk, tabanlık"

@@ -45,8 +45,8 @@ class _PrimaryButtonState extends State<PrimaryButton> {
     final background = !enabled
         ? SiteColors.border
         : _hovered
-            ? SiteColors.primaryHover
-            : SiteColors.primary;
+        ? SiteColors.primaryHover
+        : SiteColors.primary;
 
     return _SiteButtonShell(
       onPressed: widget.onPressed,
@@ -113,8 +113,8 @@ class _SecondaryButtonState extends State<SecondaryButton> {
     final foreground = widget.onDark
         ? SiteColors.textInverse
         : _hovered
-            ? SiteColors.primaryHover
-            : SiteColors.textPrimary;
+        ? SiteColors.primaryHover
+        : SiteColors.textPrimary;
 
     final borderColor = widget.onDark
         ? (_hovered ? SiteColors.textInverse : SiteColors.borderInverse)
@@ -122,8 +122,8 @@ class _SecondaryButtonState extends State<SecondaryButton> {
 
     final background = _hovered
         ? (widget.onDark
-            ? SiteColors.textInverse.withValues(alpha: 0.08)
-            : SiteColors.primarySoft)
+              ? SiteColors.textInverse.withValues(alpha: 0.08)
+              : SiteColors.primarySoft)
         : Colors.transparent;
 
     return _SiteButtonShell(
@@ -236,7 +236,10 @@ class _ButtonContent extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: SiteType.action(context, strong: true).copyWith(color: color),
+            style: SiteType.action(
+              context,
+              strong: true,
+            ).copyWith(color: color),
           ),
         ),
       ],
@@ -274,8 +277,9 @@ class _SiteButtonShell extends StatelessWidget {
       enabled: enabled,
       child: FocusableActionDetector(
         enabled: enabled,
-        mouseCursor:
-            enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        mouseCursor: enabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
         onShowHoverHighlight: onHover,
         onShowFocusHighlight: onFocus,
         actions: {

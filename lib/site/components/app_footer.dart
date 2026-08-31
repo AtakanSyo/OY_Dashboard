@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../content/site_contact.dart';
 import '../site_routes.dart';
 import '../theme/site_responsive.dart';
 import '../theme/site_tokens.dart';
@@ -31,7 +32,10 @@ class AppFooter extends StatelessWidget {
         title: 'Keşfet',
         links: [
           SiteNavLink('Nasıl Çalışır?', SiteRoutes.nasilCalisir),
-          SiteNavLink('Anatomik Kategorilerimiz', SiteRoutes.anatomikKategoriler),
+          SiteNavLink(
+            'Anatomik Kategorilerimiz',
+            SiteRoutes.anatomikKategoriler,
+          ),
           SiteNavLink('Teknolojilerimiz', SiteRoutes.teknolojiler),
           SiteNavLink('Ölçüm Merkezleri', SiteRoutes.olcumMerkezleri),
           SiteNavLink('SSS', SiteRoutes.sss),
@@ -47,7 +51,6 @@ class AppFooter extends StatelessWidget {
           SiteNavLink('İletişim', SiteRoutes.iletisim),
         ],
       ),
-      const NewsletterForm(),
     ];
 
     return Container(
@@ -69,14 +72,11 @@ class AppFooter extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Expanded(flex: 4, child: _FooterBrand()),
+                    const Expanded(flex: 5, child: _FooterBrand()),
                     const SizedBox(width: SiteSpacing.x5),
                     for (var i = 0; i < columns.length; i++) ...[
                       if (i > 0) const SizedBox(width: SiteSpacing.x3),
-                      Expanded(
-                        flex: i == columns.length - 1 ? 4 : 3,
-                        child: columns[i],
-                      ),
+                      Expanded(flex: 3, child: columns[i]),
                     ],
                   ],
                 )
@@ -113,9 +113,9 @@ class AppFooter extends StatelessWidget {
                 children: [
                   Text(
                     '© ${DateTime.now().year} OPTIYOU',
-                    style: SiteType.small(context).copyWith(
-                      color: SiteColors.textInverseSecondary,
-                    ),
+                    style: SiteType.small(
+                      context,
+                    ).copyWith(color: SiteColors.textInverseSecondary),
                   ),
                   SiteTextLink(
                     label: 'Gizlilik Politikası',
@@ -166,13 +166,55 @@ class _FooterBrand extends StatelessWidget {
             'Dijital ayak ölçümü, veri güdümlü değerlendirme, uygun ürün '
             'seçimi, üretim ve takip altyapısını bir araya getiren yeni nesil '
             'ayak deneyimi platformu.',
-            style: SiteType.small(context).copyWith(
-              color: SiteColors.textInverseSecondary,
-              height: 1.65,
-            ),
+            style: SiteType.small(
+              context,
+            ).copyWith(color: SiteColors.textInverseSecondary, height: 1.65),
           ),
         ),
+        const SizedBox(height: SiteSpacing.lg),
+        _FooterContactLine(Icons.mail_outline, SiteContact.email),
+        _FooterContactLine(
+          Icons.call_outlined,
+          'İzmir · ${SiteContact.phoneIzmir}',
+        ),
+        _FooterContactLine(
+          Icons.call_outlined,
+          'İstanbul · ${SiteContact.phoneIstanbul}',
+        ),
+        _FooterContactLine(
+          Icons.location_on_outlined,
+          SiteContact.addressShort,
+        ),
       ],
+    );
+  }
+}
+
+class _FooterContactLine extends StatelessWidget {
+  const _FooterContactLine(this.icon, this.text);
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SiteSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: SiteColors.primaryOnDark),
+          const SizedBox(width: SiteSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: SiteType.small(
+                context,
+              ).copyWith(color: SiteColors.textInverseSecondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -202,123 +244,6 @@ class _FooterColumn extends StatelessWidget {
               onPressed: () => SiteNav.go(context, link.route),
             ),
           ),
-      ],
-    );
-  }
-}
-
-/// Bülten kayıt formu.
-///
-/// Superspec §4.3: gerçek backend uydurulmaz. Form yalnızca istemci tarafı
-/// doğrulama yapar ve gönderim noktası entegrasyon için açık bırakılmıştır.
-class NewsletterForm extends StatefulWidget {
-  const NewsletterForm({super.key});
-
-  @override
-  State<NewsletterForm> createState() => _NewsletterFormState();
-}
-
-class _NewsletterFormState extends State<NewsletterForm> {
-  final TextEditingController _controller = TextEditingController();
-
-  String? _error;
-  bool _submitted = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final email = _controller.text.trim();
-    final valid = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
-
-    if (!valid) {
-      setState(() {
-        _error = 'Geçerli bir e-posta adresi girin.';
-        _submitted = false;
-      });
-      return;
-    }
-
-    // TODO(entegrasyon): bülten kaydı servis bağlantısı eklenecek.
-    setState(() {
-      _error = null;
-      _submitted = true;
-      _controller.clear();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'BÜLTEN',
-          style: SiteType.dataLabel(context, color: SiteColors.textInverse),
-        ),
-        const SizedBox(height: SiteSpacing.lg),
-        Text(
-          'Yeni ürünler, ölçüm merkezleri ve proje gelişmeleri için e-posta '
-          'listemize katılın.',
-          style: SiteType.small(context).copyWith(
-            color: SiteColors.textInverseSecondary,
-            height: 1.6,
-          ),
-        ),
-        const SizedBox(height: SiteSpacing.lg),
-        TextField(
-          controller: _controller,
-          style: SiteType.small(context).copyWith(
-            color: SiteColors.textInverse,
-          ),
-          decoration: InputDecoration(
-            hintText: 'ornek@eposta.com',
-            hintStyle: SiteType.small(context).copyWith(
-              color: SiteColors.textInverseSecondary,
-            ),
-            errorText: _error,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: SiteSpacing.md,
-              vertical: SiteSpacing.md,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: SiteRadius.buttonRadius,
-              borderSide: const BorderSide(color: SiteColors.borderInverse),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: SiteRadius.buttonRadius,
-              borderSide: const BorderSide(color: SiteColors.primary, width: 2),
-            ),
-          ),
-          onSubmitted: (_) => _submit(),
-        ),
-        const SizedBox(height: SiteSpacing.md),
-        PrimaryButton(label: 'Kaydol', expand: true, onPressed: _submit),
-        if (_submitted) ...[
-          const SizedBox(height: SiteSpacing.md),
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                size: 16,
-                color: SiteColors.primary,
-              ),
-              const SizedBox(width: SiteSpacing.sm),
-              Expanded(
-                child: Text(
-                  'Kaydınız alındı.',
-                  style: SiteType.small(context).copyWith(
-                    color: SiteColors.textInverse,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }

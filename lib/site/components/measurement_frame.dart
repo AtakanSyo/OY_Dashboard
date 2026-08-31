@@ -24,10 +24,7 @@ class _MeasurementFrameState extends State<MeasurementFrame>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: SiteMotion.reveal,
-    );
+    _controller = AnimationController(vsync: this, duration: SiteMotion.reveal);
   }
 
   @override
@@ -53,7 +50,8 @@ class _MeasurementFrameState extends State<MeasurementFrame>
     final height = device.responsiveHeight;
 
     return Semantics(
-      label: 'Ayak profili ölçüm görseli: ayak konturu, örnek ölçü çizgileri, '
+      label:
+          'Ayak profili ölçüm görseli: ayak konturu, örnek ölçü çizgileri, '
           'basınç dağılımı ısı haritası ve iki tabanlık görseli.',
       image: true,
       child: SizedBox(
@@ -124,9 +122,7 @@ class _ScanCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: CustomPaint(painter: _GraphPaperPainter()),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _GraphPaperPainter())),
           Positioned(
             left: SiteSpacing.lg,
             top: SiteSpacing.lg,
@@ -283,10 +279,7 @@ class _MeasurementTag extends StatelessWidget {
                 style: SiteType.dataLabel(context).copyWith(fontSize: 9),
               ),
               const SizedBox(height: 1),
-              Text(
-                value,
-                style: SiteType.numeric(context, size: 14),
-              ),
+              Text(value, style: SiteType.numeric(context, size: 14)),
             ],
           ),
         ),
@@ -360,11 +353,7 @@ class _CaliperPainter extends CustomPainter {
     canvas.drawLine(Offset(left, top), Offset(left, verticalEnd), paint);
     canvas.drawLine(Offset(left - 6, top), Offset(left + 6, top), tick);
     if (progress > 0.98) {
-      canvas.drawLine(
-        Offset(left - 6, bottom),
-        Offset(left + 6, bottom),
-        tick,
-      );
+      canvas.drawLine(Offset(left - 6, bottom), Offset(left + 6, bottom), tick);
     }
 
     // Yatay genişlik kumpası (ön ayak hizası).

@@ -16,12 +16,17 @@ class SiteSection extends StatelessWidget {
 
   final EdgeInsets? padding;
 
+  /// Dikey ritmi yarıya indirir. Art arda gelen ve birlikte tek ekrana
+  /// sığması istenen bölümler için (ör. "Sürecimiz" + teknoloji platformu).
+  final bool dense;
+
   const SiteSection({
     super.key,
     required this.child,
     this.inverse = false,
     this.background,
     this.padding,
+    this.dense = false,
   });
 
   @override
@@ -30,11 +35,13 @@ class SiteSection extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      color: background ??
+      color:
+          background ??
           (inverse ? SiteColors.surfaceInverse : SiteColors.surface),
-      padding: padding ??
+      padding:
+          padding ??
           EdgeInsets.symmetric(
-            vertical: device.sectionSpacing,
+            vertical: dense ? device.sectionSpacing / 2 : device.sectionSpacing,
             horizontal: device.gutter,
           ),
       child: Center(
@@ -130,8 +137,9 @@ class SectionHeading extends StatelessWidget {
     final accent = inverse ? SiteColors.textInverse : SiteColors.primary;
 
     return Column(
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,

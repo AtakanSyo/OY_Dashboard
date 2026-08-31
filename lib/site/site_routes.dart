@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'content/site_page_content.dart';
+import 'pages/scan_appointment_page.dart';
 import 'pages/site_content_page.dart';
 import 'pages/site_home_page.dart';
+import 'pages/site_utility_pages.dart';
 
 /// Public site route adları — Superspec §8.1.
 ///
@@ -168,22 +170,22 @@ const List<SiteNavItem> siteNavigation = [
     children: [
       SiteNavLink(
         '3D Ayak Tarama',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#3d-ayak-tarama',
         description: 'Ayak geometrisinin üç boyutlu kaydı.',
       ),
       SiteNavLink(
         'Basınç Ölçümü',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#basinc-olcumu',
         description: 'Basış dağılımının görünür hâle getirilmesi.',
       ),
       SiteNavLink(
         'Yapay Zekâ Destekli Değerlendirme',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#yz-degerlendirme',
         description: 'Ölçüm verisinden uyum sınıfına giden yol.',
       ),
       SiteNavLink(
         'Üretim ve Tarama Teknolojilerimiz',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#uretim-tarama',
         description: 'Tarama donanımı ve üretim hattı.',
       ),
       SiteNavLink(
@@ -193,12 +195,12 @@ const List<SiteNavItem> siteNavigation = [
       ),
       SiteNavLink(
         'Kalite ve Doğruluk',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#kalite-dogruluk',
         description: 'Ölçüm doğruluğu ve tekrarlanabilirlik.',
       ),
       SiteNavLink(
         'Veri Güvenliği',
-        SiteRoutes.teknolojiler,
+        '${SiteRoutes.teknolojiler}#veri-guvenligi',
         description: 'Ölçüm verisinin saklanması ve korunması.',
       ),
     ],
@@ -262,6 +264,36 @@ Route<dynamic>? generateSiteRoute(RouteSettings settings) {
     return _siteRoute(const SiteHomePage(), settings);
   }
 
+  // "Tarama Yap" akışı: statik içerik yerine interaktif randevu / kurumsal
+  // talep formu. `?kurumsal=1` doğrudan kurumsal sekmesini açar.
+  if (path == SiteRoutes.taramaRandevusu) {
+    final query = Uri.tryParse(rawName)?.queryParameters ?? const {};
+    final corporate = query['kurumsal'] == '1' || query['corporate'] == '1';
+    return _siteRoute(
+      ScanAppointmentPage(initialCorporate: corporate),
+      settings,
+    );
+  }
+
+  // Tarama standı başvurusu kurumsal talep formuyla aynı akışı kullanır.
+  if (path == SiteRoutes.taramaStandiBasvuru) {
+    return _siteRoute(
+      const ScanAppointmentPage(initialCorporate: true),
+      settings,
+    );
+  }
+
+  // Durum tutan yardımcı sayfalar (arama/filtre/form).
+  if (path == SiteRoutes.olcumMerkezleri) {
+    return _siteRoute(const MeasurementCentersPage(), settings);
+  }
+  if (path == SiteRoutes.iletisim) {
+    return _siteRoute(const ContactPage(), settings);
+  }
+  if (path == SiteRoutes.haberler) {
+    return _siteRoute(const NewsPage(), settings);
+  }
+
   final content = sitePageContent[path];
   if (content == null) return null;
 
@@ -269,8 +301,5 @@ Route<dynamic>? generateSiteRoute(RouteSettings settings) {
 }
 
 MaterialPageRoute<dynamic> _siteRoute(Widget page, RouteSettings settings) {
-  return MaterialPageRoute<dynamic>(
-    builder: (_) => page,
-    settings: settings,
-  );
+  return MaterialPageRoute<dynamic>(builder: (_) => page, settings: settings);
 }

@@ -20,7 +20,11 @@ class SiteType {
   /// cümlelik başlıkta 52 px, "Edin." gibi tek kelimelik öksüz satırlar
   /// bırakıyordu; ölçek bir kademe indirilerek cümleler dengeli kırılıyor.
   static TextStyle hero(BuildContext context) {
-    final size = context.responsive<double>(mobile: 32, tablet: 38, desktop: 46);
+    final size = context.responsive<double>(
+      mobile: 32,
+      tablet: 38,
+      desktop: 46,
+    );
     return GoogleFonts.montserrat(
       fontSize: size,
       height: 1.12,
@@ -31,7 +35,11 @@ class SiteType {
   }
 
   static TextStyle h1(BuildContext context) {
-    final size = context.responsive<double>(mobile: 28, tablet: 34, desktop: 38);
+    final size = context.responsive<double>(
+      mobile: 28,
+      tablet: 34,
+      desktop: 38,
+    );
     return GoogleFonts.montserrat(
       fontSize: size,
       height: 1.18,
@@ -42,7 +50,11 @@ class SiteType {
   }
 
   static TextStyle h2(BuildContext context) {
-    final size = context.responsive<double>(mobile: 24, tablet: 27, desktop: 30);
+    final size = context.responsive<double>(
+      mobile: 24,
+      tablet: 27,
+      desktop: 30,
+    );
     return GoogleFonts.montserrat(
       fontSize: size,
       height: 1.22,
@@ -65,7 +77,11 @@ class SiteType {
   // ── Gövde (Public Sans) ──────────────────────────────────────────────────
 
   static TextStyle bodyLarge(BuildContext context) {
-    final size = context.responsive<double>(mobile: 16, tablet: 17, desktop: 18);
+    final size = context.responsive<double>(
+      mobile: 16,
+      tablet: 17,
+      desktop: 18,
+    );
     return GoogleFonts.publicSans(
       fontSize: size,
       height: 1.62,

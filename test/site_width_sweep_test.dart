@@ -12,7 +12,6 @@ String? _lastErrorDump;
 void main() {
   setUpAll(() {
     GoogleFonts.config.allowRuntimeFetching = false;
-
   });
 
   testWidgets('ana sayfa 360–1600 px aralığında taşma vermez', (tester) async {
@@ -25,7 +24,7 @@ void main() {
     };
     addTearDown(() => FlutterError.onError = previousOnError);
 
-    for (var width = 360.0; width <= 1600; width += 20) {
+    for (var width = 320.0; width <= 1920; width += 20) {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = Size(width, 1000);
 

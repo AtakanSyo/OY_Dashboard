@@ -69,7 +69,8 @@ class SiteColors {
   static const Color focus = SitePrimitives.pineGreen;
 
   /// Primary rengin düşük yoğunluklu zemin varyantı (chip, ikon kutusu).
-  static Color get primarySoft => SitePrimitives.pineGreen.withValues(alpha: 0.10);
+  static Color get primarySoft =>
+      SitePrimitives.pineGreen.withValues(alpha: 0.10);
 
   /// Primary rengin border varyantı.
   static Color get primarySoftBorder =>
@@ -106,8 +107,12 @@ class SiteRadius {
   static const double pill = 999;
 
   static const BorderRadius cardRadius = BorderRadius.all(Radius.circular(lg));
-  static const BorderRadius buttonRadius = BorderRadius.all(Radius.circular(md));
-  static const BorderRadius chipRadius = BorderRadius.all(Radius.circular(pill));
+  static const BorderRadius buttonRadius = BorderRadius.all(
+    Radius.circular(md),
+  );
+  static const BorderRadius chipRadius = BorderRadius.all(
+    Radius.circular(pill),
+  );
 }
 
 /// Gölge tanımları. Marka dili "temiz + mühendislik hassasiyeti" olduğu için
@@ -116,36 +121,36 @@ class SiteShadows {
   const SiteShadows._();
 
   static List<BoxShadow> get card => [
-        BoxShadow(
-          color: SitePrimitives.deepTeal.withValues(alpha: 0.06),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ];
+    BoxShadow(
+      color: SitePrimitives.deepTeal.withValues(alpha: 0.06),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+  ];
 
   static List<BoxShadow> get cardHover => [
-        BoxShadow(
-          color: SitePrimitives.deepTeal.withValues(alpha: 0.12),
-          blurRadius: 32,
-          offset: const Offset(0, 14),
-        ),
-      ];
+    BoxShadow(
+      color: SitePrimitives.deepTeal.withValues(alpha: 0.12),
+      blurRadius: 32,
+      offset: const Offset(0, 14),
+    ),
+  ];
 
   static List<BoxShadow> get header => [
-        BoxShadow(
-          color: SitePrimitives.deepTeal.withValues(alpha: 0.08),
-          blurRadius: 20,
-          offset: const Offset(0, 4),
-        ),
-      ];
+    BoxShadow(
+      color: SitePrimitives.deepTeal.withValues(alpha: 0.08),
+      blurRadius: 20,
+      offset: const Offset(0, 4),
+    ),
+  ];
 
   static List<BoxShadow> get floating => [
-        BoxShadow(
-          color: SitePrimitives.deepTeal.withValues(alpha: 0.14),
-          blurRadius: 40,
-          offset: const Offset(0, 18),
-        ),
-      ];
+    BoxShadow(
+      color: SitePrimitives.deepTeal.withValues(alpha: 0.14),
+      blurRadius: 40,
+      offset: const Offset(0, 18),
+    ),
+  ];
 }
 
 /// Hareket token'ları. Kullanıcı "azaltılmış hareket" tercih ediyorsa

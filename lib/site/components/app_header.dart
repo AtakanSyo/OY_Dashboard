@@ -19,14 +19,10 @@ class AppHeader extends StatefulWidget {
 
   final VoidCallback onMenuTap;
 
-  const AppHeader({
-    super.key,
-    required this.scrolled,
-    required this.onMenuTap,
-  });
+  const AppHeader({super.key, required this.scrolled, required this.onMenuTap});
 
   static double heightFor(SiteDevice device) =>
-      device.isMobile ? 64 : (device.isTablet ? 72 : 78);
+      device.isMobile ? 68 : (device.isTablet ? 74 : 82);
 
   @override
   State<AppHeader> createState() => _AppHeaderState();
@@ -107,10 +103,7 @@ class _AppHeaderState extends State<AppHeader> {
       'Daha Fazla',
       children: [
         for (final item in items)
-          SiteNavLink(
-            item.label,
-            item.route ?? item.children.first.route,
-          ),
+          SiteNavLink(item.label, item.route ?? item.children.first.route),
       ],
     );
   }
@@ -119,7 +112,8 @@ class _AppHeaderState extends State<AppHeader> {
     if (available <= 0) return null;
 
     final widths = {
-      for (final item in siteNavigation) item.label: _navItemWidth(context, item),
+      for (final item in siteNavigation)
+        item.label: _navItemWidth(context, item),
     };
 
     final total = widths.values.fold<double>(0, (sum, value) => sum + value);
@@ -163,9 +157,7 @@ class _AppHeaderState extends State<AppHeader> {
           height: barHeight,
           decoration: BoxDecoration(
             color: SiteColors.surfaceRaised,
-            border: const Border(
-              bottom: BorderSide(color: SiteColors.border),
-            ),
+            border: const Border(bottom: BorderSide(color: SiteColors.border)),
             boxShadow: widget.scrolled ? SiteShadows.header : null,
           ),
           padding: EdgeInsets.symmetric(horizontal: device.gutter),
@@ -176,18 +168,16 @@ class _AppHeaderState extends State<AppHeader> {
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  const logoWidth = 108.0;
+                  const logoWidth = 204.0;
                   const actionsGap = SiteSpacing.lg;
 
-                  final actionsWidth = _buttonWidth(
-                        context,
-                        'Giriş Yap',
-                        hasIcon: true,
-                      ) +
+                  final actionsWidth =
+                      _buttonWidth(context, 'Giriş Yap', hasIcon: true) +
                       SiteSpacing.md +
-                      _buttonWidth(context, 'Tarama İçin Randevu Al');
+                      _buttonWidth(context, '3D Tarama İçin Randevu Al');
 
-                  final available = constraints.maxWidth -
+                  final available =
+                      constraints.maxWidth -
                       logoWidth -
                       SiteSpacing.x2 -
                       actionsGap -
@@ -220,7 +210,7 @@ class _AppHeaderState extends State<AppHeader> {
                                   ),
                                   const SizedBox(width: SiteSpacing.sm),
                                   PrimaryButton(
-                                    label: 'Randevu Al',
+                                    label: '3D Tarama İçin Randevu Al',
                                     onPressed: () => SiteNav.go(
                                       context,
                                       SiteRoutes.taramaRandevusu,
@@ -291,7 +281,7 @@ class _AppHeaderState extends State<AppHeader> {
                       ),
                       const SizedBox(width: SiteSpacing.md),
                       PrimaryButton(
-                        label: 'Tarama İçin Randevu Al',
+                        label: '3D Tarama İçin Randevu Al',
                         onPressed: () =>
                             SiteNav.go(context, SiteRoutes.taramaRandevusu),
                       ),
@@ -353,7 +343,8 @@ class _HeaderLogo extends StatelessWidget {
             borderRadius: BorderRadius.circular(SiteRadius.sm),
             child: Image.asset(
               'assets/images/branding/logo.png',
-              height: context.device.isMobile ? 26 : 32,
+              // "Giriş Yap" butonundan biraz daha iri dursun.
+              height: context.device.isMobile ? 42 : 56,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.medium,
             ),
@@ -475,11 +466,7 @@ class MegaMenu extends StatelessWidget {
   final SiteNavItem item;
   final ValueChanged<SiteNavLink> onSelect;
 
-  const MegaMenu({
-    super.key,
-    required this.item,
-    required this.onSelect,
-  });
+  const MegaMenu({super.key, required this.item, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -653,7 +640,7 @@ class SiteMobileMenu extends StatelessWidget {
                     borderRadius: BorderRadius.circular(SiteRadius.sm),
                     child: Image.asset(
                       'assets/images/branding/logo.png',
-                      height: 26,
+                      height: 42,
                     ),
                   ),
                   const Spacer(),
@@ -673,9 +660,9 @@ class SiteMobileMenu extends StatelessWidget {
                   for (final item in siteNavigation)
                     if (item.hasMenu)
                       Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: Colors.transparent,
-                        ),
+                        data: Theme.of(
+                          context,
+                        ).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           title: Text(
                             item.label,
@@ -723,7 +710,7 @@ class SiteMobileMenu extends StatelessWidget {
               child: Column(
                 children: [
                   PrimaryButton(
-                    label: 'Tarama İçin Randevu Al',
+                    label: '3D Tarama İçin Randevu Al',
                     expand: true,
                     onPressed: () {
                       Navigator.pop(context);

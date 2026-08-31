@@ -108,165 +108,6 @@ class TechnologyCard extends StatelessWidget {
   }
 }
 
-/// Yorum kartı — Superspec §7.8.
-///
-/// Gerçek kullanıcı fotoğrafı bulunmadığı için avatar, baş harften üretilen
-/// bir monogramdır; stok fotoğraf hissi verilmez.
-class TestimonialCard extends StatelessWidget {
-  final String name;
-  final int rating;
-  final String comment;
-  final String context_;
-
-  const TestimonialCard({
-    super.key,
-    required this.name,
-    required this.rating,
-    required this.comment,
-    required this.context_,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SiteCard(
-      padding: const EdgeInsets.all(SiteSpacing.x2),
-      interactive: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              for (var i = 0; i < 5; i++)
-                Padding(
-                  padding: const EdgeInsets.only(right: 2),
-                  child: Icon(
-                    i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                    size: 18,
-                    color: SiteColors.primary,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: SiteSpacing.lg),
-          Text(comment, style: SiteType.body(context)),
-          const SizedBox(height: SiteSpacing.xl),
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SiteColors.primarySoft,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SiteColors.primarySoftBorder),
-                ),
-                child: Text(
-                  name.characters.first,
-                  style: SiteType.numeric(
-                    context,
-                    size: 16,
-                    color: SiteColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: SiteSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: SiteType.action(context, strong: true),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      context_,
-                      style: SiteType.small(context).copyWith(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Üretim ve teslimat akışındaki tek adım — Superspec §7.7.
-class TimelineStep extends StatelessWidget {
-  final int index;
-  final int total;
-  final String label;
-  final IconData icon;
-  final bool horizontal;
-
-  const TimelineStep({
-    super.key,
-    required this.index,
-    required this.total,
-    required this.label,
-    required this.icon,
-    required this.horizontal,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final marker = Container(
-      width: 52,
-      height: 52,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: SiteColors.surfaceInverseRaised,
-        shape: BoxShape.circle,
-        border: Border.all(color: SiteColors.primary.withValues(alpha: 0.5)),
-      ),
-      child: Icon(icon, size: 22, color: SiteColors.primary),
-    );
-
-    final text = Column(
-      crossAxisAlignment:
-          horizontal ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${index.toString().padLeft(2, '0')} / ${total.toString().padLeft(2, '0')}',
-          style: SiteType.dataLabel(context).copyWith(fontSize: 10),
-        ),
-        const SizedBox(height: SiteSpacing.xs),
-        Text(
-          label,
-          textAlign: horizontal ? TextAlign.center : TextAlign.start,
-          style: SiteType.action(context, strong: true).copyWith(
-            color: SiteColors.textInverse,
-          ),
-        ),
-      ],
-    );
-
-    if (horizontal) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          marker,
-          const SizedBox(height: SiteSpacing.md),
-          text,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        marker,
-        const SizedBox(width: SiteSpacing.lg),
-        Expanded(child: text),
-      ],
-    );
-  }
-}
-
 /// Önerilen model kartı — Superspec §7.6.
 class RecommendedProductCard extends StatelessWidget {
   final String badge;
@@ -312,7 +153,10 @@ class RecommendedProductCard extends StatelessWidget {
               borderRadius: SiteRadius.chipRadius,
               border: Border.all(color: SiteColors.primarySoftBorder),
             ),
-            child: Text(badge.toUpperCase(), style: SiteType.dataLabel(context)),
+            child: Text(
+              badge.toUpperCase(),
+              style: SiteType.dataLabel(context),
+            ),
           ),
           const SizedBox(height: SiteSpacing.lg),
           ClipRRect(
@@ -508,7 +352,9 @@ class StatsStrip extends StatelessWidget {
               style: SiteType.numeric(
                 context,
                 size: device.isMobile ? 26 : 32,
-                color: inverse ? SiteColors.textInverse : SiteColors.textPrimary,
+                color: inverse
+                    ? SiteColors.textInverse
+                    : SiteColors.textPrimary,
               ),
             ),
             const SizedBox(height: SiteSpacing.xs),
@@ -589,10 +435,7 @@ class CategoryCodeBlock extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 42,
-                    child: Text(
-                      entry.part,
-                      style: SiteType.dataLabel(context),
-                    ),
+                    child: Text(entry.part, style: SiteType.dataLabel(context)),
                   ),
                   const SizedBox(width: SiteSpacing.md),
                   Expanded(

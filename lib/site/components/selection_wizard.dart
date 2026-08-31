@@ -18,9 +18,7 @@ class SelectionWizard extends StatelessWidget {
   final ValueChanged<String> onArchChanged;
   final ValueChanged<String> onBalanceChanged;
 
-  static const List<int> sizes = [
-    36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
-  ];
+  static const List<int> sizes = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
   static const List<String> archTypes = ['Düşük', 'Orta', 'Yüksek'];
   static const List<String> balanceTypes = ['İç basış', 'Nötr', 'Dış basış'];
 
@@ -50,17 +48,16 @@ class SelectionWizard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SiteSpacing.xl),
-          Text('Ayakkabı numarası', style: SiteType.action(context, strong: true)),
+          Text(
+            'Ayakkabı numarası',
+            style: SiteType.action(context, strong: true),
+          ),
           const SizedBox(height: SiteSpacing.md),
           _SizeSelector(value: size, onChanged: onSizeChanged),
           const SizedBox(height: SiteSpacing.x2),
           Text('Kemer tipi', style: SiteType.action(context, strong: true)),
           const SizedBox(height: SiteSpacing.md),
-          _ChipRow(
-            options: archTypes,
-            value: arch,
-            onChanged: onArchChanged,
-          ),
+          _ChipRow(options: archTypes, value: arch, onChanged: onArchChanged),
           const SizedBox(height: SiteSpacing.x2),
           Text('Yürüme dengesi', style: SiteType.action(context, strong: true)),
           const SizedBox(height: SiteSpacing.md),
@@ -228,15 +225,17 @@ class _SelectableChipState extends State<_SelectableChip> {
                 color: _focused
                     ? SiteColors.focus
                     : selected
-                        ? SiteColors.primary
-                        : SiteColors.border,
+                    ? SiteColors.primary
+                    : SiteColors.border,
                 width: _focused ? 2 : 1.2,
               ),
             ),
             child: Text(
               widget.label,
               style: SiteType.action(context).copyWith(
-                color: selected ? SiteColors.textInverse : SiteColors.textPrimary,
+                color: selected
+                    ? SiteColors.textInverse
+                    : SiteColors.textPrimary,
               ),
             ),
           ),
