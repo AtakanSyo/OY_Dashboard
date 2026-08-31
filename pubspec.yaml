@@ -1,5 +1,5 @@
 name: oy_site
-description: "A new Flutter project."
+description: "OPTIYOU public sitesi ve operasyon uygulaması."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
   
   flutter_libserialport: ^0.6.0 # Windows için destek

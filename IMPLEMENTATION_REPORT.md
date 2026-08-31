@@ -253,8 +253,9 @@ Video oynatma, üretim derlemesinde iki farklı zaman noktasında alınan kare k
 doğrulandı (kareler farklı → video oynuyor). Mobil genişlikte poster gösterildiği ekran
 görüntüsüyle teyit edildi.
 
-> **Performans uyarısı:** `hero.mp4` 22,8 MB (10 sn, ~18 Mbit/s). Ana sayfayı açan herkes bunu
-> indirir. Web'e uygun sürüm için bkz. [MISSING_ASSETS_REQUEST.md](MISSING_ASSETS_REQUEST.md).
+> **Performans:** `hero.mp4` web yayını için 1600×900, sessiz H.264 olarak yeniden kodlandı;
+> 22,8 MB'den 1,26 MB'ye indirildi. Ayrıntı için bkz.
+> [MISSING_ASSETS_REQUEST.md](MISSING_ASSETS_REQUEST.md).
 
 Kullanılmayan hâle gelen [measurement_frame.dart](lib/site/components/measurement_frame.dart)
 (eski kumpas kompozisyonu) silinmedi; teknoloji sayfalarında yeniden kullanılabilir.
@@ -265,8 +266,9 @@ Kullanılmayan hâle gelen [measurement_frame.dart](lib/site/components/measurem
   kapsamında; "Giriş Yap" mevcut `/login` ekranına yönlendiriyor.
 - **Menü sayfalarının uzun metinleri yazılmadı.** Kapsam kararı gereği bu sayfalar başlık ve
   mesaj iskeleti seviyesinde.
-- **SEO meta etiketleri (§15.1) eklenmedi.** Flutter Web'de sayfa başlığı/meta yönetimi ayrı bir
-  çalışma gerektirir (`web/index.html` + route bazlı başlık güncelleme).
+- **SEO meta etiketleri (§15.1) temel seviyede eklendi.** `web/index.html`, manifest,
+  `robots.txt`, `sitemap.xml` ve temiz path URL stratejisi hazırlandı. Route bazlı dinamik
+  sosyal paylaşım kartları için SSR/prerender ayrı bir çalışma olarak değerlendirilebilir.
 - **Header tam genişlik kullanıyor** (1440), içerik ızgarası 1200. Logo ile içerik sol kenarı
   arasında 80 px fark var; yedi menü öğesinin tek satırda kalması için bilinçli tercih.
 
@@ -276,6 +278,6 @@ Kullanılmayan hâle gelen [measurement_frame.dart](lib/site/components/measurem
 
 1. Menü sayfalarının metinlerini doldurmak (kaynak: `home_screen_legacy.dart` + PDF çalışmaları).
 2. `MISSING_ASSETS_REQUEST.md` içindeki görselleri sağlamak.
-3. Başvuru formu ve bülten kaydı için servis ucu bağlamak.
-4. SEO: `web/index.html` meta etiketleri + route bazlı sayfa başlığı.
+3. Bülten kaydı için servis ucu bağlamak.
+4. SEO için SSR/prerender gereksinimini değerlendirmek.
 5. Ölçüm merkezleri için veri kaynağı ve liste/harita bileşeni.

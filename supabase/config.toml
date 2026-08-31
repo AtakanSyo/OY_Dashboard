@@ -1,0 +1,4 @@
+project_id = "oy_dashboard"
+
+[functions.send-scan-appointment]
+verify_jwt = false

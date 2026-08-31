@@ -66,7 +66,10 @@ void main() {
       await tester.pump();
 
       expect(find.text('Bu alan zorunludur.'), findsWidgets);
-      expect(find.text('Devam etmek için onaylayın.'), findsOneWidget);
+      expect(
+        find.text('Devam etmek için metni okuduğunuzu işaretleyin.'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
 

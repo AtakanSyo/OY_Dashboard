@@ -305,8 +305,8 @@ String? _phoneValidator(String? value) {
   return digits.length >= 10 ? null : 'Geçerli bir telefon numarası girin.';
 }
 
-class _KvkkConsent extends StatelessWidget {
-  const _KvkkConsent({
+class _PrivacyNoticeAcknowledgement extends StatelessWidget {
+  const _PrivacyNoticeAcknowledgement({
     required this.value,
     required this.onChanged,
     this.error,
@@ -338,8 +338,8 @@ class _KvkkConsent extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      'Kişisel verilerimin randevu ve tarama sürecinin '
-                      'yürütülmesi amacıyla işlenmesine ilişkin ',
+                      'Randevu ve tarama sürecinde kişisel verilerimin nasıl '
+                      'işlendiğini açıklayan ',
                       style: SiteType.small(context),
                     ),
                     SiteTextLink(
@@ -348,7 +348,7 @@ class _KvkkConsent extends StatelessWidget {
                       onPressed: () => SiteNav.go(context, SiteRoutes.kvkk),
                     ),
                     Text(
-                      '’ni okudum, onaylıyorum.',
+                      '’ni okudum.',
                       style: SiteType.small(context),
                     ),
                   ],
@@ -477,6 +477,7 @@ class _IndividualFormState extends State<_IndividualForm> {
   bool _done = false;
   bool _emailWarning = false;
   String? _error;
+  String? _requestId;
 
   @override
   void dispose() {
@@ -527,28 +528,32 @@ class _IndividualFormState extends State<_IndividualForm> {
     });
 
     try {
-      await widget.service.submitIndividual(
+      final result = await widget.service.submitIndividual(
         IndividualScanRequest(
+          requestId: _requestId ??= buildScanRequestId(),
           fullName: _name.text,
           phone: _phone.text,
           email: _email.text,
           location: _location!,
           date: _isoDate,
           time: _time!,
-          kvkkConsent: true,
+          privacyNoticeAcknowledged: true,
         ),
       );
-      setState(() => _done = true);
-    } on ScanAppointmentEmailException {
+      if (!mounted) return;
       setState(() {
         _done = true;
-        _emailWarning = true;
+        _emailWarning = !result.emailDispatched;
       });
-    } catch (_) {
+    } on ScanAppointmentSubmissionException catch (error) {
+      if (!mounted) return;
       setState(
-        () => _error =
-            'Talebiniz gönderilemedi. Lütfen bağlantınızı kontrol edip '
-            'tekrar deneyin.',
+        () => _error = error.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _error = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.',
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -569,6 +574,7 @@ class _IndividualFormState extends State<_IndividualForm> {
       _done = false;
       _emailWarning = false;
       _error = null;
+      _requestId = null;
     });
   }
 
@@ -688,13 +694,15 @@ class _IndividualFormState extends State<_IndividualForm> {
             style: SiteType.small(context),
           ),
           const SizedBox(height: SiteSpacing.xl),
-          _KvkkConsent(
+          _PrivacyNoticeAcknowledgement(
             value: _consent,
             onChanged: (v) => setState(() {
               _consent = v;
               if (v) _consentError = false;
             }),
-            error: _consentError ? 'Devam etmek için onaylayın.' : null,
+            error: _consentError
+                ? 'Devam etmek için metni okuduğunuzu işaretleyin.'
+                : null,
           ),
           const SizedBox(height: SiteSpacing.x2),
           PrimaryButton(
@@ -737,6 +745,7 @@ class _CorporateFormState extends State<_CorporateForm> {
   bool _done = false;
   bool _emailWarning = false;
   String? _error;
+  String? _requestId;
 
   @override
   void dispose() {
@@ -761,29 +770,33 @@ class _CorporateFormState extends State<_CorporateForm> {
     });
 
     try {
-      await widget.service.submitCorporate(
+      final result = await widget.service.submitCorporate(
         CorporateScanRequest(
+          requestId: _requestId ??= buildScanRequestId(),
           companyName: _company.text,
           contactName: _contact.text,
           email: _email.text,
           phone: _phone.text,
           personCount: int.parse(_count.text.trim()),
           requestType: _type,
-          kvkkConsent: true,
+          privacyNoticeAcknowledged: true,
           note: _note.text,
         ),
       );
-      setState(() => _done = true);
-    } on ScanAppointmentEmailException {
+      if (!mounted) return;
       setState(() {
         _done = true;
-        _emailWarning = true;
+        _emailWarning = !result.emailDispatched;
       });
-    } catch (_) {
+    } on ScanAppointmentSubmissionException catch (error) {
+      if (!mounted) return;
       setState(
-        () => _error =
-            'Talebiniz gönderilemedi. Lütfen bağlantınızı kontrol edip '
-            'tekrar deneyin.',
+        () => _error = error.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _error = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.',
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -805,6 +818,7 @@ class _CorporateFormState extends State<_CorporateForm> {
       _done = false;
       _emailWarning = false;
       _error = null;
+      _requestId = null;
     });
   }
 
@@ -920,13 +934,15 @@ class _CorporateFormState extends State<_CorporateForm> {
               ),
             ),
           ),
-          _KvkkConsent(
+          _PrivacyNoticeAcknowledgement(
             value: _consent,
             onChanged: (v) => setState(() {
               _consent = v;
               if (v) _consentError = false;
             }),
-            error: _consentError ? 'Devam etmek için onaylayın.' : null,
+            error: _consentError
+                ? 'Devam etmek için metni okuduğunuzu işaretleyin.'
+                : null,
           ),
           const SizedBox(height: SiteSpacing.x2),
           PrimaryButton(

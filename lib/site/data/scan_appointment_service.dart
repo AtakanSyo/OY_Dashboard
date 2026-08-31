@@ -1,100 +1,104 @@
+import 'dart:math';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// "Tarama Yap" akışının backend'i: talep Supabase'e yazılır, ardından
-/// `send-scan-appointment` edge function e-postaları gönderir (OPTIYOU gelen
-/// kutusu + talep sahibine KVKK aydınlatma özeti).
+typedef ScanAppointmentInvoker =
+    Future<dynamic> Function(Map<String, dynamic> body);
+
+/// Public "Tarama Yap" formlarını tek bir güvenli backend çağrısıyla iletir.
 ///
-/// Bu servis yalnızca public site formları için kullanılır; kullanıcı /
-/// oturum akışlarına dokunmaz.
+/// Tarayıcı tablolara doğrudan yazmaz. Kayıt oluşturma, hız sınırı, e-posta
+/// gönderimi ve gönderim durumunun güncellenmesi Edge Function tarafından
+/// gerçekleştirilir. Bu sayede anonim kullanıcıya tablo SELECT/UPDATE yetkisi
+/// verilmesi gerekmez.
 class ScanAppointmentService {
-  ScanAppointmentService({SupabaseClient? client}) : _override = client;
+  ScanAppointmentService({
+    SupabaseClient? client,
+    ScanAppointmentInvoker? invoker,
+  }) : _override = client,
+       _invoker = invoker;
 
   final SupabaseClient? _override;
+  final ScanAppointmentInvoker? _invoker;
 
-  /// Client, ilk gönderim anında çözülür; böylece sayfanın kurulması
-  /// Supabase.initialize'a bağlı olmaz (widget testleri).
   SupabaseClient get _client => _override ?? Supabase.instance.client;
 
-  /// Bireysel randevu talebi.
-  Future<void> submitIndividual(IndividualScanRequest request) async {
-    final payload = request.toJson();
+  Future<ScanAppointmentSubmissionResult> submitIndividual(
+    IndividualScanRequest request,
+  ) => _submit(kind: 'individual', payload: request.toJson());
 
-    final inserted = await _client
-        .from('scan_appointment_requests')
-        .insert(payload)
-        .select('id')
-        .single();
+  Future<ScanAppointmentSubmissionResult> submitCorporate(
+    CorporateScanRequest request,
+  ) => _submit(kind: 'corporate', payload: request.toJson());
 
-    await _dispatchEmail(
-      kind: 'individual',
-      payload: payload,
-      requestId: inserted['id'] as String?,
-      table: 'scan_appointment_requests',
-    );
-  }
-
-  /// Kurumsal talep (tarayıcı satın alma / B2B hizmet).
-  Future<void> submitCorporate(CorporateScanRequest request) async {
-    final payload = request.toJson();
-
-    final inserted = await _client
-        .from('corporate_scan_requests')
-        .insert(payload)
-        .select('id')
-        .single();
-
-    await _dispatchEmail(
-      kind: 'corporate',
-      payload: payload,
-      requestId: inserted['id'] as String?,
-      table: 'corporate_scan_requests',
-    );
-  }
-
-  Future<void> _dispatchEmail({
+  Future<ScanAppointmentSubmissionResult> _submit({
     required String kind,
     required Map<String, dynamic> payload,
-    required String? requestId,
-    required String table,
   }) async {
-    // E-posta gönderimi kaydın kendisinden ayrı tutulur: kayıt başarılıysa
-    // form başarılı sayılır, e-posta ayrı denenip işaretlenir. Function henüz
-    // deploy edilmemişse ya da Resend hatası olursa yalnızca uyarı gösterilir.
     dynamic data;
     try {
-      final response = await _client.functions.invoke(
-        'send-scan-appointment',
-        body: {'kind': kind, 'payload': payload},
+      final body = {'kind': kind, 'payload': payload};
+      if (_invoker != null) {
+        data = await _invoker(body);
+      } else {
+        final response = await _client.functions.invoke(
+          'send-scan-appointment',
+          body: body,
+        );
+        data = response.data;
+      }
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final publicMessage = details is Map
+          ? details['message']?.toString().trim()
+          : null;
+      throw ScanAppointmentSubmissionException(
+        publicMessage?.isNotEmpty == true
+            ? publicMessage!
+            : 'Talep servisine şu an ulaşılamıyor.',
       );
-      data = response.data;
-    } catch (error) {
-      throw ScanAppointmentEmailException(error.toString());
+    } catch (_) {
+      throw const ScanAppointmentSubmissionException(
+        'Talep servisine şu an ulaşılamıyor.',
+      );
     }
 
-    final ok = data is Map && data['success'] == true;
-    if (!ok) {
-      throw ScanAppointmentEmailException(
-        data is Map ? data['error']?.toString() : 'Bilinmeyen e-posta hatası',
+    if (data is! Map || data['success'] != true) {
+      final publicMessage = data is Map ? data['message']?.toString() : null;
+      throw ScanAppointmentSubmissionException(
+        publicMessage?.trim().isNotEmpty == true
+            ? publicMessage!
+            : 'Talep şu an kaydedilemedi.',
       );
     }
 
-    if (requestId != null) {
-      await _client
-          .from(table)
-          .update({'email_dispatched': true})
-          .eq('id', requestId);
-    }
+    return ScanAppointmentSubmissionResult(
+      requestId: data['request_id']?.toString(),
+      emailDispatched: data['email_dispatched'] == true,
+      duplicate: data['duplicate'] == true,
+    );
   }
 }
 
-/// Kayıt açıldı ama bilgilendirme e-postası gönderilemedi. Form yine de
-/// başarıyla tamamlanmış sayılır; çağıran taraf yalnızca uyarı gösterir.
-class ScanAppointmentEmailException implements Exception {
-  ScanAppointmentEmailException(this.message);
-  final String? message;
+class ScanAppointmentSubmissionResult {
+  const ScanAppointmentSubmissionResult({
+    required this.requestId,
+    required this.emailDispatched,
+    required this.duplicate,
+  });
+
+  final String? requestId;
+  final bool emailDispatched;
+  final bool duplicate;
+}
+
+class ScanAppointmentSubmissionException implements Exception {
+  const ScanAppointmentSubmissionException(this.message);
+
+  final String message;
 
   @override
-  String toString() => 'ScanAppointmentEmailException: $message';
+  String toString() => 'ScanAppointmentSubmissionException: $message';
 }
 
 enum ScanLocation {
@@ -104,10 +108,7 @@ enum ScanLocation {
 
   const ScanLocation(this.code, this.label);
 
-  /// Veritabanı / edge function değeri.
   final String code;
-
-  /// Kullanıcıya gösterilen etiket.
   final String label;
 }
 
@@ -123,16 +124,18 @@ enum CorporateRequestType {
 
 class IndividualScanRequest {
   const IndividualScanRequest({
+    required this.requestId,
     required this.fullName,
     required this.phone,
     required this.email,
     required this.location,
     required this.date,
     required this.time,
-    required this.kvkkConsent,
+    required this.privacyNoticeAcknowledged,
     this.note,
   });
 
+  final String requestId;
   final String fullName;
   final String phone;
   final String email;
@@ -143,52 +146,73 @@ class IndividualScanRequest {
 
   /// "HH:mm".
   final String time;
-  final bool kvkkConsent;
+  final bool privacyNoticeAcknowledged;
   final String? note;
 
   Map<String, dynamic> toJson() => {
+    'client_request_id': requestId,
     'full_name': fullName.trim(),
     'phone': phone.trim(),
-    'email': email.trim(),
+    'email': email.trim().toLowerCase(),
     'location': location.code,
     'appointment_date': date,
     'appointment_time': time,
-    'kvkk_consent': kvkkConsent,
+    'privacy_notice_acknowledged': privacyNoticeAcknowledged,
     if (note != null && note!.trim().isNotEmpty) 'note': note!.trim(),
   };
 }
 
 class CorporateScanRequest {
   const CorporateScanRequest({
+    required this.requestId,
     required this.companyName,
     required this.contactName,
     required this.email,
     required this.phone,
     required this.personCount,
     required this.requestType,
-    required this.kvkkConsent,
+    required this.privacyNoticeAcknowledged,
     this.note,
   });
 
+  final String requestId;
   final String companyName;
   final String contactName;
   final String email;
   final String phone;
   final int personCount;
   final CorporateRequestType requestType;
-  final bool kvkkConsent;
+  final bool privacyNoticeAcknowledged;
   final String? note;
 
   Map<String, dynamic> toJson() => {
+    'client_request_id': requestId,
     'company_name': companyName.trim(),
     'contact_name': contactName.trim(),
-    'email': email.trim(),
+    'email': email.trim().toLowerCase(),
     'phone': phone.trim(),
     'person_count': personCount,
     'request_type': requestType.code,
-    'kvkk_consent': kvkkConsent,
+    'privacy_notice_acknowledged': privacyNoticeAcknowledged,
     if (note != null && note!.trim().isNotEmpty) 'note': note!.trim(),
   };
+}
+
+/// Form yeniden gönderildiğinde aynı kimlik korunarak yinelenen kayıt ve
+/// e-postaların önüne geçilir.
+String buildScanRequestId([Random? random]) {
+  final source = random ?? Random.secure();
+  final bytes = List<int>.generate(16, (_) => source.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  final value = bytes
+      .map((item) => item.toRadixString(16).padLeft(2, '0'))
+      .join();
+  return '${value.substring(0, 8)}-'
+      '${value.substring(8, 12)}-'
+      '${value.substring(12, 16)}-'
+      '${value.substring(16, 20)}-'
+      '${value.substring(20)}';
 }
 
 /// Günlük 11:00–17:00 arası 15 dakikalık slotlar (son slot 16:45).

@@ -37,6 +37,13 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Supabase CLI yerel bağlantı durumu ve function secret dosyaları
+/supabase/.temp/
+/supabase/.branches/
+/supabase/.env
+/supabase/.env.*
+!/supabase/.env.example
+
 # ------------------------
 # Generated plugin files (ÇOK ÖNEMLİ)
 # ------------------------

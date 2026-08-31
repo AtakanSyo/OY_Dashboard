@@ -26,29 +26,30 @@ kullanıldı; marka doğruluğu için gerçekleriyle değiştirilmeleri gerekiyo
 4. **TÜBİTAK 1812 ve 1707 için paylaşılabilir proje görselleri**
    Kullanılacağı yer: `/tubitak-projeleri/1812`, `/tubitak-projeleri/1707`
 
-## Hero videosu — optimizasyon gerekiyor
+## Hero videosu — optimize edildi
 
-`assets/video/hero.mp4` mevcut ve ana sayfada kullanılıyor, ancak **web için fazla ağır**:
+`assets/video/hero.mp4` web yayını için yeniden kodlandı:
 
 | Ölçüm | Değer |
 | --- | --- |
-| Boyut | 22,8 MB |
+| Boyut | 1,26 MB |
 | Süre | 10 sn |
-| Bit hızı | ~18,3 Mbit/s |
+| Çözünürlük | 1600×900 |
+| Bit hızı | ~1,0 Mbit/s |
 
-Bu, ana sayfayı açan her ziyaretçinin indireceği veri demek. 10 saniyelik sessiz bir döngü için
-1,5–2,5 Mbit/s fazlasıyla yeterli (yaklaşık 2–3 MB). Web'e uygun bir kopya şu komutla üretilebilir:
+Uygulanan dönüşüm:
 
 ```bash
 ffmpeg -i assets/video/hero.mp4 -an -vf "scale=1600:-2" \
   -c:v libx264 -profile:v high -crf 26 -preset slow -movflags +faststart \
-  assets/video/hero_web.mp4
+  assets/video/hero_optimized.mp4
 ```
 
 Poster dosyası WebP'ye çevrildi ve kod artık onu kullanıyor:
 `hero_poster.png` (1 MB) → `hero_poster.webp` (51 KB). PNG dosyası silinmedi.
 
-Video dönüşümü için onay bekleniyor; onay verilirse üretilip koda bağlanabilir.
+Optimize çıktı kalite kontrolünden sonra mevcut `hero.mp4` dosyasının yerine
+alındı; uygulama kodunda yol değişikliği gerekmedi.
 
 ## Görsel dışı eksikler
 
@@ -58,13 +59,10 @@ Video dönüşümü için onay bekleniyor; onay verilirse üretilip koda bağlan
 6. **İletişim bilgileri** (`/iletisim`)
    Gerekli: adres, telefon, e-posta, varsa harita koordinatı.
 
-7. **Başvuru formu gönderim ucu** (`/tarama-standi-basvuru`)
-   Gerekli: formun gönderileceği servis (e-posta ucu, Supabase tablosu veya CRM).
-
-8. **Bülten kaydı servisi** (footer)
+7. **Bülten kaydı servisi** (footer)
    Gerekli: liste sağlayıcısı ve API bilgisi.
 
-9. **Açık pozisyonlar** (`/kariyer`), **haber/basın içerikleri** (`/haberler`),
+8. **Açık pozisyonlar** (`/kariyer`), **haber/basın içerikleri** (`/haberler`),
    **blog yazıları** (`/blog`).
 
 ## Mevcut ve kullanılan varlıklar (talep edilmesine gerek yok)

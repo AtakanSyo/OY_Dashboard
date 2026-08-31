@@ -1,244 +1,186 @@
-# Supabase Bağlantısı — Gereklilikler ve Kurulum
+# Supabase — Tarama Talebi Kurulum ve Yayın Rehberi
 
-Bu belge, OPTIYOU public sitesindeki **"Tarama Yap"** akışının (bireysel randevu +
-kurumsal talep) çalışması için gereken Supabase parçalarını ve yapılması
-gerekenleri anlatır.
+Bu belge, public sitedeki bireysel randevu ve kurumsal tarama formlarının
+güvenli kurulumunu anlatır. Kaynak kodu ve migration geçmişi bu rehberin
+önündedir; Dashboard'da elle yapılan değişiklikler repoya migration olarak
+geri alınmalıdır.
 
-> Site tarafındaki diğer her şey (statik sayfalar, `/iletisim` mailto formu,
-> `/olcum-merkezleri` liste/harita alanı) Supabase **gerektirmez**. Yalnızca
-> aşağıdaki iki form backend'e bağlıdır.
+## 1. Akış
 
----
+İki form da `send-scan-appointment` Edge Function'ını çağırır:
 
-## 1. Özet — hangi özellikler Supabase'e bağlı
+1. Function, Supabase `apikey` başlığını ve ardından alanları/istek kimliğini
+   doğrular.
+2. Ham IP saklamadan, gizli bir tuzla üretilmiş kaynak özeti üzerinden hız
+   sınırı uygular.
+3. Kaydı servis yetkisiyle ilgili tabloya ekler.
+4. `info@optiyou.com.tr` ve form sahibine Resend üzerinden e-posta gönderir.
+5. Kaydı `pending`, `sent` veya `failed` e-posta durumuyla günceller.
 
-| Site özelliği | Route | Backend ihtiyacı |
+Public istemci tablolara doğrudan `INSERT`, `SELECT`, `UPDATE` veya `DELETE`
+yapmaz. Aynı `client_request_id` ile yinelenen çağrılar yeni kayıt/e-posta
+oluşturmaz.
+
+| Form | Route | Tablo |
 |---|---|---|
-| Bireysel tarama randevusu | `/tarama-randevusu` (Bireysel sekmesi) | `scan_appointment_requests` tablosu + `send-scan-appointment` function |
-| Kurumsal tarama talebi | `/tarama-randevusu` (Kurumsal sekmesi) ve `/tarama-standi-basvuru` | `corporate_scan_requests` tablosu + `send-scan-appointment` function |
+| Bireysel | `/tarama-randevusu` | `scan_appointment_requests` |
+| Kurumsal | `/tarama-randevusu`, `/tarama-standi-basvuru` | `corporate_scan_requests` |
 
-Akış: form gönderilince kayıt önce ilgili tabloya `INSERT` edilir, ardından
-edge function iki e-posta gönderir:
+## 2. Repo bileşenleri
 
-1. **`info@optiyou.com.tr`** → talep detayı
-2. **Talep sahibi** (form'daki e-posta) → KVKK aydınlatma özeti + randevu özeti
-
-E-posta gönderimi kaydın kendisinden ayrıdır: kayıt başarılıysa form başarılı
-sayılır, e-posta ayrıca denenip `email_dispatched` sütunu işaretlenir.
-
-İlgili kod:
-- İstemci servisi: [`lib/site/data/scan_appointment_service.dart`](../lib/site/data/scan_appointment_service.dart)
-- Form sayfası: [`lib/site/pages/scan_appointment_page.dart`](../lib/site/pages/scan_appointment_page.dart)
-- Migration: [`supabase/migrations/026_create_scan_appointment_requests.sql`](../supabase/migrations/026_create_scan_appointment_requests.sql)
-- Edge function: [`supabase/functions/send-scan-appointment/index.ts`](../supabase/functions/send-scan-appointment/index.ts)
-
----
-
-## 2. Proje bilgileri
-
-| | |
+| Bileşen | Yol |
 |---|---|
-| Proje ref | `iytzfqfhlqcboohtpugh` |
-| API URL | `https://iytzfqfhlqcboohtpugh.supabase.co` |
-| Dashboard | `https://supabase.com/dashboard/project/iytzfqfhlqcboohtpugh` |
-| Anon key | [`lib/core/supabase_config.dart`](../lib/core/supabase_config.dart) içinde gömülü (public, güvenli) |
+| İstemci servisi | `lib/site/data/scan_appointment_service.dart` |
+| Form sayfası | `lib/site/pages/scan_appointment_page.dart` |
+| İlk tablo migration'ı | `supabase/migrations/026_create_scan_appointment_requests.sql` |
+| Güvenlik migration'ı | `supabase/migrations/027_harden_scan_appointment_requests.sql` |
+| Edge Function | `supabase/functions/send-scan-appointment/index.ts` |
+| RLS/grant testleri | `supabase/tests/027_scan_appointment_rls.test.sql` |
+| Function ayarı | `supabase/config.toml` |
 
-`supabase/.temp/linked-project.json` bu ref ile bağlı görünüyor ama `supabase`
-CLI şu an bu makinede PATH'te **değil**.
+`027` migration'ı anonim tablo erişimini kapatır, tekil istek kimliği ve
+e-posta durum alanlarını ekler. Yeni veya mevcut bir ortamda `026` ve `027`
+birlikte uygulanmalıdır.
 
----
+Function ayarında platformun eski `verify_jwt` kontrolü kapalıdır; çünkü bu
+kontrol yeni `sb_publishable_...` anahtarlarını kabul etmez. Function bunun
+yerine `apikey` başlığını ortamın `SUPABASE_PUBLISHABLE_KEYS` listesiyle veya
+eski `SUPABASE_ANON_KEY` değeriyle doğrular. Böylece hem yeni hem eski public
+anahtarlar desteklenir.
 
-## 3. Gerekli bileşenler ve durum
+## 3. Ortamlar
 
-| # | Bileşen | Dosya / Yer | Amaç | Yapılacak | Durum |
-|---|---|---|---|---|---|
-| 1 | **Migration** | `supabase/migrations/026_create_scan_appointment_requests.sql` | `scan_appointment_requests` + `corporate_scan_requests` tabloları + RLS | `supabase db push` **ya da** Dashboard → SQL Editor'a dosya içeriğini yapıştır → Run | ⚠️ Deploy edilmedi |
-| 2 | **Edge Function** | `supabase/functions/send-scan-appointment/index.ts` | Talep + KVKK e-postalarını Resend ile gönderir | `supabase functions deploy send-scan-appointment` **ya da** Dashboard → Edge Functions'tan oluştur | ⚠️ Deploy edilmedi |
-| 3 | **Paylaşılan CORS** | `supabase/functions/_shared/cors.ts` | Function'ın CORS başlıkları | Yok — function deploy'u ile birlikte gider (Dashboard'dan yapıyorsan `_shared/cors.ts`'i de oluştur) | ✅ Repo'da var |
-| 4 | **Secret `RESEND_API_KEY`** | Supabase proje secrets | Function'ın okuduğu Resend anahtarı | `supabase secrets list` ile kontrol et; yoksa `supabase secrets set RESEND_API_KEY=re_xxx` | 🔎 Muhtemelen tanımlı (mevcut `send-patient-consent-email` de kullanıyor) |
-| 5 | **Resend gönderen domaini** | Resend paneli → Domains | `no-reply@optiyou.fit` doğrulanmış gönderen olmalı | Resend'de teyit et; değilse domain doğrula | 🔎 Muhtemelen doğrulanmış (mevcut KVKK e-postaları bu adresi kullanıyor) |
-| 6 | **`is_optityou_team_member()` DB fonksiyonu** | `supabase/migrations/024_create_store_catalog.sql` | 026 RLS politikalarının bağımlılığı | Yok — 024 migration'ı zaten uygulanmışsa mevcut | ✅ 024 ile geliyor |
-| 7 | **Supabase client init** | [`lib/main.dart`](../lib/main.dart) `Supabase.initialize(...)` | Formların kullandığı anon client | Yok | ✅ Hazır |
-| 8 | **Alıcı adres** | `OPTIYOU_INBOX` sabiti — `send-scan-appointment/index.ts` | Taleplerin düştüğü kutu (`info@optiyou.com.tr`) | Değiştirmek istersen sabiti düzenle + yeniden deploy et | ✅ Kodda sabit |
+Üretim proje ref'i: `iytzfqfhlqcboohtpugh`.
 
----
+Önce ayrı bir staging Supabase projesi kullanılmalıdır. Repo artık
+`supabase/.temp` klasörünü takip etmez; her geliştirici doğru projeye kendi
+makinesinde açıkça link vermelidir.
 
-## 4. Zaten hazır olanlar (aksiyon gerektirmez)
+Uygulama varsayılan olarak üretim URL ve public anon anahtarını kullanır.
+Staging/yerel derleme için kaynak kodu değiştirmeden:
 
-- `Supabase.initialize` `main.dart` içinde çağrılıyor; anon client her yerde
-  `Supabase.instance.client` üzerinden erişilebilir.
-- Migration ve function dosyaları repo'da yazılı ve derleniyor.
-- `_shared/cors.ts` ve `is_optityou_team_member()` mevcut.
-- Uygulama, backend eksikken **çökmez** (bkz. Bölüm 8).
+```powershell
+flutter run -d chrome `
+  --dart-define=SUPABASE_URL=https://STAGING_REF.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=STAGING_PUBLIC_KEY
+```
 
----
+Secret/service anahtarları hiçbir zaman `--dart-define`, istemci kodu veya
+Git içine konmaz.
 
-## 5. Adım adım kurulum
+## 4. Zorunlu Function secret'ları
 
-### Yol A — Supabase CLI (önerilen)
+| Secret | Amaç |
+|---|---|
+| `RESEND_API_KEY` | E-posta gönderimi |
+| `SCAN_RATE_LIMIT_SALT` | Kaynak adresi geri döndürülemeyen özetle saklamak; en az 32 rastgele karakter |
 
-```bash
-# 1) CLI kur (bir kez):
-#    Windows:  winget install Supabase.CLI
-#    veya:     npm i -g supabase   ·   scoop install supabase
+Opsiyonel:
 
-# 2) Giriş + projeye bağlan (bir kez)
+| Secret | Varsayılan |
+|---|---|
+| `OPTIYOU_INBOX` | `info@optiyou.com.tr` |
+| `SCAN_FROM_ADDRESS` | `Optiyou <no-reply@optiyou.fit>` |
+
+Hosted Edge Functions, Supabase sunucu anahtarlarını ortam değişkeni olarak
+sağlar. Function yeni `SUPABASE_SECRET_KEYS` biçimini, yoksa eski
+`SUPABASE_SERVICE_ROLE_KEY` değerini kullanır. Bu anahtarlar tarayıcıya
+gönderilmez.
+
+Resend tarafında `no-reply@optiyou.fit` gönderen domaininin SPF/DKIM ile
+doğrulanmış olması gerekir.
+
+## 5. Staging kurulumu
+
+Supabase CLI bu makinede kurulu değilse önce resmî yöntemlerden biriyle kurun.
+Ardından repo kökünde:
+
+```powershell
 supabase login
-supabase link --project-ref iytzfqfhlqcboohtpugh
+supabase link --project-ref STAGING_PROJECT_REF
 
-# 3) Tabloları oluştur
-supabase db push
-#    (026_create_scan_appointment_requests.sql uygulanır)
+# Yerel migration'larla uzak geçmişi karşılaştır.
+supabase migration list --linked
 
-# 4) E-posta fonksiyonunu deploy et
+# Uygulanacak migration'ları değiştirmeden göster.
+supabase db push --dry-run --linked
+
+# Çıktı yalnızca beklenen migration'ları içeriyorsa uygula.
+supabase db push --linked
+
+supabase secrets set `
+  RESEND_API_KEY=REDACTED `
+  SCAN_RATE_LIMIT_SALT=EN_AZ_32_RASTGELE_KARAKTER
+
 supabase functions deploy send-scan-appointment
-
-# 5) Secret kontrolü
-supabase secrets list
-#    RESEND_API_KEY listede görünmeli. Yoksa:
-supabase secrets set RESEND_API_KEY=re_xxxxxxxx
 ```
 
-### Yol B — Supabase Dashboard (CLI olmadan)
+Remote migration geçmişi repo ile uyuşmuyorsa `db push` yapmayın. Önce
+`supabase db pull` ile drift'i inceleyin veya doğru migration geçmişini ekipçe
+netleştirin. Üretimde `db reset --linked` kullanılmaz.
 
-1. **Tablolar:** Dashboard → **SQL Editor** → New query →
-   `supabase/migrations/026_create_scan_appointment_requests.sql` dosyasının
-   **tüm içeriğini** yapıştır → **Run**.
-   (Not: `is_optityou_team_member()` fonksiyonu yoksa önce `024_create_store_catalog.sql`
-   içindeki `CREATE OR REPLACE FUNCTION public.is_optityou_team_member` bloğunu çalıştır.)
-2. **Edge Function:** Dashboard → **Edge Functions** → **Deploy a new function** →
-   ad: `send-scan-appointment` → `index.ts` içeriğini yapıştır.
-   Dashboard editörü `../_shared/cors.ts` import'unu çözemezse:
-   - ya `_shared/cors.ts`'i ayrı dosya olarak ekle,
-   - ya da `import { corsHeaders } ...` satırını kaldırıp `corsHeaders`
-     nesnesini `index.ts` başına satır içi yaz:
-     ```ts
-     const corsHeaders = {
-       "Access-Control-Allow-Origin": "*",
-       "Access-Control-Allow-Headers":
-         "authorization, x-client-info, apikey, content-type",
-     };
-     ```
-3. **Secret:** Dashboard → **Project Settings → Edge Functions → Secrets** →
-   `RESEND_API_KEY` var mı bak; yoksa ekle.
-4. **Resend:** [resend.com](https://resend.com) → **Domains** → `optiyou.fit`
-   doğrulanmış mı bak (SPF/DKIM). Değilse domaini ekleyip DNS kayıtlarını gir.
+## 6. Yerel DB ve RLS testleri
 
----
+Docker uyumlu çalışma zamanı ve Supabase CLI ile:
 
-## 6. Tablo şeması (referans)
-
-### `public.scan_appointment_requests` — bireysel randevu
-
-| Sütun | Tip | Not |
-|---|---|---|
-| `id` | `uuid` | PK, `gen_random_uuid()` |
-| `full_name` | `text` | zorunlu |
-| `phone` | `text` | zorunlu |
-| `email` | `text` | zorunlu |
-| `location` | `text` | `CHECK IN ('LLT','OPTIYOU','IZTU_DML')` |
-| `appointment_date` | `date` | zorunlu |
-| `appointment_time` | `text` | `"HH:mm"` (ör. `14:15`) |
-| `note` | `text` | opsiyonel |
-| `kvkk_consent` | `boolean` | INSERT için `TRUE` şart (RLS) |
-| `email_dispatched` | `boolean` | function e-postayı yollayınca `TRUE` |
-| `created_at` | `timestamptz` | `NOW()` |
-
-### `public.corporate_scan_requests` — kurumsal talep
-
-| Sütun | Tip | Not |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_name` | `text` | zorunlu |
-| `contact_name` | `text` | zorunlu |
-| `email` | `text` | zorunlu |
-| `phone` | `text` | zorunlu |
-| `person_count` | `integer` | `CHECK > 0` |
-| `request_type` | `text` | `CHECK IN ('scanner_purchase','b2b_service')` |
-| `note` | `text` | opsiyonel |
-| `kvkk_consent` | `boolean` | INSERT için `TRUE` şart |
-| `email_dispatched` | `boolean` | |
-| `created_at` | `timestamptz` | |
-
-> **Önemli:** `location` kısıtı `'LLT' / 'OPTIYOU' / 'IZTU_DML'` kodlarına
-> bağlıdır. Ekranda görünen adlar ("LiveLifeTaller — Kartal" vb.) yalnızca
-> etiket; kodları değiştirmek migration'ı ve edge function'ı da kırar.
-
----
-
-## 7. RLS / güvenlik
-
-Her iki tabloda da RLS **açık**:
-
-- **INSERT** → `anon` + `authenticated`, yalnızca `kvkk_consent = TRUE` ile.
-  (Giriş yapmamış ziyaretçi kayıt açabilir ama KVKK onayı olmadan olmaz.)
-- **SELECT / UPDATE / DELETE** → yalnızca `authenticated` + `public.is_optityou_team_member()`.
-  (Talepleri yalnızca OPTIYOU ekibi görür/yönetir; anon okuyamaz.)
-- `service_role` (edge function'ın `email_dispatched` güncellemesi) RLS'i baypas eder.
-
-Edge function **anon key** ile çağrılır (`Supabase.instance.client.functions.invoke`);
-`RESEND_API_KEY` yalnızca function ortamında bulunur, istemciye sızmaz.
-
----
-
-## 8. Deploy edilmeden önceki davranış (çökme yok)
-
-| Durum | Kullanıcı ne görür |
-|---|---|
-| Tablo yok | Kırmızı "Talebiniz gönderilemedi. Lütfen bağlantınızı kontrol edip tekrar deneyin." uyarısı. Kayıt olmaz. |
-| Tablo var, function yok / hata | Kayıt tutulur; yeşil başarı ekranı + "Bilgilendirme e-postası şu an gönderilemedi, ancak talebiniz kaydedildi." notu. |
-| Her şey hazır | Yeşil başarı ekranı; `info@optiyou.com.tr` ve talep sahibi e-posta alır; `email_dispatched = true`. |
-
----
-
-## 9. Doğrulama listesi (deploy sonrası)
-
-- [ ] Dashboard → Table Editor'da `scan_appointment_requests` ve
-      `corporate_scan_requests` görünüyor, RLS "Enabled".
-- [ ] Dashboard → Edge Functions'ta `send-scan-appointment` "Deployed".
-- [ ] `RESEND_API_KEY` secret tanımlı.
-- [ ] Uygulamadan `/tarama-randevusu` → Bireysel form gönder → başarı ekranı.
-- [ ] `info@optiyou.com.tr` gelen kutusunda "Yeni tarama randevusu" e-postası.
-- [ ] Form'da girdiğin e-postada "Tarama randevunuz alındı" + KVKK özeti e-postası.
-- [ ] Tabloda yeni satır, `email_dispatched = true`.
-- [ ] `/tarama-randevusu` → Kurumsal form için aynısını tekrarla (`corporate_scan_requests`).
-- [ ] Anon bir istemciden `SELECT * FROM scan_appointment_requests` **boş / yetkisiz** dönüyor.
-
----
-
-## 10. Sık değiştirilen değerler
-
-| Ne | Nerede | Deploy gereği |
-|---|---|---|
-| Alıcı gelen kutusu (`info@optiyou.com.tr`) | `OPTIYOU_INBOX` — `send-scan-appointment/index.ts` | function redeploy |
-| Gönderen adresi (`no-reply@optiyou.fit`) | `FROM_ADDRESS` — aynı dosya | function redeploy + Resend'de domain doğrulama |
-| Lokasyon etiketleri | `LOCATION_LABELS` — `send-scan-appointment/index.ts` **ve** `ScanLocation` enum — [`scan_appointment_service.dart`](../lib/site/data/scan_appointment_service.dart) | function redeploy + uygulama rebuild |
-| Randevu saat aralığı (11:00–16:45, 15 dk) | `buildDailyScanSlots()` — `scan_appointment_service.dart` | uygulama rebuild |
-| İletişim numaraları / adres | [`lib/site/content/site_contact.dart`](../lib/site/content/site_contact.dart) | uygulama rebuild |
-| KVKK metni bağlantısı | `KVKK_URL` — `send-scan-appointment/index.ts` | function redeploy |
-
----
-
-## 11. Sorun giderme
-
-| Belirti | Olası neden | Çözüm |
-|---|---|---|
-| Form "gönderilemedi" (kırmızı) | Tablo yok ya da RLS INSERT politikası eksik | Migration'ı uygula; `kvkk_consent` kolonunun politikasını kontrol et |
-| Kayıt oluyor, e-posta gelmiyor | Function deploy edilmemiş / `RESEND_API_KEY` yok / Resend domaini doğrulanmamış | Function loglarına bak (Dashboard → Edge Functions → Logs); secret ve domaini teyit et |
-| Function log: `RESEND_API_KEY tanımlı değil` | Secret eksik | `supabase secrets set RESEND_API_KEY=...` |
-| Resend 403 / "domain not verified" | `optiyou.fit` Resend'de doğrulanmamış | Resend → Domains → DNS kayıtlarını ekle |
-| `location` INSERT hatası (`check constraint`) | Enum kodu ile DB kısıtı uyuşmuyor | Kod her iki tarafta da `LLT / OPTIYOU / IZTU_DML` olmalı |
-| Web'de CORS hatası | Function `_shared/cors.ts` olmadan deploy edildi | CORS başlıklarını function'a ekleyip redeploy et |
-
----
-
-## 12. Yerel geliştirme (opsiyonel)
-
-```bash
-supabase start                         # yerel Postgres + Studio
-supabase functions serve send-scan-appointment --env-file supabase/functions/.env
-# .env içine: RESEND_API_KEY=re_xxx
+```powershell
+supabase start
+supabase db reset
+supabase test db
 ```
 
-Yerelde `SupabaseConfig.url` / `anonKey` değerlerini `supabase start` çıktısındaki
-yerel değerlerle geçici olarak değiştirmen gerekir (commit etme).
+Testlerde en az şu matris doğrulanmalıdır:
+
+| Rol | INSERT | SELECT | UPDATE | DELETE |
+|---|---:|---:|---:|---:|
+| `anon` | Engelli | Engelli | Engelli | Engelli |
+| OPTIYOU ekip üyesi | İzinli | İzinli | İzinli | İzinli |
+| `service_role` / secret key | İzinli | İzinli | İzinli | İzinli |
+
+## 7. Staging uçtan uca doğrulama
+
+- [ ] `026` ve `027` migration geçmişinde uygulanmış.
+- [ ] İki tablo mevcut ve RLS açık.
+- [ ] `send-scan-appointment` deployed.
+- [ ] `RESEND_API_KEY` ve `SCAN_RATE_LIMIT_SALT` tanımlı.
+- [ ] Resend gönderen domaini doğrulanmış.
+- [ ] Bireysel form bir kayıt oluşturuyor.
+- [ ] Kurumsal form bir kayıt oluşturuyor.
+- [ ] Her form için ekip ve başvuru sahibi e-postası ulaşıyor.
+- [ ] Başarılı kayıtta `email_status = 'sent'` ve
+      `email_dispatched = true`.
+- [ ] Resend hatasında kayıt korunuyor ve `email_status = 'failed'`.
+- [ ] Aynı istek kimliğiyle tekrar gönderim ikinci satır/e-posta oluşturmuyor.
+- [ ] Aynı kaynaktan art arda aşırı gönderim HTTP 429 ile engelleniyor.
+- [ ] Anon REST istemcisi tablolara doğrudan erişemiyor.
+- [ ] Eksik veya geçersiz `apikey` ile Function çağrısı HTTP 401 dönüyor.
+- [ ] Function cevabı iç hata/secrets/kişisel veri sızdırmıyor.
+
+## 8. Üretim yayın sırası
+
+1. Üretim DB yedeğinin güncel olduğunu doğrulayın.
+2. Doğru proje ref'ine link verildiğini iki kişiyle kontrol edin.
+3. `migration list --linked` ve `db push --dry-run --linked` çıktısını saklayın.
+4. Migration'ları uygulayın.
+5. Secret'ları kontrol edin ve Function'ı deploy edin.
+6. Test adresleriyle iki formun smoke testini yapın.
+7. Function/Resend loglarını ve tablo durumlarını kontrol edin.
+8. Backend doğrulandıktan sonra web uygulamasını yayınlayın.
+
+## 9. Geri dönüş
+
+- Web: bir önceki doğrulanmış `build/web` çıktısını yeniden yayınlayın.
+- Function: bir önceki Git commit'indeki Function sürümünü yeniden deploy edin.
+- DB: hata halinde tabloları veya talepleri silmeyin. Önce public Function'ı
+  devre dışı bırakın; gerekiyorsa yeni bir ileri-düzeltme migration'ı yazın.
+- Secret sızıntısı şüphesinde ilgili secret/anahtarı döndürün ve logları
+  inceleyin.
+
+## 10. CAPTCHA notu
+
+Sunucu tarafında kaynak ve hedef e-posta bazlı hız sınırı aktiftir. Cloudflare
+Turnstile eklenmesi ikinci bir savunma katmanı sağlar; ancak yalnızca istemci
+widget'ı yeterli değildir. Site key istemcide, secret yalnızca Function
+ortamında tutulmalı ve token her istekte Function tarafından Siteverify API ile
+doğrulanmalıdır. Turnstile anahtarları oluşturulmadan yarım entegrasyon deploy
+edilmemelidir.

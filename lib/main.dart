@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:oy_site/core/app_url_strategy.dart';
 import 'package:oy_site/core/supabase_config.dart';
 import 'package:oy_site/l10n/app_locale_controller.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
@@ -25,6 +26,7 @@ class AppConfig {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  configureAppUrlStrategy();
 
   // Site hero videosu media_kit ile oynatılıyor (video_player Windows'ta
   // doku sunmuyor); yerel kütüphaneler burada hazırlanır.
