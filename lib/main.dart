@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:oy_site/core/supabase_config.dart';
 import 'package:oy_site/l10n/app_locale_controller.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
@@ -13,8 +15,9 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/dashboard/shell/dashboard_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/public/welcome_qr_screen.dart';
+import 'site/pages/site_home_page.dart';
+import 'site/site_routes.dart';
 
 class AppConfig {
   static bool useMock = true;
@@ -22,6 +25,14 @@ class AppConfig {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Site hero videosu media_kit ile oynatılıyor (video_player Windows'ta
+  // doku sunmuyor); yerel kütüphaneler burada hazırlanır.
+  MediaKit.ensureInitialized();
+
+  // Site tipografisi assets/fonts/ altında paketlenmiştir; çalışma anında
+  // Google'dan font indirilmez (yükleme gecikmesi ve dış bağımlılık olmasın).
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   await Supabase.initialize(
     url: SupabaseConfig.url,
@@ -126,7 +137,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
         animation: widget.localeController,
         builder: (context, _) => MaterialApp(
           navigatorKey: _navigatorKey,
-          onGenerateTitle: (context) => 'OY Dashboard',
+          onGenerateTitle: (context) => 'OPTIYOU',
           debugShowCheckedModeBanner: false,
           locale: widget.localeController.locale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -162,7 +173,7 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
                 )
               : legalConsentToken != null
               ? LegalConsentScreen(token: legalConsentToken)
-              : HomeScreen(pressureRepository: widget.pressureRepository),
+              : const SiteHomePage(),
           onGenerateRoute: (settings) {
             final routeName = settings.name ?? '';
 
@@ -222,7 +233,8 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
               );
             }
 
-            if (routeName.startsWith('/login')) {
+            if (routeName.startsWith('/login') ||
+                routeName.startsWith(SiteRoutes.login)) {
               return MaterialPageRoute(
                 settings: settings,
                 builder: (_) =>
@@ -245,10 +257,15 @@ class _OYDashboardAppState extends State<OYDashboardApp> {
               );
             }
 
+            // Public site route'ları (ana sayfa, menü ve yasal sayfalar).
+            // Site route'u değilse `null` döner.
+            final siteRoute = generateSiteRoute(settings);
+            if (siteRoute != null) return siteRoute;
+
+            // Tanımsız adresler public ana sayfaya döner.
             return MaterialPageRoute(
               settings: settings,
-              builder: (_) =>
-                  HomeScreen(pressureRepository: widget.pressureRepository),
+              builder: (_) => const SiteHomePage(),
             );
           },
         ),

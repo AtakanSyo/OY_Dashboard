@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.1...4.7)
-project(OY_Dashboard LANGUAGES CXX)
+project(oy_site LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "OY_Dashboard")
+set(BINARY_NAME "oy_site")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -85,6 +85,17 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# MSVC çalışma zamanı kitaplıklarını pakete dahil et.
+#
+# media_kit_video_plugin.dll, MSVCP140/VCRUNTIME140'a bağlı; bunlar temiz bir
+# Windows kurulumunda bulunmaz, "Visual C++ Redistributable" ile gelir. Yanına
+# kopyalanmazsa uygulama başka bir bilgisayarda eksik DLL hatasıyla açılmaz.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+install(FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
 
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")

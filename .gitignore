@@ -93,3 +93,21 @@ app.*.symbols
 # ------------------------
 app.*.map.json
 .vercel
+
+# ------------------------
+# Dagitim ciktilari
+# ------------------------
+# installer/build_release.ps1 buraya uretim yapar: kurulum exe'si ve acilmis
+# uygulama klasoru, toplam ~270 MB. Derlemeden yeniden uretilir, surumlenmez.
+dist/
+
+# ------------------------
+# Claude Code brief / kaynak paketleri (~74 MB)
+# ------------------------
+# Yapay zeka arac girdisi olarak saglanan tasarim brief'leri ve PNG master
+# setleri. Uygulamada kullanilan WebP turevleri assets/site/ altina kopyalandi;
+# pakete pubspec'ten referans verilmiyor, bu yuzden surumlenmiyor.
+assets/OPTIYOU_CLAUDE_SITE_PACKAGE/
+assets/OPTIYOU_HOVER_ASSETS_CLAUDE_PACKAGE/
+assets/OPTIYOU_SITE_COMPLETE_REVISION_V3/
+assets/OPTIYOU_SUREC_WEB_PAKETI/

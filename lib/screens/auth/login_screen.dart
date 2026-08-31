@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/screens/auth/forgot_password_screen.dart';
 import 'package:oy_site/screens/auth/register_screen.dart';
-import 'package:oy_site/screens/home_screen.dart';
+import 'package:oy_site/site/pages/site_home_page.dart';
 import 'package:oy_site/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:oy_site/screens/dashboard/shell/dashboard_screen.dart';
@@ -77,6 +77,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// "Giriş Yap"tan gelindiğinde her durumda public site ana sayfasına döner
+  /// ve giriş ekranını yığından temizler.
+  void _goHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/'),
+        builder: (_) => const SiteHomePage(),
+      ),
+      (route) => false,
+    );
+  }
+
   void _openForgotPasswordScreen() {
     Navigator.push(
       context,
@@ -122,6 +134,11 @@ class _LoginScreenState extends State<LoginScreen> {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: l10n.home,
+          onPressed: _isLoading ? null : _goHome,
+        ),
         actions: const [LanguageSelector(), SizedBox(width: 12)],
       ),
       body: Center(
@@ -254,17 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: _isLoading
-                    ? null
-                    : () => Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => HomeScreen(
-                            pressureRepository: widget.pressureRepository,
-                          ),
-                        ),
-                        (_) => false,
-                      ),
+                onPressed: _isLoading ? null : _goHome,
                 icon: const Icon(Icons.arrow_back, size: 18),
                 label: Text(l10n.home),
                 style: TextButton.styleFrom(foregroundColor: Colors.teal),
