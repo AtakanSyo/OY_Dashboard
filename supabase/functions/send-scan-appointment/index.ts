@@ -3,7 +3,13 @@ import {
   type SupabaseClient,
 } from "npm:@supabase/supabase-js@2.57.4";
 
-import { corsHeaders } from "../_shared/cors.ts";
+// Dashboard "Via Editor" dağıtımı tek dosya kullandığı için CORS başlıkları
+// burada tutulur. Aynı dosya CLI ile de doğrudan deploy edilebilir.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
 
 const OPTIYOU_INBOX = Deno.env.get("OPTIYOU_INBOX") ??
   "info@optiyou.com.tr";

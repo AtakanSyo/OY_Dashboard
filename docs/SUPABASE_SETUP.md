@@ -90,6 +90,27 @@ gönderilmez.
 Resend tarafında `no-reply@optiyou.fit` gönderen domaininin SPF/DKIM ile
 doğrulanmış olması gerekir.
 
+### Dashboard üzerinden Function yayını
+
+CLI kullanılmayacaksa aşağıdaki akış izlenir:
+
+1. Supabase Dashboard'da **Edge Functions → Secrets** bölümüne girin.
+2. `RESEND_API_KEY` ve en az 32 rastgele karakterden oluşan
+   `SCAN_RATE_LIMIT_SALT` değerlerini ekleyin. Secret değerlerini Git'e veya
+   destek konuşmalarına kopyalamayın.
+3. **Edge Functions → Deploy a new function → Via Editor** yolunu açın.
+4. Function adını tam olarak `send-scan-appointment` girin.
+5. `supabase/functions/send-scan-appointment/index.ts` dosyasının tamamını
+   editöre yapıştırın. Dosya Dashboard dağıtımı için kendi CORS ayarlarını
+   içerir; başka bir dosya yüklenmesi gerekmez.
+6. Function'ın **Verify JWT / Enforce JWT Verification** ayarını kapatın.
+   Kod, `apikey` başlığını hem eski anon hem yeni publishable anahtarlarına
+   karşı kendisi doğrular.
+7. **Deploy function** ile yayınlayın.
+
+Dashboard editöründe yapılan değişikliklerin sürüm geçmişi olmadığı için
+kaynak dosya olarak her zaman repodaki `index.ts` esas alınmalıdır.
+
 ## 5. Staging kurulumu
 
 Supabase CLI bu makinede kurulu değilse önce resmî yöntemlerden biriyle kurun.
