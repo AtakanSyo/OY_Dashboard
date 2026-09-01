@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(22);
 
 SELECT ok(
   NOT has_table_privilege(
@@ -83,6 +83,42 @@ SELECT ok(
     'INSERT, UPDATE'
   ),
   'service role can create and update corporate requests'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'anon',
+    'public.is_optityou_team_member()',
+    'EXECUTE'
+  ),
+  'anon cannot execute the team membership helper'
+);
+SELECT ok(
+  has_function_privilege(
+    'authenticated',
+    'public.is_optityou_team_member()',
+    'EXECUTE'
+  ),
+  'authenticated users can execute the team membership helper'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.scan_appointment_requests'::regclass
+      AND conname = 'scan_appointment_requests_privacy_notice_check'
+  ),
+  'individual requests require privacy notice acknowledgement'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.corporate_scan_requests'::regclass
+      AND conname = 'corporate_scan_requests_privacy_notice_check'
+  ),
+  'corporate requests require privacy notice acknowledgement'
 );
 
 SELECT ok(

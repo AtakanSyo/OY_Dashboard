@@ -119,6 +119,27 @@ Remote migration geçmişi repo ile uyuşmuyorsa `db push` yapmayın. Önce
 `supabase db pull` ile drift'i inceleyin veya doğru migration geçmişini ekipçe
 netleştirin. Üretimde `db reset --linked` kullanılmaz.
 
+### SQL Editor alternatifi
+
+CLI yerine Dashboard SQL Editor kullanılacaksa
+`supabase/manual/scan_appointment_sql_editor.sql` dosyasının tamamı tek seferde
+çalıştırılmalıdır. Betik hem boş ortamı kurar hem de `026` daha önce uygulanmışsa
+mevcut yapıyı güvenli biçimde yükseltir. Transaction kullandığı için herhangi
+bir kısıt veya şema uyumsuzluğunda bütün değişiklik geri alınır.
+
+Betik sonunda iki satırlık doğrulama sonucu döner. Her iki satırda da:
+
+- `rls_enabled = true`
+- tüm `anon_*` alanları `false`
+- `service_insert = true` ve `service_update = true`
+- `team_policy_count = 1`
+- `anon_policy_count = 0`
+
+olmalıdır. SQL Editor üzerinden çalıştırılan betik repo migration geçmişini
+otomatik olarak uygulanmış saymaz. Bu nedenle sonuç doğrulandıktan sonra
+`supabase migration list` incelenmeli; geçmiş uzlaştırılmadan `db push`
+çalıştırılmamalıdır.
+
 ## 6. Yerel DB ve RLS testleri
 
 Docker uyumlu çalışma zamanı ve Supabase CLI ile:

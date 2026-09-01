@@ -1,6 +1,30 @@
 -- Public tarama formlarını doğrudan tablo erişiminden sunucu kontrollü
 -- Edge Function akışına taşır.
 
+-- SECURITY DEFINER fonksiyonu güvenli search_path ve en dar EXECUTE
+-- ayrıcalıklarıyla yeniden tanımlar. Fonksiyon diğer OPTIYOU ekip
+-- politikaları tarafından da kullanılmaya devam eder.
+CREATE OR REPLACE FUNCTION public.is_optityou_team_member()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_profiles AS up
+    JOIN public.roles AS r ON r.id = up.role_id
+    WHERE up.auth_id = auth.uid()
+      AND up.is_active = TRUE
+      AND r.role_code = 'OPTIYOU_TEAM'
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_optityou_team_member() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_optityou_team_member()
+  TO authenticated, service_role;
+
 ALTER TABLE public.scan_appointment_requests
   RENAME COLUMN kvkk_consent TO privacy_notice_acknowledged;
 ALTER TABLE public.corporate_scan_requests
@@ -28,6 +52,14 @@ UPDATE public.corporate_scan_requests
 SET client_request_id = gen_random_uuid()
 WHERE client_request_id IS NULL;
 
+UPDATE public.scan_appointment_requests
+SET email_status = 'sent'
+WHERE email_dispatched = TRUE AND email_status = 'pending';
+
+UPDATE public.corporate_scan_requests
+SET email_status = 'sent'
+WHERE email_dispatched = TRUE AND email_status = 'pending';
+
 ALTER TABLE public.scan_appointment_requests
   ALTER COLUMN client_request_id SET NOT NULL,
   ADD CONSTRAINT scan_appointment_requests_client_request_id_key
@@ -47,7 +79,9 @@ ALTER TABLE public.scan_appointment_requests
       appointment_time ~ '^(11|12|13|14|15|16):(00|15|30|45)$'
     ),
   ADD CONSTRAINT scan_appointment_requests_note_length_check
-    CHECK (note IS NULL OR length(note) <= 1000);
+    CHECK (note IS NULL OR length(note) <= 1000),
+  ADD CONSTRAINT scan_appointment_requests_privacy_notice_check
+    CHECK (privacy_notice_acknowledged = TRUE);
 
 ALTER TABLE public.corporate_scan_requests
   ALTER COLUMN client_request_id SET NOT NULL,
@@ -68,7 +102,9 @@ ALTER TABLE public.corporate_scan_requests
   ADD CONSTRAINT corporate_scan_requests_person_count_check_v2
     CHECK (person_count BETWEEN 1 AND 100000),
   ADD CONSTRAINT corporate_scan_requests_note_length_check
-    CHECK (note IS NULL OR length(note) <= 1000);
+    CHECK (note IS NULL OR length(note) <= 1000),
+  ADD CONSTRAINT corporate_scan_requests_privacy_notice_check
+    CHECK (privacy_notice_acknowledged = TRUE);
 
 CREATE INDEX scan_appointment_requests_source_created_idx
   ON public.scan_appointment_requests (request_source_hash, created_at DESC);
