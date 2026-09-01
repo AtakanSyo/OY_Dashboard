@@ -56,13 +56,14 @@ anahtarlar desteklenir.
 `supabase/.temp` klasörünü takip etmez; her geliştirici doğru projeye kendi
 makinesinde açıkça link vermelidir.
 
-Uygulama varsayılan olarak üretim URL ve public anon anahtarını kullanır.
+Uygulama varsayılan olarak üretim URL ve `sb_publishable_...` public anahtarını
+kullanır.
 Staging/yerel derleme için kaynak kodu değiştirmeden:
 
 ```powershell
 flutter run -d chrome `
   --dart-define=SUPABASE_URL=https://STAGING_REF.supabase.co `
-  --dart-define=SUPABASE_ANON_KEY=STAGING_PUBLIC_KEY
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=STAGING_PUBLIC_KEY
 ```
 
 Secret/service anahtarları hiçbir zaman `--dart-define`, istemci kodu veya
@@ -100,9 +101,10 @@ CLI kullanılmayacaksa aşağıdaki akış izlenir:
    destek konuşmalarına kopyalamayın.
 3. **Edge Functions → Deploy a new function → Via Editor** yolunu açın.
 4. Function adını tam olarak `send-scan-appointment` girin.
-5. `supabase/functions/send-scan-appointment/index.ts` dosyasının tamamını
-   editöre yapıştırın. Dosya Dashboard dağıtımı için kendi CORS ayarlarını
-   içerir; başka bir dosya yüklenmesi gerekmez.
+5. Editördeki örnek `Hello` kodunun tamamını silin ve
+   `supabase/functions/send-scan-appointment/index.ts` dosyasının tamamını
+   yapıştırın. Dosya Dashboard dağıtımı için kendi CORS ayarlarını içerir;
+   başka bir dosya yüklenmesi gerekmez.
 6. Function'ın **Verify JWT / Enforce JWT Verification** ayarını kapatın.
    Kod, `apikey` başlığını hem eski anon hem yeni publishable anahtarlarına
    karşı kendisi doğrular.

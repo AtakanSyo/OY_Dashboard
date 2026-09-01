@@ -4,13 +4,14 @@ class SupabaseConfig {
     defaultValue: 'https://iytzfqfhlqcboohtpugh.supabase.co',
   );
 
-  // Public anon key — safe to embed in client apps.
-  // Never embed the service_role key here.
-  static const String anonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
-        '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5dHpmcWZobHFjYm9vaHRwdWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTgxNjMsImV4cCI6MjA5MDk3NDE2M30'
-        '.6W1mY4Q2XnIvMkkX-y19tZOxId15GOzTn9GyLvjZ6UU',
+  // Public publishable key — safe to embed in client apps.
+  // Never embed an sb_secret_... or service_role key here.
+  static const String publishableKey = String.fromEnvironment(
+    'SUPABASE_PUBLISHABLE_KEY',
+    defaultValue: String.fromEnvironment(
+      // Geçiş sürecindeki eski build komutları için geriye uyumluluk.
+      'SUPABASE_ANON_KEY',
+      defaultValue: 'sb_publishable_lsEJ2rlxDeiWK4hr46mmng_hlnynFG2',
+    ),
   );
 }
