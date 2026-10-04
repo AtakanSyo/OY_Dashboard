@@ -84,10 +84,6 @@ flutter:
     - assets/images/analysis/
     - assets/images/systems/
     - assets/images/orthotic_design/
-    - assets/images/dml/
-    - assets/images/dml/catalog/
-    - assets/images/dml/methods/
-    - assets/images/dml/services/
     # Public site sayfa paketi (CLAUDE_CODE_IMPLEMENTATION.md).
     # Hero / lifestyle görsellerinden yalnızca WebP türevleri bundle'a girer;
     # PNG master'lar aynı klasörde durur ama pakete alınmaz (web build ağırlığı).
@@ -116,3 +112,4 @@ flutter:
     - assets/products.csv
     - assets/images/
     - assets/heatmaps/
+

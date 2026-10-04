@@ -1,0 +1,27 @@
+{
+  "targetProcessNames": [
+    "eSole",
+    "ESole",
+    "eFoot",
+    "eFoot-touch",
+    "FootScan",
+    "Scanner"
+  ],
+  "watchPaths": [
+    "D:\\eFoot V3.2.112",
+    "C:\\ProgramData",
+    "C:\\Users\\Public\\Documents",
+    "%USERPROFILE%\\Documents",
+    "%USERPROFILE%\\Desktop",
+    "%LOCALAPPDATA%",
+    "%APPDATA%"
+  ],
+  "outputDirectory": "logs",
+  "snapshotIntervalSeconds": 5,
+  "includeProcessSnapshots": true,
+  "includeNetworkSnapshots": true,
+  "includeDeviceSnapshots": true,
+  "includeServiceSnapshots": true,
+  "includePipeSnapshots": true,
+  "includeTargetModules": true
+}

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:oy_site/dml/app/dml_shell.dart';
 import 'package:oy_site/l10n/app_localizations.dart';
 import 'package:oy_site/screens/auth/login_screen.dart';
 import 'package:oy_site/screens/auth/register_screen.dart';
@@ -45,13 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _goToDml() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const DmlShell()),
-    );
-  }
-
   void _scrollTo(GlobalKey key) {
     final ctx = key.currentContext;
     if (ctx != null) {
@@ -75,7 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _Navbar(
             onLogin: _goToLogin,
             onRegister: _goToRegister,
-            onDml: _goToDml,
             onScrollToServices: () => _scrollTo(_servicesKey),
             onScrollToProducts: () => _scrollTo(_productsKey),
             onScrollToCenters: () => _scrollTo(_centersKey),
@@ -131,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
 class _Navbar extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onRegister;
-  final VoidCallback onDml;
   final VoidCallback onScrollToServices;
   final VoidCallback onScrollToProducts;
   final VoidCallback onScrollToCenters;
@@ -141,7 +131,6 @@ class _Navbar extends StatelessWidget {
   const _Navbar({
     required this.onLogin,
     required this.onRegister,
-    required this.onDml,
     required this.onScrollToServices,
     required this.onScrollToProducts,
     required this.onScrollToCenters,
@@ -192,23 +181,6 @@ class _Navbar extends StatelessWidget {
             _NavLink(label: l10n.products, onTap: onScrollToProducts),
             _NavLink(label: l10n.measurementCenters, onTap: onScrollToCenters),
             _NavLink(label: l10n.aboutUs, onTap: onScrollToAbout),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: onDml,
-              icon: const Icon(Icons.view_in_ar_outlined, size: 18),
-              label: Text(l10n.digitalManufacturingLab),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF182629),
-                side: const BorderSide(color: Color(0xFF182629)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
             const SizedBox(width: 16),
             OutlinedButton(
               onPressed: onLogin,
@@ -269,9 +241,6 @@ class _Navbar extends StatelessWidget {
                   case 'about':
                     onScrollToAbout();
                     break;
-                  case 'dml':
-                    onDml();
-                    break;
                   case 'login':
                     onLogin();
                     break;
@@ -330,20 +299,6 @@ class _Navbar extends StatelessWidget {
                       Icon(Icons.info_outline, size: 18, color: Colors.teal),
                       SizedBox(width: 10),
                       Text('Hakkımızda'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'dml',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.view_in_ar_outlined,
-                        size: 18,
-                        color: Color(0xFF182629),
-                      ),
-                      SizedBox(width: 10),
-                      Text('DML Platformu'),
                     ],
                   ),
                 ),

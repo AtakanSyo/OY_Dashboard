@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Ölçüm Geçmişi'**
   String get measurementHistory;
 
+  /// No description provided for @devices.
+  ///
+  /// In tr, this message translates to:
+  /// **'Cihazlar'**
+  String get devices;
+
   /// No description provided for @orders.
   ///
   /// In tr, this message translates to:

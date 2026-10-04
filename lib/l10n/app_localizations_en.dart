@@ -54,6 +54,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get measurementHistory => 'Measurement History';
 
   @override
+  String get devices => 'Devices';
+
+  @override
   String get orders => 'Orders';
 
   @override

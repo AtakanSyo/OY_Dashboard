@@ -108,6 +108,9 @@ app.*.map.json
 # installer/build_release.ps1 buraya uretim yapar: kurulum exe'si ve acilmis
 # uygulama klasoru, toplam ~270 MB. Derlemeden yeniden uretilir, surumlenmez.
 dist/
+OY_Scanner/dist/
+OY_Scanner/src/**/bin/
+OY_Scanner/src/**/obj/
 
 # ------------------------
 # Claude Code brief / kaynak paketleri (~74 MB)

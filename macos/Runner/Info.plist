@@ -24,6 +24,10 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Basınç sensörü iç tabanına bağlanmak için Bluetooth erişimi gerekir.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Basınç sensörü iç tabanıyla Bluetooth üzerinden iletişim kurmak için erişim gerekir.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

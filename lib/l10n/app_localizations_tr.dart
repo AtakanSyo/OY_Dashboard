@@ -54,6 +54,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get measurementHistory => 'Ölçüm Geçmişi';
 
   @override
+  String get devices => 'Cihazlar';
+
+  @override
   String get orders => 'Siparişler';
 
   @override
