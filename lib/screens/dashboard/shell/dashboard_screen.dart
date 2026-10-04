@@ -4,13 +4,16 @@ import 'package:oy_site/screens/dashboard/analysis/customer_analysis_results_scr
 import 'package:oy_site/screens/dashboard/patients/patient_list_screen.dart';
 import 'package:oy_site/screens/dashboard/sessions/session_list_screen.dart';
 import 'package:oy_site/screens/dashboard/operations/optiyou_operations_board_screen.dart';
+import 'package:oy_site/screens/dashboard/operations/corporate_scan_projects_screen.dart';
 import 'package:oy_site/screens/dashboard/operations/sales_statistics_screen.dart';
 import 'package:oy_site/screens/dashboard/customer/customer_home_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate/corporate_dashboard_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate/corporate_department_analysis_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate/corporate_trends_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate/corporate_employees_screen.dart';
+import 'package:oy_site/screens/dashboard/corporate/corporate_kiosk_screen.dart';
 import 'package:oy_site/screens/dashboard/corporate/corporate_reports_screen.dart';
+import 'package:oy_site/screens/dashboard/devices/devices_screen.dart';
 import 'package:oy_site/screens/dashboard/expert/expert_control_panel_screen.dart';
 import 'package:oy_site/screens/dashboard/operations/optiyou_measurement_pool_screen.dart';
 import 'package:oy_site/screens/dashboard/orders/orders_screen.dart';
@@ -68,6 +71,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             currentUser: widget.currentUser,
             pressureRepository: widget.pressureRepository,
           ),
+          DevicesScreen(
+            currentUser: widget.currentUser,
+            pressureRepository: widget.pressureRepository,
+          ),
           OrdersScreen(currentUser: widget.currentUser),
           SupportScreen(currentUser: widget.currentUser),
           ExpertProfileScreen(currentUser: widget.currentUser),
@@ -92,6 +99,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           CorporateDepartmentAnalysisScreen(currentUser: widget.currentUser),
           CorporateTrendsScreen(currentUser: widget.currentUser),
           CorporateEmployeesScreen(currentUser: widget.currentUser),
+          CorporateKioskScreen(
+            currentUser: widget.currentUser,
+            onExit: _exitKiosk,
+          ),
           CorporateReportsScreen(currentUser: widget.currentUser),
           CorporateProfileScreen(currentUser: widget.currentUser),
         ];
@@ -99,6 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case RoleCodes.optiYouTeam:
         return [
           const SalesStatisticsScreen(),
+          const CorporateScanProjectsScreen(),
           OptiyouMeasurementPoolScreen(
             currentUser: widget.currentUser,
             pressureRepository: widget.pressureRepository,
@@ -139,6 +151,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _exitKiosk() {
+    setState(() {
+      _navigationHistory.clear();
+      _selectedIndex = 0;
+    });
+  }
+
+  bool _isKioskFullscreen(List<Widget> pages) {
+    if (widget.currentUser.roleCode != RoleCodes.corporate) return false;
+    if (_selectedIndex < 0 || _selectedIndex >= pages.length) return false;
+    return pages[_selectedIndex] is CorporateKioskScreen;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = _pages;
@@ -147,32 +172,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _selectedIndex = 0;
     }
 
+    final kioskFullscreen = _isKioskFullscreen(pages);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _goBack();
+        if (!didPop) {
+          if (kioskFullscreen) {
+            _exitKiosk();
+          } else {
+            _goBack();
+          }
+        }
       },
       child: Scaffold(
-        body: Row(
-          children: [
-            Sidebar(
-              onItemSelected: _onItemSelected,
-              selectedIndex: _selectedIndex,
-              currentUser: widget.currentUser,
-            ),
-            Expanded(
-              child: Column(
+        body: kioskFullscreen
+            ? pages[_selectedIndex]
+            : Row(
                 children: [
-                  Topbar(
+                  Sidebar(
+                    onItemSelected: _onItemSelected,
+                    selectedIndex: _selectedIndex,
                     currentUser: widget.currentUser,
-                    onProfileTap: () => _onItemSelected(pages.length - 1),
                   ),
-                  Expanded(child: pages[_selectedIndex]),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Topbar(
+                          currentUser: widget.currentUser,
+                          onProfileTap: () => _onItemSelected(pages.length - 1),
+                        ),
+                        Expanded(child: pages[_selectedIndex]),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -26,6 +27,7 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  RegisterKioskWindowChannel();
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -40,6 +42,8 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  ExitKioskFullscreen();
+
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -68,4 +72,98 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::RegisterKioskWindowChannel() {
+  kiosk_window_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "oy_site/kiosk_window",
+          &flutter::StandardMethodCodec::GetInstance());
+
+  kiosk_window_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() == "enterFullscreen") {
+          EnterKioskFullscreen();
+          result->Success();
+          return;
+        }
+
+        if (call.method_name() == "exitFullscreen") {
+          ExitKioskFullscreen();
+          result->Success();
+          return;
+        }
+
+        result->NotImplemented();
+      });
+}
+
+void FlutterWindow::EnterKioskFullscreen() {
+  if (kiosk_fullscreen_) {
+    return;
+  }
+
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) {
+    return;
+  }
+
+  previous_window_placement_.length = sizeof(WINDOWPLACEMENT);
+  if (!GetWindowPlacement(hwnd, &previous_window_placement_)) {
+    return;
+  }
+
+  previous_window_style_ = GetWindowLongPtr(hwnd, GWL_STYLE);
+  previous_extended_window_style_ = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO monitor_info = {};
+  monitor_info.cbSize = sizeof(MONITORINFO);
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
+    return;
+  }
+
+  LONG_PTR fullscreen_style =
+      (previous_window_style_ &
+       ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZEBOX |
+         WS_SYSMENU)) |
+      WS_POPUP;
+  LONG_PTR fullscreen_extended_style =
+      previous_extended_window_style_ &
+      ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE |
+        WS_EX_STATICEDGE);
+
+  SetWindowLongPtr(hwnd, GWL_STYLE, fullscreen_style);
+  SetWindowLongPtr(hwnd, GWL_EXSTYLE, fullscreen_extended_style);
+
+  const RECT monitor_rect = monitor_info.rcMonitor;
+  SetWindowPos(hwnd, HWND_TOPMOST, monitor_rect.left, monitor_rect.top,
+               monitor_rect.right - monitor_rect.left,
+               monitor_rect.bottom - monitor_rect.top,
+               SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+
+  kiosk_fullscreen_ = true;
+}
+
+void FlutterWindow::ExitKioskFullscreen() {
+  if (!kiosk_fullscreen_) {
+    return;
+  }
+
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) {
+    kiosk_fullscreen_ = false;
+    return;
+  }
+
+  SetWindowLongPtr(hwnd, GWL_STYLE, previous_window_style_);
+  SetWindowLongPtr(hwnd, GWL_EXSTYLE, previous_extended_window_style_);
+  SetWindowPlacement(hwnd, &previous_window_placement_);
+  SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOOWNERZORDER |
+                   SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+
+  kiosk_fullscreen_ = false;
 }

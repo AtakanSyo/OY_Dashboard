@@ -69,6 +69,7 @@ class Sidebar extends StatelessWidget {
           _SidebarMenuItem(Icons.dashboard_outlined, l10n.dashboard),
           _SidebarMenuItem(Icons.groups, l10n.customers),
           _SidebarMenuItem(Icons.fact_check, l10n.measurementHistory),
+          _SidebarMenuItem(Icons.sensors_outlined, l10n.devices),
           _SidebarMenuItem(Icons.shopping_bag, l10n.orders),
           _SidebarMenuItem(Icons.help_outline, l10n.support),
           _SidebarMenuItem(Icons.person, l10n.profile),
@@ -90,6 +91,10 @@ class Sidebar extends StatelessWidget {
           _SidebarMenuItem(Icons.apartment_outlined, l10n.departmentAnalysis),
           _SidebarMenuItem(Icons.show_chart, l10n.trends),
           _SidebarMenuItem(Icons.groups_outlined, l10n.employees),
+          const _SidebarMenuItem(
+            Icons.document_scanner_outlined,
+            'Tarama Kiosku',
+          ),
           _SidebarMenuItem(Icons.description_outlined, l10n.reports),
           _SidebarMenuItem(Icons.person, l10n.profile),
         ];
@@ -97,6 +102,7 @@ class Sidebar extends StatelessWidget {
       case RoleCodes.optiYouTeam:
         return [
           _SidebarMenuItem(Icons.show_chart, l10n.salesStatistics),
+          const _SidebarMenuItem(Icons.business_outlined, 'Kurumsal Taramalar'),
           _SidebarMenuItem(Icons.hub_outlined, l10n.measurementPool),
           _SidebarMenuItem(Icons.inventory_2_outlined, l10n.operations),
           _SidebarMenuItem(Icons.shopping_bag, l10n.orders),
@@ -116,7 +122,7 @@ class Sidebar extends StatelessWidget {
   Widget _buildMenuItem(IconData icon, String title, int index) {
     final bool isActive = selectedIndex == index;
 
-    return Container(
+    return Material(
       color: isActive
           ? Colors.teal.withValues(alpha: 0.15)
           : Colors.transparent,

@@ -16,6 +16,8 @@ dependencies:
     sdk: flutter
   
   flutter_libserialport: ^0.6.0 # Windows için destek
+  universal_ble: 2.2.0
+  ffi: ^2.1.4
 
   cupertino_icons: ^1.0.8
   #firebase_core: ^4.2.1
@@ -105,6 +107,7 @@ flutter:
     # Ana sayfa V3 revizyonu — yalnızca WebP web sürümleri bundle'a girer.
     - assets/site/v3/generated/
     - assets/site/v3/source/
+    - assets/templates/
     - assets/mock_data/
     - assets/scans/
     - assets/Results1.csv

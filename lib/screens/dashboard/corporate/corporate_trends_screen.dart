@@ -1,68 +1,83 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_corporate_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/corporate_dashboard_model.dart';
 
 class CorporateTrendsScreen extends StatefulWidget {
   final AppUser currentUser;
 
-  const CorporateTrendsScreen({
-    super.key,
-    required this.currentUser,
-  });
+  const CorporateTrendsScreen({super.key, required this.currentUser});
 
   @override
   State<CorporateTrendsScreen> createState() => _CorporateTrendsScreenState();
 }
 
 class _CorporateTrendsScreenState extends State<CorporateTrendsScreen> {
-  final MockCorporateRepository _repository = MockCorporateRepository();
-
-  bool _isLoading = true;
-  Map<String, List<CorporateTrendPoint>> _data = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final data = await _repository.getTrendData();
-    if (!mounted) return;
-
-    setState(() {
-      _data = data;
-      _isLoading = false;
-    });
-  }
+  final Map<String, List<CorporateTrendPoint>> _data = const {};
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Wrap(
-          spacing: 16,
-          runSpacing: 16,
+        child: _data.isEmpty
+            ? const _EmptyCorporateState(
+                icon: Icons.show_chart_outlined,
+                title: 'Trend verisi yok',
+                message:
+                    'Gerçek tarama analizleri biriktikçe dönemsel trendler burada gösterilecek.',
+              )
+            : Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  _TrendCard(
+                    title: 'Ortalama Risk Skoru',
+                    points: _data['risk'] ?? const [],
+                  ),
+                  _TrendCard(
+                    title: 'Pronasyon Eğilimi',
+                    points: _data['pronation'] ?? const [],
+                  ),
+                  _TrendCard(
+                    title: 'Basınç Yüklenme Endeksi',
+                    points: _data['pressure'] ?? const [],
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _EmptyCorporateState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _EmptyCorporateState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 80),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _TrendCard(
-              title: 'Ortalama Risk Skoru',
-              points: _data['risk'] ?? const [],
-            ),
-            _TrendCard(
-              title: 'Pronasyon Eğilimi',
-              points: _data['pronation'] ?? const [],
-            ),
-            _TrendCard(
-              title: 'Basınç Yüklenme Endeksi',
-              points: _data['pressure'] ?? const [],
+            Icon(icon, size: 42, color: Colors.grey[500]),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[700]),
             ),
           ],
         ),
@@ -75,10 +90,7 @@ class _TrendCard extends StatelessWidget {
   final String title;
   final List<CorporateTrendPoint> points;
 
-  const _TrendCard({
-    required this.title,
-    required this.points,
-  });
+  const _TrendCard({required this.title, required this.points});
 
   @override
   Widget build(BuildContext context) {
@@ -92,19 +104,14 @@ class _TrendCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6),
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -113,10 +120,7 @@ class _TrendCard extends StatelessWidget {
               LineChartData(
                 minY: 0,
                 borderData: FlBorderData(show: false),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                ),
+                gridData: FlGridData(show: true, drawVerticalLine: false),
                 titlesData: FlTitlesData(
                   topTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),

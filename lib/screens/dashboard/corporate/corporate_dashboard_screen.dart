@@ -1,16 +1,12 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:oy_site/data/mock/mock_corporate_repository.dart';
 import 'package:oy_site/models/app_user.dart';
 import 'package:oy_site/models/corporate_dashboard_model.dart';
+import 'package:oy_site/services/corporate/corporate_employee_source_service.dart';
 
 class CorporateDashboardScreen extends StatefulWidget {
   final AppUser currentUser;
 
-  const CorporateDashboardScreen({
-    super.key,
-    required this.currentUser,
-  });
+  const CorporateDashboardScreen({super.key, required this.currentUser});
 
   @override
   State<CorporateDashboardScreen> createState() =>
@@ -18,11 +14,12 @@ class CorporateDashboardScreen extends StatefulWidget {
 }
 
 class _CorporateDashboardScreenState extends State<CorporateDashboardScreen> {
-  final MockCorporateRepository _repository = MockCorporateRepository();
+  final CorporateEmployeeSourceService _employeeSource =
+      const CorporateEmployeeSourceService();
 
   bool _isLoading = true;
   String? _errorMessage;
-  CorporateDashboardModel? _dashboard;
+  List<CorporateEmployeeItem> _employees = [];
 
   @override
   void initState() {
@@ -37,19 +34,20 @@ class _CorporateDashboardScreenState extends State<CorporateDashboardScreen> {
     });
 
     try {
-      final data = await _repository.getDashboardData();
-
+      final employees = await _employeeSource.getEmployees(
+        currentUser: widget.currentUser,
+      );
       if (!mounted) return;
 
       setState(() {
-        _dashboard = data;
+        _employees = employees;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Kurumsal dashboard yüklenemedi: $e';
+        _errorMessage = 'Kurumsal tarama durumu yüklenemedi.';
         _isLoading = false;
       });
     }
@@ -63,379 +61,365 @@ class _CorporateDashboardScreenState extends State<CorporateDashboardScreen> {
 
     if (_errorMessage != null) {
       return Center(
-        child: Text(
-          _errorMessage!,
-          style: const TextStyle(color: Colors.red),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _errorMessage!,
+              style: const TextStyle(color: Color(0xFFB3261E)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _loadDashboard,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tekrar Dene'),
+            ),
+          ],
         ),
       );
     }
 
-    final dashboard = _dashboard;
-    if (dashboard == null) {
-      return const Center(
-        child: Text('Gösterilecek veri bulunamadı.'),
-      );
-    }
+    final summary = CorporateScanSummary.fromEmployees(_employees);
+    final waitingEmployees = _employees
+        .where((employee) => employee.scanStatus == CorporateScanStatus.waiting)
+        .take(5)
+        .toList();
+    final attentionEmployees = _employees
+        .where(
+          (employee) =>
+              employee.scanStatus == CorporateScanStatus.failed ||
+              employee.scanStatus == CorporateScanStatus.needsRepeat,
+        )
+        .take(5)
+        .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: _loadDashboard,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
           children: [
-            _buildHeader(),
-            const SizedBox(height: 18),
-            _buildKpiGrid(dashboard),
-            const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildSectionCard(
-                    title: 'Risk Dağılımı',
-                    child: _buildRiskChart(dashboard),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildSectionCard(
-                    title: 'En Yaygın Problemler',
-                    child: _buildTopIssues(dashboard),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _buildSectionCard(
-              title: 'Kritik Uyarılar',
-              child: _buildAlerts(dashboard),
-            ),
-            const SizedBox(height: 18),
-            _buildSectionCard(
-              title: 'Departman İçgörüleri',
-              child: _buildDepartmentInsights(dashboard),
+            _Hero(summary: summary),
+            const SizedBox(height: 14),
+            _SummaryGrid(summary: summary),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 980;
+                final waiting = _EmployeePreviewCard(
+                  title: 'Sıradaki Çalışanlar',
+                  emptyText: 'Bekleyen çalışan yok.',
+                  employees: waitingEmployees,
+                );
+                final attention = _EmployeePreviewCard(
+                  title: 'Kontrol Gerekenler',
+                  emptyText: 'Kontrol bekleyen kayıt yok.',
+                  employees: attentionEmployees,
+                );
+
+                if (!isWide) {
+                  return Column(
+                    children: [waiting, const SizedBox(height: 14), attention],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: waiting),
+                    const SizedBox(width: 14),
+                    Expanded(child: attention),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00695C),
-            Color(0xFF00897B),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
+class _Hero extends StatelessWidget {
+  final CorporateScanSummary summary;
+
+  const _Hero({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (summary.completionRatio * 100).round();
+
+    return _Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Kurumsal Ayak Sağlığı Dashboard',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Çalışan gruplarının ayak sağlığı eğilimlerini, risk dağılımlarını ve operasyonel içgörüleri tek ekranda takip edin.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiGrid(CorporateDashboardModel dashboard) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: dashboard.kpis.map((item) {
-        return Container(
-          width: 240,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(color: Colors.black12, blurRadius: 6),
-            ],
-          ),
-          child: Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.title,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontSize: 13,
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7F7F4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.document_scanner_outlined,
+                  color: Color(0xFF087F73),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                item.value,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.subtitle,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildRiskChart(CorporateDashboardModel dashboard) {
-    final total = dashboard.riskDistribution.fold<int>(
-      0,
-      (sum, item) => sum + item.count,
-    );
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 220,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 42,
-              sections: [
-                PieChartSectionData(
-                  value: dashboard.riskDistribution[0].count.toDouble(),
-                  title: '%${((dashboard.riskDistribution[0].count / total) * 100).round()}',
-                  radius: 52,
-                ),
-                PieChartSectionData(
-                  value: dashboard.riskDistribution[1].count.toDouble(),
-                  title: '%${((dashboard.riskDistribution[1].count / total) * 100).round()}',
-                  radius: 52,
-                ),
-                PieChartSectionData(
-                  value: dashboard.riskDistribution[2].count.toDouble(),
-                  title: '%${((dashboard.riskDistribution[2].count / total) * 100).round()}',
-                  radius: 52,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...dashboard.riskDistribution.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.circle, size: 12),
-                const SizedBox(width: 8),
-                Expanded(child: Text(item.label)),
-                Text(
-                  item.count.toString(),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTopIssues(CorporateDashboardModel dashboard) {
-    return Column(
-      children: dashboard.topIssues.map((issue) {
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                issue.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                issue.percentage,
-                style: const TextStyle(
-                  color: Colors.teal,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                issue.description,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildAlerts(CorporateDashboardModel dashboard) {
-    return Column(
-      children: dashboard.alerts.map((alert) {
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange.withOpacity(0.2)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      alert.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+                    const Text(
+                      'Kurumsal Tarama Durumu',
+                      style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Text(
-                      alert.description,
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        height: 1.45,
-                      ),
+                      '${summary.completed} çalışan tamamlandı, ${summary.remaining} çalışan bekliyor.',
+                      style: TextStyle(color: Colors.grey[700]),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildDepartmentInsights(CorporateDashboardModel dashboard) {
-    return Column(
-      children: dashboard.departmentInsights.map((item) {
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.departmentName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  item.keyFinding,
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
-              ),
-              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: item.riskLevel == 'Yüksek'
-                      ? Colors.red.withOpacity(0.08)
-                      : item.riskLevel == 'Orta'
-                          ? Colors.orange.withOpacity(0.08)
-                          : Colors.green.withOpacity(0.08),
+                  color: const Color(0xFF087F73).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  item.riskLevel,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  '%$percent',
+                  style: const TextStyle(
+                    color: Color(0xFF087F73),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
           ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildSectionCard({
-    required String title,
-    required Widget child,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: summary.completionRatio,
+              minHeight: 10,
+              color: const Color(0xFF087F73),
+              backgroundColor: const Color(0xFFE5E7EB),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _SummaryGrid extends StatelessWidget {
+  final CorporateScanSummary summary;
+
+  const _SummaryGrid({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _SummaryCard('Toplam', summary.total, Icons.groups_outlined),
+      _SummaryCard('Tamamlandı', summary.completed, Icons.check_circle_outline),
+      _SummaryCard('Bekliyor', summary.waiting, Icons.schedule_outlined),
+      _SummaryCard(
+        'Kontrol',
+        summary.failed + summary.needsRepeat,
+        Icons.error_outline,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth >= 900
+            ? (constraints.maxWidth - 30) / 4
+            : (constraints.maxWidth - 10) / 2;
+
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: items
+              .map((item) => SizedBox(width: width, child: item))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+
+  const _SummaryCard(this.label, this.value, this.icon);
+
+  @override
+  Widget build(BuildContext context) {
+    return _Surface(
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF087F73)),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: Colors.grey[700])),
+              const SizedBox(height: 4),
+              Text(
+                value.toString(),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmployeePreviewCard extends StatelessWidget {
+  final String title;
+  final String emptyText;
+  final List<CorporateEmployeeItem> employees;
+
+  const _EmployeePreviewCard({
+    required this.title,
+    required this.emptyText,
+    required this.employees,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 14),
-          child,
+          const SizedBox(height: 10),
+          if (employees.isEmpty)
+            Text(emptyText, style: TextStyle(color: Colors.grey[700]))
+          else
+            ...employees.map(
+              (employee) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            employee.fullName,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${employee.employeeCode} • ${employee.departmentName}',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _StatusPill(status: employee.scanStatus),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final CorporateScanStatus status;
+
+  const _StatusPill({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _statusLabel(status),
+        style: TextStyle(color: color, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+class _Surface extends StatelessWidget {
+  final Widget child;
+
+  const _Surface({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
+String _statusLabel(CorporateScanStatus status) {
+  switch (status) {
+    case CorporateScanStatus.waiting:
+      return 'Bekliyor';
+    case CorporateScanStatus.scanning:
+      return 'Taranıyor';
+    case CorporateScanStatus.completed:
+      return 'Tamamlandı';
+    case CorporateScanStatus.failed:
+      return 'Hata';
+    case CorporateScanStatus.needsRepeat:
+      return 'Tekrar Gerekli';
+  }
+}
+
+Color _statusColor(CorporateScanStatus status) {
+  switch (status) {
+    case CorporateScanStatus.completed:
+      return const Color(0xFF087F73);
+    case CorporateScanStatus.failed:
+      return const Color(0xFFB3261E);
+    case CorporateScanStatus.needsRepeat:
+      return const Color(0xFFC2410C);
+    case CorporateScanStatus.scanning:
+      return const Color(0xFF2563EB);
+    case CorporateScanStatus.waiting:
+      return const Color(0xFF6B7280);
   }
 }
